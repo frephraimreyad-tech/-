@@ -141,7 +141,7 @@ export const Top10Scoreboard: React.FC = () => {
 
     if (newLeaderFound) {
       setNewLeaderNotice(newLeaderFound);
-      confettiRef.current?.celebrate();
+      confettiRef.current?.celebrateWinner();
       setTimeout(() => setNewLeaderNotice(null), 6000);
     }
 

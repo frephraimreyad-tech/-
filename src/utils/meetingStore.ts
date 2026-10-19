@@ -436,59 +436,24 @@ class MeetingStore {
 
   constructor() {
     this.data = this.loadFromStorage();
+    
+    // Cross-tab synchronization
+    if (typeof window !== "undefined") {
+      window.addEventListener("storage", (e) => {
+        if (e.key === STORAGE_KEY && e.newValue) {
+          try {
+            this.data = JSON.parse(e.newValue);
+            this.notify();
+          } catch (err) {
+            console.error("Error syncing across tabs:", err);
+          }
+        }
+      });
+    }
   }
 
   private loadFromStorage(): MeetingData {
-    if (typeof window === "undefined") {
-      return {
-        config: DEFAULT_CONFIG,
-        teams: DEFAULT_TEAMS,
-        members: DEFAULT_MEMBERS,
-        transactions: DEFAULT_TRANSACTIONS,
-        activityReasons: DEFAULT_ACTIVITY_REASONS,
-        events: DEFAULT_EVENTS,
-        attendance: [],
-        auditLogs: DEFAULT_AUDIT_LOGS,
-      };
-    }
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed?.teams && Array.isArray(parsed.teams)) {
-          // Ensure all members have accessCode and permissions
-          const membersWithCodes = (parsed.members || DEFAULT_MEMBERS).map((m: any, idx: number) => {
-            const defaults = getRoleDefaultPermissions(m.role || "member");
-            return {
-              ...m,
-              accessCode: m.accessCode || `${(idx + 1) * 100}`,
-              permissions: {
-                ...defaults,
-                ...(m.permissions || {}),
-              },
-            };
-          });
-
-          return {
-            config: { ...DEFAULT_CONFIG, ...(parsed.config || {}) },
-            teams: parsed.teams,
-            members: membersWithCodes,
-            transactions: parsed.transactions || DEFAULT_TRANSACTIONS,
-            activityReasons:
-              parsed.activityReasons && Array.isArray(parsed.activityReasons) && parsed.activityReasons.length > 0
-                ? parsed.activityReasons
-                : DEFAULT_ACTIVITY_REASONS,
-            events: parsed.events && Array.isArray(parsed.events) ? parsed.events : DEFAULT_EVENTS,
-            attendance: parsed.attendance && Array.isArray(parsed.attendance) ? parsed.attendance : [],
-            auditLogs: parsed.auditLogs && Array.isArray(parsed.auditLogs) ? parsed.auditLogs : DEFAULT_AUDIT_LOGS,
-          };
-        }
-      }
-    } catch (e) {
-      console.error("Error loading meeting store from storage:", e);
-    }
-
-    return {
+    const fallback: MeetingData = {
       config: DEFAULT_CONFIG,
       teams: DEFAULT_TEAMS,
       members: DEFAULT_MEMBERS,
@@ -497,12 +462,64 @@ class MeetingStore {
       events: DEFAULT_EVENTS,
       attendance: [],
       auditLogs: DEFAULT_AUDIT_LOGS,
+      lastSaved: new Date().toISOString(),
     };
+
+    if (typeof window === "undefined") return fallback;
+
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (!stored) return fallback;
+
+      const parsed = JSON.parse(stored);
+      if (!parsed || typeof parsed !== "object") return fallback;
+
+      // Robust merge with defaults
+      const config = { ...DEFAULT_CONFIG, ...(parsed.config || {}) };
+      const teams = Array.isArray(parsed.teams) ? parsed.teams : DEFAULT_TEAMS;
+      
+      const rawMembers = Array.isArray(parsed.members) ? parsed.members : DEFAULT_MEMBERS;
+      const members = rawMembers.map((m: any, idx: number) => {
+        const defaults = getRoleDefaultPermissions(m.role || "member");
+        return {
+          ...m,
+          accessCode: m.accessCode || `${(idx + 1) * 100}`,
+          permissions: {
+            ...defaults,
+            ...(m.permissions || {}),
+          },
+        };
+      });
+
+      const transactions = Array.isArray(parsed.transactions) ? parsed.transactions : DEFAULT_TRANSACTIONS;
+      const activityReasons = (Array.isArray(parsed.activityReasons) && parsed.activityReasons.length > 0)
+        ? parsed.activityReasons
+        : DEFAULT_ACTIVITY_REASONS;
+      const events = Array.isArray(parsed.events) ? parsed.events : DEFAULT_EVENTS;
+      const attendance = Array.isArray(parsed.attendance) ? parsed.attendance : [];
+      const auditLogs = Array.isArray(parsed.auditLogs) ? parsed.auditLogs : DEFAULT_AUDIT_LOGS;
+
+      return {
+        config,
+        teams,
+        members,
+        transactions,
+        activityReasons,
+        events,
+        attendance,
+        auditLogs,
+        lastSaved: parsed.lastSaved || new Date().toISOString(),
+      };
+    } catch (e) {
+      console.error("Error loading meeting store from storage:", e);
+      return fallback;
+    }
   }
 
   private saveToStorage(): void {
     if (typeof window === "undefined") return;
     try {
+      this.data.lastSaved = new Date().toISOString();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
     } catch (e) {
       console.error("Error saving meeting store to storage:", e);

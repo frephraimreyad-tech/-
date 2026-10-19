@@ -126,6 +126,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard }) =>
     }
   }, []);
 
+  // Sync local form states if store changes externally
+  useEffect(() => {
+    setMeetingConfig(data.config);
+  }, [data.config]);
+
   const showFeedback = (text: string, type: "success" | "error" = "success") => {
     setFeedbackMsg({ text, type });
     setTimeout(() => setFeedbackMsg(null), 3500);
@@ -2860,6 +2865,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard }) =>
                 <Settings className="h-5 w-5 text-emerald-400" />
                 <span>إعدادات وهوية الاجتماع</span>
               </h2>
+              
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] sm:text-xs font-bold w-fit">
+                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>ميزة الحفظ التلقائي مفعلة (Auto-save)</span>
+                {data.lastSaved && (
+                  <span className="opacity-70 border-r border-emerald-500/30 pr-2 mr-2">
+                    آخر حفظ: {new Date(data.lastSaved).toLocaleTimeString("ar-EG")}
+                  </span>
+                )}
+              </div>
 
               <form onSubmit={handleSaveConfig} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

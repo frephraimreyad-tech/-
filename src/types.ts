@@ -131,6 +131,7 @@ export interface MeetingData {
   events: EventSession[];
   attendance: AttendanceRecord[];
   auditLogs: AuditLogEntry[];
+  lastSaved?: string;
 }
 
 export interface ProcessedMeetingTeam extends CustomTeam {
