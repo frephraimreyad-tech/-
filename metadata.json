@@ -1,0 +1,8 @@
+{
+  "name": "لوحة شرف الفرق العشرة | 2026 University Youth Meeting Scoreboard",
+  "description": "شاشة الترتيب الكبرى للفرق المتنافسة في اجتماع الشباب 2026 ",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
