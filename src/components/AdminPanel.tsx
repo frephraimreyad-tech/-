@@ -31,6 +31,7 @@ import {
   Camera,
   Check,
   X,
+  CreditCard,
 } from "lucide-react";
 import type {
   ActivityReason,
@@ -51,6 +52,7 @@ import { authStore, type SystemUser, getRoleDefaultPermissions } from "../utils/
 import { QRCodeModal } from "./QRCodeModal";
 import { QRScannerModal } from "./QRScannerModal";
 import { UserSwitcherModal } from "./UserSwitcherModal";
+import { MemberCard } from "./MemberCard";
 
 interface AdminPanelProps {
   onBackToScoreboard: () => void;
@@ -97,6 +99,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
   const [showUserSwitcher, setShowUserSwitcher] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [activeQRModalEvent, setActiveQRModalEvent] = useState<EventSession | null>(null);
+  const [previewingCardMember, setPreviewingCardMember] = useState<CustomMember | null>(null);
 
   // Store data
   const [data, setData] = useState(meetingStore.getData());
@@ -1909,6 +1912,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                             >
                               <KeyRound className="h-3.5 w-3.5" />
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                sounds.playOpen();
+                                setPreviewingCardMember(m);
+                              }}
+                              className="p-1.5 rounded-lg bg-slate-800/90 hover:bg-sky-500 hover:text-slate-950 text-sky-400 border border-sky-500/30 transition-all cursor-pointer shadow-xs active:scale-90"
+                              title="معاينة وطباعة الكارنيه"
+                            >
+                              <CreditCard className="h-3.5 w-3.5" />
+                            </button>
                             {currentUser.permissions.canEditMembers && (
                               <button
                                 type="button"
@@ -3330,6 +3344,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
             </form>
           </div>
         </div>
+      )}
+      {/* Member Identity Card Preview Modal */}
+      {previewingCardMember && (
+        <MemberCard
+          member={previewingCardMember}
+          team={data.teams.find((t) => t.id === previewingCardMember.teamId)}
+          onClose={() => setPreviewingCardMember(null)}
+        />
       )}
     </div>
   );

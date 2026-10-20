@@ -949,176 +949,232 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
               </p>
             </div>
 
-            <form onSubmit={handleQuickPointsSubmit} className="space-y-6">
-              {/* Select Target Team */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-300 block">
-                  1. اختر الفريق المستهدف بالرصد:
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
-                  {data.teams.map((t) => {
-                    const isSelected = pointTargetTeamId === t.id;
-                    return (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* LEFT: Points Form */}
+              <div className="lg:col-span-2 space-y-6">
+                <form onSubmit={handleQuickPointsSubmit} className="space-y-6">
+                  {/* Select Target Team */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-300 block">
+                      1. اختر الفريق المستهدف بالرصد:
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                      {data.teams.map((t) => {
+                        const isSelected = pointTargetTeamId === t.id;
+                        return (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => {
+                              sounds.playTap();
+                              setPointTargetTeamId(t.id);
+                            }}
+                            className={`p-3 rounded-2xl border text-right transition-all cursor-pointer flex items-center gap-2.5 ${
+                              isSelected
+                                ? "bg-amber-500/20 border-amber-400 text-white font-black shadow-md shadow-amber-500/10 scale-102"
+                                : "bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800"
+                            }`}
+                          >
+                            <span className="text-2xl">{t.icon}</span>
+                            <div className="min-w-0 flex-1">
+                              <span className="text-xs font-bold block truncate">{t.name}</span>
+                              <span className="text-[10px] text-amber-400 font-mono block">
+                                {t.points.toLocaleString()} XP
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Operation: Add or Deduct */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-300 block">
+                      2. نوع العملية (إضافة نقاط تفوق أو خصم):
+                    </label>
+                    <div className="flex items-center gap-3">
                       <button
-                        key={t.id}
                         type="button"
                         onClick={() => {
                           sounds.playTap();
-                          setPointTargetTeamId(t.id);
+                          setPointOperation("add");
                         }}
-                        className={`p-3 rounded-2xl border text-right transition-all cursor-pointer flex items-center gap-2.5 ${
-                          isSelected
-                            ? "bg-amber-500/20 border-amber-400 text-white font-black shadow-md shadow-amber-500/10 scale-102"
-                            : "bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800"
+                        className={`flex-1 py-3 px-4 rounded-2xl font-black text-xs sm:text-sm border transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                          pointOperation === "add"
+                            ? "bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-md"
+                            : "bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800"
                         }`}
                       >
-                        <span className="text-2xl">{t.icon}</span>
-                        <div className="min-w-0 flex-1">
-                          <span className="text-xs font-bold block truncate">{t.name}</span>
-                          <span className="text-[10px] text-amber-400 font-mono block">
-                            {t.points.toLocaleString()} XP
-                          </span>
-                        </div>
+                        <Plus className="h-4 w-4 text-emerald-400" />
+                        <span>إضافة نقاط (+ XP) ⚡</span>
                       </button>
-                    );
-                  })}
-                </div>
-              </div>
 
-              {/* Operation: Add or Deduct */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-300 block">
-                  2. نوع العملية (إضافة نقاط تفوق أو خصم):
-                </label>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      sounds.playTap();
-                      setPointOperation("add");
-                    }}
-                    className={`flex-1 py-3 px-4 rounded-2xl font-black text-xs sm:text-sm border transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                      pointOperation === "add"
-                        ? "bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-md"
-                        : "bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800"
-                    }`}
-                  >
-                    <Plus className="h-4 w-4 text-emerald-400" />
-                    <span>إضافة نقاط (+ XP) ⚡</span>
-                  </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          sounds.playTap();
+                          setPointOperation("deduct");
+                        }}
+                        className={`flex-1 py-3 px-4 rounded-2xl font-black text-xs sm:text-sm border transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                          pointOperation === "deduct"
+                            ? "bg-rose-500/20 border-rose-500 text-rose-300 shadow-md"
+                            : "bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800"
+                        }`}
+                      >
+                        <span className="text-base font-mono">-</span>
+                        <span>خصم نقاط (- XP) ⚠️</span>
+                      </button>
+                    </div>
+                  </div>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      sounds.playTap();
-                      setPointOperation("deduct");
-                    }}
-                    className={`flex-1 py-3 px-4 rounded-2xl font-black text-xs sm:text-sm border transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                      pointOperation === "deduct"
-                        ? "bg-rose-500/20 border-rose-500 text-rose-300 shadow-md"
-                        : "bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800"
-                    }`}
-                  >
-                    <span className="text-base font-mono">-</span>
-                    <span>خصم نقاط (- XP) ⚠️</span>
-                  </button>
-                </div>
-              </div>
+                  {/* Amount of Points */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-300 block">
+                      3. مقدار النقاط:
+                    </label>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {[10, 25, 50, 100, 150, 200, 500].map((val) => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => {
+                            sounds.playTap();
+                            setPointDelta(val);
+                            setCustomPointAmount("");
+                          }}
+                          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-mono font-black border transition-all cursor-pointer ${
+                            pointDelta === val && !customPointAmount
+                              ? "bg-amber-500 text-slate-950 border-amber-400 shadow-sm"
+                              : "bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800"
+                          }`}
+                        >
+                          {pointOperation === "deduct" ? `-${val}` : `+${val}`} XP
+                        </button>
+                      ))}
 
-              {/* Amount of Points Presets & Custom */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-300 block">
-                  3. مقدار النقاط:
-                </label>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {[10, 25, 50, 100, 150, 200, 500].map((val) => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => {
-                        sounds.playTap();
-                        setPointDelta(val);
-                        setCustomPointAmount("");
-                      }}
-                      className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-mono font-black border transition-all cursor-pointer ${
-                        pointDelta === val && !customPointAmount
-                          ? "bg-amber-500 text-slate-950 border-amber-400 shadow-sm"
-                          : "bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800"
-                      }`}
-                    >
-                      {pointOperation === "deduct" ? `-${val}` : `+${val}`} XP
-                    </button>
-                  ))}
+                      <div className="flex items-center gap-1.5 mr-auto">
+                        <span className="text-xs text-slate-400">أو قيمة مخصصة:</span>
+                        <input
+                          type="number"
+                          value={customPointAmount}
+                          onChange={(e) => setCustomPointAmount(e.target.value)}
+                          placeholder="XP مخصص"
+                          className="w-28 h-9 px-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-                  <div className="flex items-center gap-1.5 mr-auto">
-                    <span className="text-xs text-slate-400">أو قيمة مخصصة:</span>
+                  {/* Reason Selection */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-300 block">
+                      4. سبب الرصد / نوع النشاط المعتمد:
+                    </label>
+                    {meetingStore.getActivityReasons().length > 0 && (
+                      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+                        {meetingStore.getActivityReasons().map((r) => (
+                          <button
+                            key={r.id}
+                            type="button"
+                            onClick={() => {
+                              sounds.playTap();
+                              setPointReason(r.text);
+                              setPointDelta(r.points);
+                              setPointCategory(r.category);
+                              setCustomPointAmount("");
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                              pointReason === r.text
+                                ? "bg-amber-500 text-slate-950 border-amber-400 font-black shadow-sm"
+                                : "bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800"
+                            }`}
+                          >
+                            <span>{r.icon}</span>
+                            <span>{r.text}</span>
+                            <span className="font-mono text-[11px] opacity-80">({r.points} XP)</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     <input
-                      type="number"
-                      value={customPointAmount}
-                      onChange={(e) => setCustomPointAmount(e.target.value)}
-                      placeholder="XP مخصص"
-                      className="w-28 h-9 px-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400"
+                      type="text"
+                      value={pointReason}
+                      onChange={(e) => setPointReason(e.target.value)}
+                      placeholder="أو اكتب سبب الرصد أو تفاصيل النشاط هنا..."
+                      className="w-full h-11 px-4 rounded-2xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
                     />
                   </div>
-                </div>
+
+                  {/* Submit Button */}
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-sm sm:text-base shadow-xl shadow-amber-500/20 active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <Zap className="h-5 w-5" />
+                      <span>
+                        اعتماد وتحديث النقاط فوراً (
+                        {pointOperation === "deduct" ? "-" : "+"}
+                        {customPointAmount || pointDelta} XP)
+                      </span>
+                    </button>
+                  </div>
+                </form>
               </div>
 
-              {/* Reason Selection / Approved Activities */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-300 block">
-                  4. سبب الرصد / نوع النشاط المعتمد:
-                </label>
-                {activityReasons.length > 0 && (
-                  <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-                    {activityReasons.map((r) => (
-                      <button
-                        key={r.id}
-                        type="button"
-                        onClick={() => {
-                          sounds.playTap();
-                          setPointReason(r.text);
-                          setPointDelta(r.points);
-                          setPointCategory(r.category);
-                          setCustomPointAmount("");
-                        }}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                          pointReason === r.text
-                            ? "bg-amber-500 text-slate-950 border-amber-400 font-black shadow-sm"
-                            : "bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800"
-                        }`}
-                      >
-                        <span>{r.icon}</span>
-                        <span>{r.text}</span>
-                        <span className="font-mono text-[11px] opacity-80">({r.points} XP)</span>
-                      </button>
+              {/* RIGHT: Live Feed & Mini Board */}
+              <div className="space-y-6">
+                {/* Mini Leaderboard */}
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 space-y-3">
+                  <h3 className="text-xs font-black text-white flex items-center gap-1.5 uppercase tracking-wider">
+                    <Trophy className="h-3.5 w-3.5 text-amber-400" />
+                    <span>ترتيب الفرق المباشر</span>
+                  </h3>
+                  <div className="space-y-2">
+                    {meetingStore.getProcessedTeams().slice(0, 5).map((t, idx) => (
+                      <div key={t.id} className="flex items-center justify-between p-2 rounded-xl bg-slate-950/50 border border-slate-800/50">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="text-[10px] font-mono font-black text-slate-500 w-4">#{idx + 1}</span>
+                          <span className="text-base">{t.icon}</span>
+                          <span className="text-[11px] font-bold text-white truncate">{t.name}</span>
+                        </div>
+                        <span className="text-[11px] font-mono font-black text-amber-400">{t.points.toLocaleString()}</span>
+                      </div>
                     ))}
                   </div>
-                )}
+                </div>
 
-                <input
-                  type="text"
-                  value={pointReason}
-                  onChange={(e) => setPointReason(e.target.value)}
-                  placeholder="أو اكتب سبب الرصد أو تفاصيل النشاط هنا..."
-                  className="w-full h-11 px-4 rounded-2xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
-                />
+                {/* Live Transactions Feed */}
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 space-y-3">
+                  <h3 className="text-xs font-black text-white flex items-center gap-1.5 uppercase tracking-wider">
+                    <Clock className="h-3.5 w-3.5 text-emerald-400" />
+                    <span>آخر التحديثات المسجلة</span>
+                  </h3>
+                  <div className="space-y-2.5">
+                    {data.transactions.slice(0, 5).map((tx) => (
+                      <div key={tx.id} className="text-[10px] space-y-1 p-2 rounded-xl border border-slate-800 bg-slate-950/30 animate-in fade-in slide-in-from-right-2 duration-300">
+                        <div className="flex justify-between items-center">
+                          <span className="font-black text-white">{tx.targetName}</span>
+                          <span className={`font-mono font-black ${tx.points > 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                            {tx.points > 0 ? "+" : ""}{tx.points} XP
+                          </span>
+                        </div>
+                        <div className="text-slate-400 truncate">{tx.reason}</div>
+                        <div className="text-[8px] text-slate-600 flex justify-between items-center">
+                           <span>بواسطة: {tx.executorName?.split(" ")[0]}</span>
+                           <span>{new Date(tx.timestamp).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {data.transactions.length === 0 && (
+                      <p className="text-center py-4 text-slate-600 text-[10px]">لا توجد عمليات مؤخراً</p>
+                    )}
+                  </div>
+                </div>
               </div>
-
-              {/* Submit Button */}
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-sm sm:text-base shadow-xl shadow-amber-500/20 active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <Zap className="h-5 w-5" />
-                  <span>
-                    اعتماد وتحديث النقاط فوراً (
-                    {pointOperation === "deduct" ? "-" : "+"}
-                    {customPointAmount || pointDelta} XP)
-                  </span>
-                </button>
-              </div>
-            </form>
+            </div>
           </div>
         )}
 
