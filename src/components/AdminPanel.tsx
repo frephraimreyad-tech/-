@@ -97,7 +97,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
   // Auth User
   const [currentUser, setCurrentUser] = useState<SystemUser>(authStore.getCurrentUser());
   const [showUserSwitcher, setShowUserSwitcher] = useState(false);
-  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState<boolean | string>(false);
   const [activeQRModalEvent, setActiveQRModalEvent] = useState<EventSession | null>(null);
   const [previewingCardMember, setPreviewingCardMember] = useState<CustomMember | null>(null);
 
@@ -160,6 +160,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
   const [newEventDesc, setNewEventDesc] = useState("");
   const [newEventPoints, setNewEventPoints] = useState(30);
   const [newEventBonus, setNewEventBonus] = useState(15);
+  const [newEventStartTime, setNewEventStartTime] = useState("18:30");
   const [newEventCode, setNewEventCode] = useState("");
 
   // --- Permissions Management State ---
@@ -635,6 +636,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
         title: newEventTitle,
         description: newEventDesc,
         attendancePoints: newEventPoints,
+        startTime: newEventStartTime,
         punctualityBonusPoints: newEventBonus,
         qrCode: newEventCode || undefined,
       },
@@ -647,6 +649,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
       setNewEventDesc("");
       setNewEventPoints(30);
       setNewEventBonus(15);
+      setNewEventStartTime("18:30");
       setNewEventCode("");
     } else {
       sounds.playClose();
@@ -2019,6 +2022,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                         min={0}
                       />
                     </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-300 block">وقت البدء (للـ Bonus التلقائي):</label>
+                      <input
+                        type="time"
+                        value={newEventStartTime}
+                        onChange={(e) => setNewEventStartTime(e.target.value)}
+                        className="w-full h-10 px-3 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-teal-400"
+                        required
+                      />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -2094,8 +2108,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                               +{evt.attendancePoints} XP حضور
                             </span>
                             {evt.punctualityBonusPoints > 0 && (
-                              <span className="px-2 py-1 rounded-lg bg-slate-950 border border-slate-800 text-amber-400 font-mono font-bold">
-                                +{evt.punctualityBonusPoints} XP بونص التزام
+                              <span className="px-2 py-1 rounded-lg bg-slate-950 border border-slate-800 text-amber-400 font-mono font-bold flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {evt.startTime || "غير محدد"}
+                                <span className="mx-1">|</span>
+                                +{evt.punctualityBonusPoints} XP بونص
                               </span>
                             )}
                             <span className="px-2 py-1 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 font-mono text-[11px]">
@@ -2125,7 +2142,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                             type="button"
                             onClick={() => {
                               sounds.playTap();
-                              setShowQRScanner(true);
+                              setShowQRScanner(evt.id);
                             }}
                             className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 active:scale-95"
                             title="مسح الحضور لهذه الفعالية"
@@ -3142,7 +3159,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
 
       {/* QR Attendance Camera Scanner Modal */}
       {showQRScanner && (
-        <QRScannerModal onClose={() => setShowQRScanner(false)} />
+        <QRScannerModal 
+          onClose={() => setShowQRScanner(false)} 
+          defaultEventId={typeof showQRScanner === "string" ? showQRScanner : undefined}
+        />
       )}
 
       {/* User Switcher / Passcode Login Modal */}

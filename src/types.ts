@@ -70,6 +70,7 @@ export interface EventSession {
   description?: string;
   qrCode: string; // كود مميز مشفر في QR
   attendancePoints: number; // نقاط الحضور التلقائية
+  startTime?: string; // وقت بدء الفعالية (مثال: "18:30")
   punctualityBonusPoints: number; // نقاط الالتزام في الموعد
   isActive: boolean;
   createdAt: string;

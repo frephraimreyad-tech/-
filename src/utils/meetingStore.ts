@@ -72,6 +72,7 @@ export const DEFAULT_EVENTS: EventSession[] = [
     description: "حضور اللقاء العام والتسبيح ودراسة الكلمة المقدسة والأنشطة المشتركة",
     qrCode: "EVT-FRIDAY-JOHN-2026",
     attendancePoints: 30,
+    startTime: "18:00",
     punctualityBonusPoints: 15,
     isActive: true,
     createdAt: new Date(Date.now() - 86400000).toISOString(),
@@ -84,6 +85,7 @@ export const DEFAULT_EVENTS: EventSession[] = [
     description: "حضور وتنافس الفرق في الألعاب والتحديات الفورية",
     qrCode: "EVT-CHALLENGE-2026",
     attendancePoints: 25,
+    startTime: "19:30",
     punctualityBonusPoints: 10,
     isActive: true,
     createdAt: new Date(Date.now() - 43200000).toISOString(),
@@ -920,6 +922,7 @@ class MeetingStore {
       title: string;
       description?: string;
       attendancePoints?: number;
+      startTime?: string;
       punctualityBonusPoints?: number;
       qrCode?: string;
     },
@@ -952,6 +955,7 @@ class MeetingStore {
       description: eventData.description?.trim() || "",
       qrCode,
       attendancePoints: eventData.attendancePoints ?? 30,
+      startTime: eventData.startTime,
       punctualityBonusPoints: eventData.punctualityBonusPoints ?? 15,
       isActive: true,
       createdAt: new Date().toISOString(),
@@ -1046,8 +1050,10 @@ class MeetingStore {
       return { success: false, error: "هذه الفعالية غير نشطة حالياً ولا تقبل تسجيل الحضور" };
     }
 
-    // 3. Find Member
-    const member = this.data.members.find((m) => m.id === memberId);
+    // 3. Find Member (by ID or Access Code)
+    const member = this.data.members.find(
+      (m) => m.id === memberId || m.accessCode === memberId
+    );
     if (!member) {
       return { success: false, error: "العضو المحدد غير موجود في قاعدة البيانات" };
     }
@@ -1069,10 +1075,35 @@ class MeetingStore {
       };
     }
 
-    // 5. Automatic Points Calculation
+    // 5. Automatic Points Calculation with Time-Based Punctuality
     let pointsAwarded = event.attendancePoints;
-    if (isPunctual && event.punctualityBonusPoints > 0) {
+    let punctualityStatus = "";
+    let effectivePunctual = !!isPunctual;
+
+    if (event.startTime && event.punctualityBonusPoints > 0) {
+      const now = new Date();
+      const [startHour, startMin] = event.startTime.split(":").map(Number);
+      const eventStartTime = new Date(now);
+      eventStartTime.setHours(startHour, startMin, 0, 0);
+
+      const diffMs = now.getTime() - eventStartTime.getTime();
+      const diffMins = diffMs / (1000 * 60);
+
+      if (diffMins <= 15) {
+        // Full bonus if within first 15 mins (or before start)
+        pointsAwarded += event.punctualityBonusPoints;
+        punctualityStatus = " (بونص كامل - حضور مبكر)";
+        effectivePunctual = true;
+      } else {
+        // Half bonus after 15 mins
+        const halfBonus = Math.floor(event.punctualityBonusPoints / 2);
+        pointsAwarded += halfBonus;
+        punctualityStatus = ` (نصف بونص - تأخير ${Math.floor(diffMins)} دقيقة)`;
+        effectivePunctual = halfBonus > 0;
+      }
+    } else if (isPunctual && event.punctualityBonusPoints > 0) {
       pointsAwarded += event.punctualityBonusPoints;
+      punctualityStatus = " (بونص الالتزام المبكر)";
     }
 
     // Update member points
@@ -1083,9 +1114,7 @@ class MeetingStore {
     }
 
     // 6. Record Score Transaction
-    const reasonText = `تسجيل حضور تلقائي بالـ QR في [${event.title}]${
-      isPunctual ? " (مع بونص الالتزام المبكر)" : ""
-    }`;
+    const reasonText = `تسجيل حضور تلقائي بالـ QR في [${event.title}]${punctualityStatus}`;
 
     const tx: ScoreTransaction = {
       id: "tx-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
@@ -1117,7 +1146,7 @@ class MeetingStore {
       scannedByUserId: executor.id,
       scannedByUserName: executor.name,
       pointsAwarded,
-      isPunctual: !!isPunctual,
+      isPunctual: effectivePunctual,
     };
     this.data.attendance.unshift(attendanceRecord);
 

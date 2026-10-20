@@ -19,15 +19,16 @@ import { authStore, type SystemUser } from "../utils/authStore";
 import { sounds } from "../utils/soundEffects";
 
 interface QRScannerModalProps {
-  onClose: () => void;
   defaultTeamId?: string;
   defaultMemberId?: string;
+  defaultEventId?: string;
 }
 
 export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   onClose,
   defaultTeamId,
   defaultMemberId,
+  defaultEventId,
 }) => {
   const [currentUser, setCurrentUser] = useState<SystemUser>(authStore.getCurrentUser());
   const data = meetingStore.getData();
@@ -35,6 +36,9 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   const [scanMode, setScanMode] = useState<"camera" | "code_select">("camera");
   const [selectedMemberId, setSelectedMemberId] = useState<string>(
     defaultMemberId || ""
+  );
+  const [selectedEventId, setSelectedEventId] = useState<string>(
+    defaultEventId || ""
   );
   const [manualCode, setManualCode] = useState<string>("");
   const [isPunctual, setIsPunctual] = useState<boolean>(true);
@@ -133,19 +137,49 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   }, [scanMode]);
 
   const handleProcessQRCode = async (codeOrId: string) => {
-    if (!selectedMemberId) {
+    let processedCode = codeOrId.trim();
+    
+    // If the scanned code is a URL (from our member cards), extract the 'code' parameter
+    if (processedCode.includes("?code=") || processedCode.includes("&code=")) {
+      try {
+        const url = new URL(processedCode);
+        const codeParam = url.searchParams.get("code");
+        if (codeParam) {
+          processedCode = codeParam;
+        }
+      } catch (e) {
+        // Not a valid URL, use as is
+      }
+    }
+
+    // Determine target event and member
+    let targetEventId = selectedEventId;
+    let targetMemberId = selectedMemberId;
+
+    // Logic: 
+    // 1. If we have an event selected but NO member selected -> The scanned code MUST be a member
+    // 2. If we have a member selected but NO event selected -> The scanned code MUST be an event
+    // 3. If we have both selected (manual mode) -> The scanned code is ignored or used as event code fallback
+    
+    if (targetEventId && !targetMemberId) {
+      targetMemberId = processedCode; // Scanned a member card
+    } else if (!targetEventId && targetMemberId) {
+      targetEventId = processedCode; // Scanned an event QR
+    } else if (!targetEventId && !targetMemberId) {
+      // Nothing selected, let's try to figure it out
+      // Usually, we want the admin to at least pick the event first
       sounds.playClose();
       setScanResult({
         type: "error",
-        title: "برجاء اختيار العضو",
-        message: "حدد العضو المراد تسجيل حضوره أولاً قبل مسح الرمز.",
+        title: "تحديد غير مكتمل",
+        message: "برجاء اختيار الفعالية أولاً من القائمة، ثم ابدأ في مسح كارنيهات الأعضاء.",
       });
       return;
     }
 
     const res = await meetingStore.recordQRAttendance({
-      eventIdOrCode: codeOrId.trim(),
-      memberId: selectedMemberId,
+      eventIdOrCode: targetEventId,
+      memberId: targetMemberId,
       isPunctual,
       executor: currentUser,
     });
@@ -154,16 +188,22 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       sounds.playVictory();
       setScanResult({
         type: "success",
-        title: "تم تسجيل الحضور واحتساب النقاط تلقائياً! 🎉",
-        message: `تم تسجيل حضور العضو (${res.member?.name}) في [${res.event?.title}]. تم إضافة +${res.pointsAwarded} XP لرصيده ورصيد فريقه بنجاح!`,
+        title: "تم تسجيل الحضور بنجاح! 🎉",
+        message: `العضو: ${res.member?.name} | الفعالية: ${res.event?.title}. تم إضافة +${res.pointsAwarded} XP لرصيده.`,
         points: res.pointsAwarded,
       });
+      
+      // If we are in "Scan multiple members for one event" mode, 
+      // clear the scan result after a delay so we can scan the next person
+      if (defaultEventId) {
+        setTimeout(() => setScanResult(null), 3000);
+      }
     } else {
       sounds.playClose();
       setScanResult({
         type: "error",
-        title: "تعذر تسجيل الحضور",
-        message: res.error || "تأكد من صلاحية كود الفعالية أو عدم تكرار التسجيل.",
+        title: "فشل في التسجيل",
+        message: res.error || "تأكد من صحة الكود أو عدم تكرار التسجيل.",
       });
     }
   };
@@ -210,46 +250,59 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
           </p>
         </div>
 
-        {/* Member Selector */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3.5 space-y-2">
-          <label className="text-xs font-black text-slate-300 flex items-center justify-between">
-            <span className="flex items-center gap-1.5">
+        {/* Selector Section */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3.5 space-y-4">
+          {/* Event Selector (Primary if scanning members) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-black text-slate-300 flex items-center gap-1.5">
+              <QrCode className="h-3.5 w-3.5 text-teal-400" />
+              <span>الفعالية الحالية:</span>
+            </label>
+            <select
+              value={selectedEventId}
+              onChange={(e) => {
+                setSelectedEventId(e.target.value);
+                setScanResult(null);
+              }}
+              className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-xs sm:text-sm font-bold text-white focus:outline-none focus:border-teal-400"
+            >
+              <option value="">-- اختر الفعالية أولاً --</option>
+              {data.events.map((evt) => (
+                <option key={evt.id} value={evt.id}>
+                  {evt.title} ({evt.isActive ? "نشطة" : "مغلقة"})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Member Selector (Optional if scanning cards) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-black text-slate-300 flex items-center gap-1.5">
               <Users className="h-3.5 w-3.5 text-sky-400" />
-              <span>اختر العضو المراد تسجيل حضوره:</span>
-            </span>
-            <span className="text-[11px] text-amber-400 font-mono font-normal">
-              ({availableMembers.length} متاح)
-            </span>
-          </label>
+              <span>المشارك المستهدف (اختياري عند مسح الكارنيهات):</span>
+            </label>
+            <select
+              value={selectedMemberId}
+              onChange={(e) => {
+                setSelectedMemberId(e.target.value);
+                setScanResult(null);
+              }}
+              className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-xs sm:text-sm font-bold text-white focus:outline-none focus:border-sky-400"
+            >
+              <option value="">-- أو اختر المشارك يدويًا هنا --</option>
+              {availableMembers.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name} ({m.points} XP)
+                </option>
+              ))}
+            </select>
+          </div>
 
-          <select
-            value={selectedMemberId}
-            onChange={(e) => {
-              setSelectedMemberId(e.target.value);
-              setScanResult(null);
-            }}
-            className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-xs sm:text-sm font-bold text-white focus:outline-none focus:border-amber-400"
-          >
-            {availableMembers.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name} — رصيده: {m.points} XP {m.role === "leader" ? "👑 (قائد)" : ""}
-              </option>
-            ))}
-          </select>
-
-          {/* Punctuality Checkbox */}
-          <label className="flex items-center gap-2 pt-1 text-xs text-slate-300 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={isPunctual}
-              onChange={(e) => setIsPunctual(e.target.checked)}
-              className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 bg-slate-950 border-slate-700"
-            />
-            <span className="font-bold text-emerald-300 flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5" />
-              <span>حضور مبكر والتزام في الموعد (احتساب بونص إضافي تلقائياً)</span>
-            </span>
-          </label>
+          {/* Punctuality Info */}
+          <div className="flex items-center gap-2 pt-1 text-[11px] text-emerald-400 font-bold bg-emerald-500/5 p-2 rounded-lg border border-emerald-500/10">
+            <Clock className="h-3.5 w-3.5" />
+            <span>الاحتساب التلقائي للبونص مفعل بناءً على وقت الفعالية المجدول.</span>
+          </div>
         </div>
 
         {/* Mode Switcher Tabs */}
