@@ -24,6 +24,7 @@ import {
   TrendingUp,
   TrendingDown,
   Edit2,
+  X,
 } from "lucide-react";
 import type { CustomMember, ProcessedMeetingTeam } from "../types";
 import { meetingStore } from "../utils/meetingStore";
@@ -36,6 +37,7 @@ import { AdminDashboard } from "./AdminDashboard";
 import { QRScannerModal } from "./QRScannerModal";
 import { UserSwitcherModal } from "./UserSwitcherModal";
 import { MemberCard } from "./MemberCard";
+import { DailyChallengeBanner } from "./DailyChallengeBanner";
 export const Top10Scoreboard: React.FC = () => {
   const [data, setData] = useState(meetingStore.getData());
   const [isLoading, setIsLoading] = useState(meetingStore.getIsLoading());
@@ -44,13 +46,51 @@ export const Top10Scoreboard: React.FC = () => {
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortOrder, setSortOrder] = useState<"points-desc" | "points-asc">("points-desc");
   const [viewMode, setViewMode] = useState<"scoreboard" | "admin">("scoreboard");
   const [adminInitialTab, setAdminInitialTab] = useState<any>(undefined);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showUserSwitcher, setShowUserSwitcher] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<
+    Array<{
+      id: string;
+      type: "leader_change" | "rank_up" | "rank_down" | "info" | "success" | "warning";
+      title: string;
+      message: string;
+      teamIcon?: string;
+      timestamp: number;
+    }>
+  >([]);
 
   const confettiRef = useRef<ConfettiCanvasRef | null>(null);
+
+  const addToast = (toast: {
+    type: "leader_change" | "rank_up" | "rank_down" | "info" | "success" | "warning";
+    title: string;
+    message: string;
+    teamIcon?: string;
+  }) => {
+    const newToast = {
+      ...toast,
+      id: `toast-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      timestamp: Date.now(),
+    };
+    setToasts((prev) => [newToast, ...prev].slice(0, 5));
+  };
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // Auto-dismiss oldest toast after 5s
+  useEffect(() => {
+    if (toasts.length === 0) return;
+    const timer = setTimeout(() => {
+      setToasts((prev) => prev.slice(0, prev.length - 1));
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [toasts]);
 
   // Subscribe to meetingStore and authStore changes
   useEffect(() => {
@@ -99,18 +139,23 @@ export const Top10Scoreboard: React.FC = () => {
         window.history.replaceState({}, document.title, newUrl);
         
         sounds.playVictory();
-        setToastMsg(`مرحباً بك يا ${result.user?.name}! تم تسجيل دخولك بنجاح.`);
+        addToast({
+          type: "success",
+          title: "تسجيل دخول كود QR",
+          message: `مرحباً بك يا ${result.user?.name}! تم تسجيل دخولك بنجاح.`,
+        });
         
         // Find the full member object to show the card
         const member = data.members.find(m => m.id === result.user?.id);
         if (member) {
           setShowMemberCardOnLogin(member);
         }
-
-        setTimeout(() => setToastMsg(null), 5000);
       } else {
-        setToastMsg("كود الدخول من الـ QR غير صحيح أو منتهي الصلاحية.");
-        setTimeout(() => setToastMsg(null), 5000);
+        addToast({
+          type: "warning",
+          title: "خطأ في تسجيل الدخول",
+          message: "كود الدخول من الـ QR غير صحيح أو منتهي الصلاحية.",
+        });
       }
     }
   }, [isLoading, data.members, data.teams]);
@@ -163,7 +208,27 @@ export const Top10Scoreboard: React.FC = () => {
           hasClimbed = true;
           if (team.rank === 1 && oldRank > 1) {
             newLeaderFound = { teamName: team.name, icon: team.icon };
+            addToast({
+              type: "leader_change",
+              title: "👑 متصدر جديد للائحة الشرف!",
+              message: `صعد فريق «${team.name}» إلى المركز الأول بمجموع ${team.points.toLocaleString("en-US")} XP! 🏆`,
+              teamIcon: team.icon,
+            });
+          } else {
+            addToast({
+              type: "rank_up",
+              title: `🚀 تقدم في الترتيب: ${team.name}`,
+              message: `قفز فريق «${team.name}» إلى المركز #${team.rank} (تقدم ${delta} ${delta === 1 ? "مركز" : "مراكز"})!`,
+              teamIcon: team.icon,
+            });
           }
+        } else if (delta < 0) {
+          addToast({
+            type: "rank_down",
+            title: `📉 تغيير الترتيب: ${team.name}`,
+            message: `تراجع فريق «${team.name}» إلى المركز #${team.rank}.`,
+            teamIcon: team.icon,
+          });
         }
       }
     });
@@ -208,18 +273,30 @@ export const Top10Scoreboard: React.FC = () => {
     return processedTeams.find((t) => t.id === selectedTeam.id) || selectedTeam;
   }, [selectedTeam, processedTeams]);
 
-  // Filtered teams by search query
+  // Filtered and sorted teams
   const filteredTeams = useMemo(() => {
-    if (!searchQuery.trim()) return processedTeams;
-    const q = searchQuery.toLowerCase().trim();
-    return processedTeams.filter(
-      (t) =>
-        t.name.toLowerCase().includes(q) ||
-        (t.slogan && t.slogan.toLowerCase().includes(q)) ||
-        (t.leaderName && t.leaderName.toLowerCase().includes(q)) ||
-        t.members.some((m) => m.name.toLowerCase().includes(q))
-    );
-  }, [processedTeams, searchQuery]);
+    let list = [...processedTeams];
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter(
+        (t) =>
+          t.name.toLowerCase().includes(q) ||
+          (t.slogan && t.slogan.toLowerCase().includes(q)) ||
+          (t.leaderName && t.leaderName.toLowerCase().includes(q)) ||
+          t.members.some((m) => m.name.toLowerCase().includes(q))
+      );
+    }
+
+    if (sortOrder === "points-asc") {
+      list.sort((a, b) => a.points - b.points);
+    } else {
+      // Default: "points-desc"
+      list.sort((a, b) => b.points - a.points);
+    }
+
+    return list;
+  }, [processedTeams, searchQuery, sortOrder]);
 
   const totalMembers = data.members.length;
   const totalTeams = data.teams.length;
@@ -300,15 +377,16 @@ export const Top10Scoreboard: React.FC = () => {
 
   return (
     <div
-      className="relative min-h-[100dvh] w-full bg-[#070A1E] text-slate-100 overflow-x-hidden select-none font-arabic"
+      className="relative min-h-[100dvh] w-full bg-[#0B0F2A] text-slate-100 overflow-x-hidden select-none font-arabic"
       dir="rtl"
     >
-      {/* Background ambient lighting */}
+      {/* Background ambient lighting - Cheerful Vibrant Orbs */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden z-0">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1200px] h-[500px] bg-gradient-to-b from-blue-600/15 via-purple-600/10 to-transparent blur-3xl opacity-70" />
-        <div className="absolute top-[35%] -left-48 w-96 h-96 bg-amber-500/10 blur-[130px] rounded-full" />
-        <div className="absolute top-[45%] -right-48 w-96 h-96 bg-rose-500/10 blur-[130px] rounded-full" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:32px_32px] opacity-40" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1200px] h-[550px] bg-gradient-to-b from-indigo-600/25 via-purple-600/20 to-transparent blur-3xl opacity-80" />
+        <div className="absolute top-[25%] -left-40 w-[450px] h-[450px] bg-amber-500/20 blur-[140px] rounded-full" />
+        <div className="absolute top-[35%] -right-40 w-[450px] h-[450px] bg-emerald-500/20 blur-[140px] rounded-full" />
+        <div className="absolute top-[65%] left-1/3 w-[500px] h-[500px] bg-cyan-500/15 blur-[160px] rounded-full" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:32px_32px] opacity-50" />
       </div>
 
       {/* Confetti Canvas */}
@@ -316,7 +394,7 @@ export const Top10Scoreboard: React.FC = () => {
 
       <div className="relative z-10 max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-16 flex flex-col min-h-screen">
         {/* Top Header Card */}
-        <header className="rounded-3xl border border-slate-800/90 bg-[#0B132B]/85 backdrop-blur-2xl p-4 sm:p-5 shadow-[0_20px_50px_rgba(0,0,0,0.6)] mb-5">
+        <header className="rounded-3xl border border-slate-700/60 bg-slate-900/85 backdrop-blur-2xl p-4 sm:p-5 shadow-[0_20px_50px_rgba(0,0,0,0.5)] mb-5">
           <div className="flex items-center justify-between gap-3 flex-wrap md:flex-nowrap">
             {/* Title & Brand */}
             <div className="flex items-center gap-3">
@@ -481,27 +559,82 @@ export const Top10Scoreboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Search bar */}
-          <div className="relative mt-3.5 pt-3 border-t border-slate-800/80">
-            <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="ابحث عن اسم فريق أو قائد أو شعار أو عضو..."
-              className="w-full h-10 sm:h-11 pr-10 pl-4 rounded-xl bg-slate-900/80 border border-slate-700/80 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400 shadow-inner"
-            />
-            {searchQuery && (
+          {/* Search & Sort Filter Control Bar */}
+          <div className="relative mt-3.5 pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            {/* Search Input */}
+            <div className="relative flex-1">
+              <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="ابحث عن اسم فريق أو قائد أو شعار بسرعة..."
+                className="w-full h-10 sm:h-11 pr-10 pl-8 rounded-2xl bg-slate-950/80 border border-slate-700/80 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400 transition-colors shadow-inner"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-white px-2 py-0.5 bg-slate-800 rounded-lg cursor-pointer"
+                >
+                  مسح
+                </button>
+              )}
+            </div>
+
+            {/* Sort Controls */}
+            <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-2xl border border-slate-800 shrink-0 overflow-x-auto no-scrollbar">
+              <span className="text-[11px] text-slate-400 px-2 font-bold whitespace-nowrap hidden sm:inline-block">
+                ترتيب الفرق:
+              </span>
               <button
                 type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-white px-2 py-0.5 bg-slate-800 rounded-md cursor-pointer"
+                onClick={() => {
+                  sounds.playTap();
+                  setSortOrder("points-desc");
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                  sortOrder === "points-desc"
+                    ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black"
+                    : "text-slate-300 hover:text-white hover:bg-slate-800"
+                }`}
+                title="ترتيب الفرق حسب النقاط تنازلياً (الأعلى أولاً)"
               >
-                مسح
+                <TrendingDown className="h-3.5 w-3.5" />
+                <span>الأعلى نقاطاً ⚡</span>
               </button>
-            )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  setSortOrder("points-asc");
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                  sortOrder === "points-asc"
+                    ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black"
+                    : "text-slate-300 hover:text-white hover:bg-slate-800"
+                }`}
+                title="ترتيب الفرق حسب النقاط تصاعدياً (الأقل أولاً)"
+              >
+                <TrendingUp className="h-3.5 w-3.5" />
+                <span>الأقل نقاطاً 📈</span>
+              </button>
+            </div>
           </div>
         </header>
+
+        {/* Daily Challenge Banner */}
+        {data.config.dailyChallenge && (
+          <DailyChallengeBanner
+            challenge={data.config.dailyChallenge}
+            canAwardPoints={currentUser.permissions.canAwardPoints}
+            onAwardChallengePoints={() => {
+              setAdminInitialTab("quick_score");
+              setViewMode("admin");
+            }}
+          />
+        )}
 
         {/* Permission / Action Toast Alert */}
         {toastMsg && (
@@ -600,16 +733,16 @@ export const Top10Scoreboard: React.FC = () => {
                     }}
                     className={`group relative flex flex-row items-center justify-between px-3.5 sm:px-5 py-3 sm:py-3.5 rounded-2xl sm:rounded-3xl border transition-all duration-300 cursor-pointer shadow-lg ${
                       hasShiftedUp
-                        ? "ring-2 ring-emerald-400 border-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.3)] bg-gradient-to-r from-emerald-950/40 via-[#0B132B] to-[#121B42]"
+                        ? "ring-2 ring-emerald-400 border-emerald-400 shadow-[0_0_35px_rgba(16,185,129,0.35)] bg-gradient-to-r from-emerald-950/60 via-slate-900 to-teal-950/60"
                         : hasShiftedDown
-                        ? "ring-1 ring-rose-500/60 border-rose-500/60 shadow-[0_0_20px_rgba(244,63,94,0.2)] bg-gradient-to-r from-rose-950/30 via-[#0B132B] to-[#121B42]"
+                        ? "ring-1 ring-rose-500/80 border-rose-500/80 shadow-[0_0_25px_rgba(244,63,94,0.25)] bg-gradient-to-r from-rose-950/50 via-slate-900 to-slate-950"
                         : isRank1
-                        ? "bg-gradient-to-r from-[#161B3D] via-[#0D1535] to-[#121B42] border-amber-400/80 shadow-[0_0_24px_rgba(245,178,26,0.18)]"
+                        ? "bg-gradient-to-r from-amber-950/75 via-slate-900/95 to-amber-950/75 border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.25)] ring-1 ring-amber-400/40"
                         : isRank2
-                        ? "bg-gradient-to-r from-[#121730] via-[#0B132B] to-[#101938] border-slate-400/70 shadow-[0_0_18px_rgba(203,213,225,0.12)]"
+                        ? "bg-gradient-to-r from-sky-950/70 via-slate-900/95 to-sky-950/70 border-cyan-400/80 shadow-[0_0_24px_rgba(6,182,212,0.2)]"
                         : isRank3
-                        ? "bg-gradient-to-r from-[#151428] via-[#0B132B] to-[#131330] border-orange-500/70 shadow-[0_0_18px_rgba(249,115,22,0.12)]"
-                        : "bg-[#0B132B]/85 hover:bg-[#0E1738] border-slate-800/90 hover:border-slate-700/90 shadow-black/40"
+                        ? "bg-gradient-to-r from-orange-950/70 via-slate-900/95 to-amber-950/70 border-orange-400/80 shadow-[0_0_24px_rgba(249,115,22,0.2)]"
+                        : "bg-slate-900/80 hover:bg-slate-800/90 border-slate-700/60 hover:border-slate-500/80 shadow-black/40"
                     }`}
                     style={{
                       borderRightWidth: "6px",
@@ -864,6 +997,71 @@ export const Top10Scoreboard: React.FC = () => {
           onClose={() => setShowMemberCardOnLogin(null)}
         />
       )}
+
+      {/* Floating Toast Notifications Stack */}
+      <div
+        className="fixed bottom-6 left-4 sm:left-6 z-[200] max-w-sm w-full flex flex-col-reverse gap-2.5 pointer-events-none"
+        dir="rtl"
+      >
+        <AnimatePresence>
+          {toasts.map((toast) => (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, y: 20, scale: 0.9, x: -20 }}
+              animate={{ opacity: 1, y: 0, scale: 1, x: 0 }}
+              exit={{ opacity: 0, y: 10, scale: 0.9, x: -20 }}
+              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+              className={`pointer-events-auto relative p-3.5 sm:p-4 rounded-2xl border shadow-2xl backdrop-blur-xl flex items-start gap-3 overflow-hidden ${
+                toast.type === "leader_change"
+                  ? "bg-gradient-to-r from-amber-950/95 via-slate-900/95 to-amber-950/95 border-amber-400/90 text-amber-200 shadow-amber-500/20 ring-2 ring-amber-500/30"
+                  : toast.type === "rank_up"
+                  ? "bg-gradient-to-r from-emerald-950/95 via-slate-900/95 to-teal-950/95 border-emerald-400/80 text-emerald-200 shadow-emerald-500/20"
+                  : toast.type === "rank_down"
+                  ? "bg-gradient-to-r from-rose-950/95 via-slate-900/95 to-slate-950/95 border-rose-500/60 text-rose-200 shadow-rose-500/15"
+                  : toast.type === "success"
+                  ? "bg-gradient-to-r from-teal-950/95 via-slate-900/95 to-slate-950/95 border-teal-500/60 text-teal-200"
+                  : "bg-gradient-to-r from-amber-950/95 via-slate-900/95 to-slate-950/95 border-amber-500/60 text-amber-200"
+              }`}
+            >
+              {/* Icon badge */}
+              <div className="shrink-0 p-2 rounded-xl bg-white/10 border border-white/10 text-lg flex items-center justify-center">
+                {toast.teamIcon ? (
+                  <span>{toast.teamIcon}</span>
+                ) : toast.type === "leader_change" ? (
+                  <Crown className="h-5 w-5 text-amber-400" />
+                ) : toast.type === "rank_up" ? (
+                  <TrendingUp className="h-5 w-5 text-emerald-400" />
+                ) : toast.type === "rank_down" ? (
+                  <TrendingDown className="h-5 w-5 text-rose-400" />
+                ) : toast.type === "success" ? (
+                  <CheckCircle className="h-5 w-5 text-teal-400" />
+                ) : (
+                  <AlertCircle className="h-5 w-5 text-amber-400" />
+                )}
+              </div>
+
+              {/* Text Body */}
+              <div className="flex-1 space-y-0.5 min-w-0 pr-1">
+                <div className="text-xs font-black tracking-tight leading-snug">
+                  {toast.title}
+                </div>
+                <div className="text-[11px] font-bold opacity-90 leading-relaxed">
+                  {toast.message}
+                </div>
+              </div>
+
+              {/* Dismiss Button */}
+              <button
+                type="button"
+                onClick={() => removeToast(toast.id)}
+                className="shrink-0 p-1 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
     </div>
   );
 };

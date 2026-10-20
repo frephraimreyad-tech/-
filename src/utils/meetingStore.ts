@@ -4,6 +4,7 @@ import type {
   AuditLogEntry,
   CustomMember,
   CustomTeam,
+  DailyChallenge,
   EventSession,
   MeetingConfig,
   MeetingData,
@@ -51,6 +52,16 @@ const DEFAULT_CONFIG: MeetingConfig = {
   seasonName: "موسم النهضة الروحية ٢٠٢٦",
   enableSounds: true,
   autoIdleSeconds: 50,
+  dailyChallenge: {
+    id: "dc-today-01",
+    title: "تحدي حفظ آية اللقاء والاشتراك الجماعي",
+    description: "حفظ ومشاركة آية اليوم مع الفريق والوصول بنسبة حضور المجموعة إلى 100% قبل نهاية وقت الاجتماع!",
+    pointsReward: 100,
+    icon: "🔥",
+    category: "تحدي اليوم المميز",
+    endsAt: new Date(Date.now() + 4 * 60 * 60 * 1000 + 30 * 60 * 1000).toISOString(),
+    isActive: true,
+  },
 };
 
 const DEFAULT_TEAMS: CustomTeam[] = [
@@ -1333,9 +1344,44 @@ class MeetingStore {
     
     // 4. Clear Transactions and Attendance
     this.data.transactions.forEach(tx => batch.delete(doc(db, "transactions", tx.id)));
-    this.data.attendance.forEach(a => batch.delete(doc(db, "attendance", a.id)));
-    
     await batch.commit();
+  }
+
+  async updateDailyChallenge(
+    challengeUpdates: Partial<DailyChallenge>,
+    executor?: SystemUser
+  ): Promise<{ success: boolean; error?: string }> {
+    if (executor && !executor.permissions.canEditTeams && executor.role !== "admin") {
+      return { success: false, error: "ليس لديك صلاحية تعديل تحدي اليوم" };
+    }
+
+    const currentConfig = this.data.config;
+    const currentChallenge = currentConfig.dailyChallenge || {
+      id: `dc-${Date.now()}`,
+      title: "تحدي اليوم المميز",
+      description: "",
+      pointsReward: 100,
+      icon: "🔥",
+      category: "تحدي اليوم",
+      endsAt: new Date(Date.now() + 4 * 3600 * 1000).toISOString(),
+      isActive: true,
+    };
+
+    const updatedChallenge: DailyChallenge = {
+      ...currentChallenge,
+      ...challengeUpdates,
+    };
+
+    const updatedConfig: MeetingConfig = {
+      ...currentConfig,
+      dailyChallenge: updatedChallenge,
+    };
+
+    this.data.config = updatedConfig;
+    this.notify();
+
+    await setDoc(doc(db, "config", "meeting"), updatedConfig, { merge: true });
+    return { success: true };
   }
 
   exportDataJson(): string {

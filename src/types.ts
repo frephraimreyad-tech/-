@@ -114,6 +114,17 @@ export interface AuditLogEntry {
   status: "success" | "denied";
 }
 
+export interface DailyChallenge {
+  id: string;
+  title: string;
+  description: string;
+  pointsReward: number;
+  icon: string;
+  category: string;
+  endsAt: string; // ISO timestamp string
+  isActive: boolean;
+}
+
 export interface MeetingConfig {
   meetingName: string;
   subTitle: string;
@@ -121,6 +132,7 @@ export interface MeetingConfig {
   seasonName: string;
   enableSounds: boolean;
   autoIdleSeconds: number;
+  dailyChallenge?: DailyChallenge;
 }
 
 export interface MeetingData {
