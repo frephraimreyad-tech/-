@@ -132,7 +132,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     };
   }, [scanMode]);
 
-  const handleProcessQRCode = (codeOrId: string) => {
+  const handleProcessQRCode = async (codeOrId: string) => {
     if (!selectedMemberId) {
       sounds.playClose();
       setScanResult({
@@ -143,7 +143,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       return;
     }
 
-    const res = meetingStore.recordQRAttendance({
+    const res = await meetingStore.recordQRAttendance({
       eventIdOrCode: codeOrId.trim(),
       memberId: selectedMemberId,
       isPunctual,

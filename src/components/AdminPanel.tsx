@@ -175,7 +175,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
     }
   }, [scoreTargetType, data.teams, data.members]);
 
-  const handleApplyPoints = (e: React.FormEvent) => {
+  const handleApplyPoints = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTargetId) {
       showFeedback("برجاء اختيار الفريق أو العضو المستهدف", "error");
@@ -186,7 +186,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
       return;
     }
 
-    const tx = meetingStore.awardPoints(
+    const tx = await meetingStore.awardPoints(
       {
         targetType: scoreTargetType,
         targetId: selectedTargetId,
@@ -224,7 +224,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
   const [newReasonIcon, setNewReasonIcon] = useState("🎯");
   const [editingReasonId, setEditingReasonId] = useState<string | null>(null);
 
-  const handleSaveReason = (e: React.FormEvent) => {
+  const handleSaveReason = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newReasonText.trim()) {
       showFeedback("برجاء إدخال اسم النشاط أو سبب رصد النقاط", "error");
@@ -305,7 +305,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
   const [newTeamPoints, setNewTeamPoints] = useState(0);
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
 
-  const handleSaveTeam = (e: React.FormEvent) => {
+  const handleSaveTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTeamName.trim()) {
       showFeedback("برجاء إدخال اسم الفريق", "error");
@@ -313,7 +313,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
     }
 
     if (editingTeamId) {
-      meetingStore.updateTeam(editingTeamId, {
+      await meetingStore.updateTeam(editingTeamId, {
         name: newTeamName.trim(),
         icon: newTeamIcon,
         color: newTeamColor,
@@ -324,7 +324,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
       showFeedback("تم تحديث بيانات الفريق بنجاح!");
       setEditingTeamId(null);
     } else {
-      meetingStore.addTeam({
+      await meetingStore.addTeam({
         name: newTeamName,
         icon: newTeamIcon,
         color: newTeamColor,
@@ -359,8 +359,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
       message: `هل أنت متأكد من رغبتك في حذف فريق "${name}"؟ سيتم حذف بيانات الفريق وكافة أعضائه وسجلات نقاطه نهائياً من السكور بورد.`,
       confirmLabel: "نعم، حذف الفريق",
       cancelLabel: "إلغاء",
-      onConfirm: () => {
-        meetingStore.deleteTeam(teamId);
+      onConfirm: async () => {
+        await meetingStore.deleteTeam(teamId);
         sounds.playTap();
         showFeedback(`تم حذف فريق "${name}" بنجاح!`);
         setConfirmDialog(null);
@@ -375,7 +375,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
   const [newMemberPhone, setNewMemberPhone] = useState("");
   const [memberSearchTerm, setMemberSearchTerm] = useState("");
 
-  const handleSaveMember = (e: React.FormEvent) => {
+  const handleSaveMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMemberName.trim()) {
       showFeedback("برجاء إدخال اسم المشارك", "error");
@@ -386,7 +386,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
       return;
     }
 
-    meetingStore.addMember({
+    await meetingStore.addMember({
       name: newMemberName,
       teamId: newMemberTeamId,
       role: newMemberRole,
@@ -404,8 +404,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
       message: `هل أنت متأكد من رغبتك في حذف "${name}" من قائمة أعضاء الفريق؟`,
       confirmLabel: "نعم، حذف المشارك",
       cancelLabel: "إلغاء",
-      onConfirm: () => {
-        meetingStore.deleteMember(memberId);
+      onConfirm: async () => {
+        await meetingStore.deleteMember(memberId);
         sounds.playTap();
         showFeedback(`تم حذف المشارك "${name}"`);
         setConfirmDialog(null);
@@ -416,9 +416,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
   // --- Settings & Backup ---
   const [meetingConfig, setMeetingConfig] = useState<MeetingConfig>(data.config);
 
-  const handleSaveConfig = (e: React.FormEvent) => {
+  const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
-    meetingStore.updateConfig(meetingConfig);
+    await meetingStore.updateConfig(meetingConfig);
     sounds.playTap();
     showFeedback("تم حفظ إعدادات الاجتماع بنجاح!");
   };
@@ -436,17 +436,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
     showFeedback("تم تنزيل النسخة الاحتياطية بنجاح!");
   };
 
-  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportJson = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const content = event.target?.result as string;
-      if (meetingStore.importDataJson(content)) {
+      const result = await meetingStore.importDataJson(content);
+      if (result.success) {
         sounds.playVictory();
         showFeedback("تم استيراد كشف الفرق والبيانات بنجاح!");
       } else {
-        showFeedback("فشل استيراد الملف، تأكد من صحة تنسيق JSON", "error");
+        showFeedback(result.error || "فشل استيراد الملف، تأكد من صحة تنسيق JSON", "error");
       }
     };
     reader.readAsText(file);
@@ -459,8 +460,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
       message: "هل تريد تصفير نقاط جميع الفرق والأعضاء وبدء دورة مسابقات جديدة؟ سيتم الاحتفاظ بجميع أسماء الفرق والأعضاء كما هي.",
       confirmLabel: "تصفير النقاط الآن",
       cancelLabel: "تراجع",
-      onConfirm: () => {
-        meetingStore.resetScoresOnly();
+      onConfirm: async () => {
+        await meetingStore.resetScoresOnly();
         sounds.playTap();
         showFeedback("تم تصفير النقاط لبدء موسم جديد بنجاح!");
         setConfirmDialog(null);
@@ -474,8 +475,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
       message: "هل تريد استعادة البيانات والفرق النموذجية الافتراضية؟ سيتم استبدال التعديلات الحالية بالكامل.",
       confirmLabel: "استعادة الافتراضي",
       cancelLabel: "إلغاء",
-      onConfirm: () => {
-        meetingStore.resetToDefaults();
+      onConfirm: async () => {
+        await meetingStore.resetToDefaults();
         sounds.playTap();
         showFeedback("تمت استعادة البيانات النموذجية الافتراضية بنجاح");
         setConfirmDialog(null);
@@ -593,8 +594,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
         message: `هل أنت متأكد من مسح جميع سجلات وتواريخ نشاط فريق "${selectedLogTeam.name}"؟ لن يتم تصفير رصيد النقاط الحالي (${selectedLogTeam.points} XP)، بل مسح السجل التاريخي للعمليات فقط.`,
         confirmLabel: "نعم، مسح سجل هذا الفريق",
         cancelLabel: "إلغاء",
-        onConfirm: () => {
-          meetingStore.clearTeamTransactions(selectedLogTeam.id);
+        onConfirm: async () => {
+          await meetingStore.clearTeamTransactions(selectedLogTeam.id);
           sounds.playTap();
           showFeedback(`تم مسح السجل التاريخي لنشاط ${selectedLogTeam.name}`);
           setConfirmDialog(null);
@@ -606,8 +607,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
         message: "هل تريد بالتأكيد مسح كافة سجلات وتواريخ رصد النقاط لجميع الفرق؟ لن تتأثر أرصدة النقاط الحالية للفرق، فقط سيتم تفريغ السجل.",
         confirmLabel: "نعم، مسح السجل بالكامل",
         cancelLabel: "إلغاء",
-        onConfirm: () => {
-          meetingStore.clearAllTransactions();
+        onConfirm: async () => {
+          await meetingStore.clearAllTransactions();
           sounds.playTap();
           showFeedback("تم مسح السجل التاريخي لكافة الفرق بنجاح");
           setConfirmDialog(null);
@@ -617,13 +618,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
   };
 
   // --- Event & QR Management Handlers ---
-  const handleCreateEvent = (e: React.FormEvent) => {
+  const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEventTitle.trim()) {
       showFeedback("برجاء إدخال اسم الفعالية", "error");
       return;
     }
-    const res = meetingStore.createEvent(
+    const res = await meetingStore.createEvent(
       {
         title: newEventTitle,
         description: newEventDesc,
@@ -647,8 +648,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
     }
   };
 
-  const handleToggleEvent = (id: string) => {
-    const res = meetingStore.toggleEventStatus(id, currentUser);
+  const handleToggleEvent = async (id: string) => {
+    const res = await meetingStore.toggleEventStatus(id, currentUser);
     if (res.success) {
       sounds.playTap();
       showFeedback("تم تحديث حالة الفعالية");
@@ -664,8 +665,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
       message: `هل أنت متأكد من حذف هذه الفعالية نهائياً؟ لن يتمكن الأعضاء من تسجيل الحضور بها مجدداً.`,
       confirmLabel: "نعم، حذف الفعالية",
       cancelLabel: "إلغاء",
-      onConfirm: () => {
-        const res = meetingStore.deleteEvent(evt.id, currentUser);
+      onConfirm: async () => {
+        const res = await meetingStore.deleteEvent(evt.id, currentUser);
         if (res.success) {
           sounds.playTap();
           showFeedback(`تم حذف فعالية ${evt.title}`);
@@ -689,10 +690,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
     });
   };
 
-  const handleSaveMemberPerms = (e: React.FormEvent) => {
+  const handleSaveMemberPerms = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMember) return;
-    const res = meetingStore.updateMemberPermissions(
+    const res = await meetingStore.updateMemberPermissions(
       editingMember.id,
       {
         role: permFormRole,
@@ -2831,8 +2832,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                                   message: `هل تريد التراجع عن هذه المعاملة (${tx.points > 0 ? "+" : ""}${tx.points} XP لـ ${tx.targetName}) واسترداد الرصيد؟`,
                                   confirmLabel: "نعم، تراجع عن العملية",
                                   cancelLabel: "إلغاء",
-                                  onConfirm: () => {
-                                    if (meetingStore.undoTransaction(tx.id)) {
+                                  onConfirm: async () => {
+                                    if (await meetingStore.undoTransaction(tx.id)) {
                                       sounds.playTap();
                                       showFeedback("تم التراجع عن المعاملة بنجاح واسترداد الرصيد");
                                     }
@@ -2957,6 +2958,64 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                   <span>استيراد كشف من ملف (Import JSON)</span>
                   <input type="file" accept=".json" onChange={handleImportJson} className="hidden" />
                 </label>
+              </div>
+
+              {/* Google Sheets Sync Controls */}
+              <div className="pt-6 border-t border-slate-800 space-y-4">
+                <div className="flex items-center gap-2 text-emerald-300">
+                  <Share2 className="h-5 w-5" />
+                  <h4 className="font-bold text-sm">مزامنة جداول بيانات جوجل (Google Sheets)</h4>
+                </div>
+                
+                <div className="flex flex-wrap gap-3">
+                  {!authStore.hasAccessToken() ? (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        sounds.playTap();
+                        const res = await authStore.loginWithGoogle();
+                        if (res.success) showFeedback("تم تسجيل الدخول بحساب جوجل بنجاح!");
+                        else showFeedback(res.error || "فشل تسجيل الدخول", "error");
+                      }}
+                      className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white border border-slate-700 font-bold text-xs flex items-center gap-2 cursor-pointer shadow-sm"
+                    >
+                      <KeyRound className="h-4 w-4 text-amber-400" />
+                      <span>تسجيل الدخول بحساب جوجل للربط</span>
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          sounds.playTap();
+                          showFeedback("بدء المزامنة إلى جوجل شيت...", "success");
+                          const res = await meetingStore.syncToSheets();
+                          if (res.success) showFeedback("تمت المزامنة بنجاح! ✅");
+                          else showFeedback(res.error || "فشل المزامنة", "error");
+                        }}
+                        className="px-5 py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 font-bold text-xs flex items-center gap-2 cursor-pointer transition-all"
+                      >
+                        <Download className="h-4 w-4" />
+                        <span>تصدير للشيت (Sync To Sheet)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          sounds.playTap();
+                          showFeedback("جاري جلب البيانات من جوجل شيت...", "success");
+                          const res = await meetingStore.syncFromSheets();
+                          if (res.success) showFeedback("تم جلب البيانات بنجاح! ✅");
+                          else showFeedback(res.error || "فشل الجلب", "error");
+                        }}
+                        className="px-5 py-2.5 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/40 font-bold text-xs flex items-center gap-2 cursor-pointer transition-all"
+                      >
+                        <Upload className="h-4 w-4" />
+                        <span>استيراد من الشيت (Sync From Sheet)</span>
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
               <div className="pt-4 border-t border-slate-800 space-y-2">

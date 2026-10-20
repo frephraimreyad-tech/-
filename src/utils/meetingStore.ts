@@ -12,7 +12,7 @@ import type {
   RoleType,
   ScoreTransaction,
 } from "../types";
-import { type SystemUser, SUPER_ADMIN_USER, getRoleDefaultPermissions } from "./authStore";
+import { type SystemUser, SUPER_ADMIN_USER, getRoleDefaultPermissions, authStore } from "./authStore";
 import { db } from "./firebase";
 import { googleSheets } from "./googleSheets";
 import { 
@@ -144,6 +144,7 @@ class MeetingStore {
   private data: MeetingData;
   private listeners: Set<() => void> = new Set();
   private initialized: boolean = false;
+  private isLoading: boolean = true;
 
   constructor() {
     this.data = this.getFallbackData();
@@ -167,14 +168,26 @@ class MeetingStore {
   private async initFirestore() {
     if (typeof window === "undefined") return;
 
+    console.log("Initializing Firestore listeners...");
+
+    // 1. Check if database needs seeding (once)
+    try {
+      const configDoc = await getDocs(query(collection(db, "config"), limit(1)));
+      if (configDoc.empty) {
+        console.log("Database empty, seeding defaults...");
+        await this.seedDatabase();
+      }
+    } catch (e) {
+      console.error("Error checking database state:", e);
+    }
+
+    // 2. Setup Snapshots
     // Listen to Config
-    onSnapshot(doc(db, "settings", "meeting"), (docSnap) => {
+    onSnapshot(doc(db, "config", "meeting"), (docSnap) => {
       if (docSnap.exists()) {
         const remoteConfig = docSnap.data() as MeetingConfig;
         this.data.config = { ...DEFAULT_CONFIG, ...remoteConfig };
         this.notify();
-      } else {
-        setDoc(doc(db, "settings", "meeting"), DEFAULT_CONFIG);
       }
     });
 
@@ -187,11 +200,6 @@ class MeetingStore {
       if (teams.length > 0) {
         this.data.teams = teams;
         this.notify();
-      } else if (!this.initialized) {
-        // Seed if first time and empty
-        DEFAULT_TEAMS.forEach(team => {
-          setDoc(doc(db, "teams", team.id), team);
-        });
       }
     });
 
@@ -210,10 +218,6 @@ class MeetingStore {
       if (members.length > 0) {
         this.data.members = members;
         this.notify();
-      } else if (!this.initialized) {
-        DEFAULT_MEMBERS.forEach(member => {
-          setDoc(doc(db, "members", member.id), member);
-        });
       }
     });
 
@@ -259,7 +263,19 @@ class MeetingStore {
       this.notify();
     });
 
+    this.isLoading = false;
     this.initialized = true;
+    this.notify();
+  }
+
+  private async seedDatabase() {
+    const batch = writeBatch(db);
+    batch.set(doc(db, "config", "meeting"), DEFAULT_CONFIG);
+    DEFAULT_TEAMS.forEach(team => batch.set(doc(db, "teams", team.id), team));
+    DEFAULT_MEMBERS.forEach(member => batch.set(doc(db, "members", member.id), member));
+    DEFAULT_EVENTS.forEach(event => batch.set(doc(db, "events", event.id), event));
+    DEFAULT_ACTIVITY_REASONS.forEach(reason => batch.set(doc(db, "activityReasons", reason.id), reason));
+    await batch.commit();
   }
 
   private notify(): void {
@@ -283,17 +299,21 @@ class MeetingStore {
     return this.data;
   }
 
+  getIsLoading(): boolean {
+    return this.isLoading;
+  }
+
   getConfig(): MeetingConfig {
     return this.data.config;
   }
 
-  updateConfig(updates: Partial<MeetingConfig>): void {
+  async updateConfig(updates: Partial<MeetingConfig>): Promise<void> {
     this.data.config = { ...this.data.config, ...updates };
-    updateDoc(doc(db, "settings", "meeting"), updates);
+    await updateDoc(doc(db, "config", "meeting"), updates);
   }
 
   // --- Audit Log Logging ---
-  logAudit(entry: Omit<AuditLogEntry, "id" | "timestamp">): AuditLogEntry {
+  async logAudit(entry: Omit<AuditLogEntry, "id" | "timestamp">): Promise<AuditLogEntry> {
     const id = "aud-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const newEntry: AuditLogEntry = {
       id,
@@ -301,7 +321,8 @@ class MeetingStore {
       ...entry,
     };
     this.data.auditLogs = [newEntry, ...this.data.auditLogs.slice(0, 499)];
-    setDoc(doc(db, "auditLogs", id), newEntry);
+    await setDoc(doc(db, "auditLogs", id), newEntry);
+    this.triggerAutoSync();
     return newEntry;
   }
 
@@ -367,7 +388,7 @@ class MeetingStore {
   }
 
   // --- Team Operations ---
-  addTeam(
+  async addTeam(
     teamData: {
       name: string;
       icon?: string;
@@ -378,7 +399,7 @@ class MeetingStore {
       initialPoints?: number;
     },
     executor?: SystemUser
-  ): { success: boolean; team?: CustomTeam; error?: string } {
+  ): Promise<{ success: boolean; team?: CustomTeam; error?: string }> {
     if (executor && !executor.permissions.canEditTeams && executor.role !== "admin") {
       this.logAudit({
         userId: executor.id,
@@ -422,15 +443,16 @@ class MeetingStore {
       });
     }
 
-    setDoc(doc(db, "teams", id), newTeam);
+    await setDoc(doc(db, "teams", id), newTeam);
+    this.triggerAutoSync();
     return { success: true, team: newTeam };
   }
 
-  updateTeam(
+  async updateTeam(
     teamId: string,
     updates: Partial<CustomTeam>,
     executor?: SystemUser
-  ): { success: boolean; error?: string } {
+  ): Promise<{ success: boolean; error?: string }> {
     if (executor && !executor.permissions.canEditTeams && executor.role !== "admin") {
       this.logAudit({
         userId: executor.id,
@@ -465,7 +487,8 @@ class MeetingStore {
         });
       }
 
-      updateDoc(doc(db, "teams", teamId), updates);
+      await updateDoc(doc(db, "teams", teamId), updates);
+      this.triggerAutoSync();
       return { success: true };
     }
     return { success: false, error: "الفريق غير موجود" };
@@ -474,13 +497,13 @@ class MeetingStore {
   /**
    * دالة مخصصة لتحديث درجات الفرق مباشرة مع المزامنة اللحظية
    */
-  updateTeamPoints(
+  async updateTeamPoints(
     teamId: string,
     points: number,
     reason: string,
     executor: SystemUser
-  ): { success: boolean; error?: string } {
-    const res = this.awardPoints({
+  ): Promise<{ success: boolean; error?: string }> {
+    const res = await this.awardPoints({
       targetType: "team",
       targetId: teamId,
       points,
@@ -491,7 +514,7 @@ class MeetingStore {
     return res ? { success: true } : { success: false, error: "فشل في تحديث النقاط" };
   }
 
-  deleteTeam(teamId: string, executor?: SystemUser): { success: boolean; error?: string } {
+  async deleteTeam(teamId: string, executor?: SystemUser): Promise<{ success: boolean; error?: string }> {
     if (executor && !executor.permissions.canEditTeams && executor.role !== "admin") {
       this.logAudit({
         userId: executor.id,
@@ -532,12 +555,13 @@ class MeetingStore {
     this.data.members.filter(m => m.teamId === teamId).forEach(m => {
       batch.delete(doc(db, "members", m.id));
     });
-    batch.commit();
+    await batch.commit();
+    this.triggerAutoSync();
     return { success: true };
   }
 
   // --- Member Operations ---
-  addMember(
+  async addMember(
     memberData: {
       name: string;
       nameEn?: string;
@@ -551,7 +575,7 @@ class MeetingStore {
       permissions?: Partial<MemberPermissions>;
     },
     executor?: SystemUser
-  ): { success: boolean; member?: CustomMember; error?: string } {
+  ): Promise<{ success: boolean; member?: CustomMember; error?: string }> {
     if (executor && !executor.permissions.canEditMembers && executor.role !== "admin") {
       this.logAudit({
         userId: executor.id,
@@ -599,14 +623,16 @@ class MeetingStore {
       },
     };
 
-    setDoc(doc(db, "members", id), newMember);
+    await setDoc(doc(db, "members", id), newMember);
 
     if (memberData.initialPoints && memberData.initialPoints > 0) {
       const team = this.data.teams.find((t) => t.id === memberData.teamId);
       if (team) {
-        updateDoc(doc(db, "teams", team.id), { points: team.points + memberData.initialPoints });
+        await updateDoc(doc(db, "teams", team.id), { points: team.points + memberData.initialPoints });
       }
     }
+    
+    this.triggerAutoSync();
 
     if (executor) {
       this.logAudit({
@@ -625,11 +651,11 @@ class MeetingStore {
     return { success: true, member: newMember };
   }
 
-  updateMember(
+  async updateMember(
     memberId: string,
     updates: Partial<CustomMember>,
     executor?: SystemUser
-  ): { success: boolean; error?: string } {
+  ): Promise<{ success: boolean; error?: string }> {
     if (executor && !executor.permissions.canEditMembers && executor.role !== "admin") {
       this.logAudit({
         userId: executor.id,
@@ -667,13 +693,14 @@ class MeetingStore {
         });
       }
 
-      updateDoc(doc(db, "members", memberId), updates);
+      await updateDoc(doc(db, "members", memberId), updates);
+      this.triggerAutoSync();
       return { success: true };
     }
     return { success: false, error: "العضو غير موجود" };
   }
 
-  deleteMember(memberId: string, executor?: SystemUser): { success: boolean; error?: string } {
+  async deleteMember(memberId: string, executor?: SystemUser): Promise<{ success: boolean; error?: string }> {
     if (executor && !executor.permissions.canEditMembers && executor.role !== "admin") {
       this.logAudit({
         userId: executor.id,
@@ -708,12 +735,13 @@ class MeetingStore {
       });
     }
 
-    deleteDoc(doc(db, "members", memberId));
+    await deleteDoc(doc(db, "members", memberId));
+    this.triggerAutoSync();
     return { success: true };
   }
 
   // --- Permissions Management ---
-  updateMemberPermissions(
+  async updateMemberPermissions(
     memberId: string,
     params: {
       role?: RoleType;
@@ -722,9 +750,9 @@ class MeetingStore {
       permissions: Partial<MemberPermissions>;
     },
     executor: SystemUser
-  ): { success: boolean; error?: string } {
+  ): Promise<{ success: boolean; error?: string }> {
     if (executor.role !== "admin" && !executor.permissions.canManagePermissions) {
-      this.logAudit({
+      await this.logAudit({
         userId: executor.id,
         userName: executor.name,
         userRole: executor.role,
@@ -751,7 +779,7 @@ class MeetingStore {
       ...params.permissions,
     };
 
-    this.logAudit({
+    await this.logAudit({
       userId: executor.id,
       userName: executor.name,
       userRole: executor.role,
@@ -763,17 +791,18 @@ class MeetingStore {
       status: "success",
     });
 
-    updateDoc(doc(db, "members", memberId), {
+    await updateDoc(doc(db, "members", memberId), {
       role: mem.role,
       roleLabel: mem.roleLabel,
       accessCode: mem.accessCode,
       permissions: mem.permissions
     });
+    this.triggerAutoSync();
     return { success: true };
   }
 
   // --- Strict Backend-Enforced Points Awarding ---
-  awardPoints(
+  async awardPoints(
     params: {
       targetType: "team" | "member";
       targetId: string;
@@ -784,7 +813,7 @@ class MeetingStore {
       notes?: string;
     },
     executor?: SystemUser
-  ): ScoreTransaction | null {
+  ): Promise<ScoreTransaction | null> {
     const { targetType, targetId, points, reason, category, timestamp, notes } = params;
     if (points === 0) return null;
 
@@ -878,7 +907,8 @@ class MeetingStore {
       status: "success",
     });
 
-    batch.commit();
+    await batch.commit();
+    this.triggerAutoSync();
     return tx;
   }
 
@@ -887,7 +917,7 @@ class MeetingStore {
     return this.data.events || [];
   }
 
-  createEvent(
+  async createEvent(
     eventData: {
       title: string;
       description?: string;
@@ -896,7 +926,7 @@ class MeetingStore {
       qrCode?: string;
     },
     executor: SystemUser
-  ): { success: boolean; event?: EventSession; error?: string } {
+  ): Promise<{ success: boolean; event?: EventSession; error?: string }> {
     if (executor.role !== "admin" && !executor.permissions.canCreateEvents) {
       this.logAudit({
         userId: executor.id,
@@ -947,7 +977,8 @@ class MeetingStore {
       });
     }
 
-    setDoc(doc(db, "events", newEvent.id), newEvent);
+    await setDoc(doc(db, "events", newEvent.id), newEvent);
+    this.triggerAutoSync();
     return { success: true, event: newEvent };
   }
 
@@ -972,19 +1003,19 @@ class MeetingStore {
   }
 
   // --- Strict QR Attendance Recording with Duplicate Prevention ---
-  recordQRAttendance(params: {
+  async recordQRAttendance(params: {
     eventIdOrCode: string;
     memberId: string;
     isPunctual?: boolean;
     executor: SystemUser;
-  }): {
+  }): Promise<{
     success: boolean;
     record?: AttendanceRecord;
     error?: string;
     pointsAwarded?: number;
     member?: CustomMember;
     event?: EventSession;
-  } {
+  }> {
     const { eventIdOrCode, memberId, isPunctual, executor } = params;
 
     // 1. Permission check
@@ -1114,7 +1145,8 @@ class MeetingStore {
     if (team) {
       batch.update(doc(db, "teams", team.id), { points: team.points });
     }
-    batch.commit();
+    await batch.commit();
+    this.triggerAutoSync();
 
     return {
       success: true,
@@ -1137,22 +1169,22 @@ class MeetingStore {
     );
   }
 
-  clearTeamTransactions(teamId: string): void {
+  async clearTeamTransactions(teamId: string): Promise<void> {
     const txsToDelete = this.data.transactions.filter(
       (tx) => tx.teamId === teamId || (tx.targetType === "team" && tx.targetId === teamId)
     );
     const batch = writeBatch(db);
     txsToDelete.forEach(tx => batch.delete(doc(db, "transactions", tx.id)));
-    batch.commit();
+    await batch.commit();
   }
 
-  clearAllTransactions(): void {
+  async clearAllTransactions(): Promise<void> {
     const batch = writeBatch(db);
     this.data.transactions.forEach(tx => batch.delete(doc(db, "transactions", tx.id)));
-    batch.commit();
+    await batch.commit();
   }
 
-  undoTransaction(transactionId: string): boolean {
+  async undoTransaction(transactionId: string): Promise<boolean> {
     const tx = this.data.transactions.find((t) => t.id === transactionId);
     if (!tx) return false;
 
@@ -1175,7 +1207,7 @@ class MeetingStore {
       }
     }
 
-    batch.commit();
+    await batch.commit();
     return true;
   }
 
@@ -1184,12 +1216,12 @@ class MeetingStore {
     return this.data.activityReasons || DEFAULT_ACTIVITY_REASONS;
   }
 
-  addActivityReason(reasonData: {
+  async addActivityReason(reasonData: {
     text: string;
     category?: string;
     points?: number;
     icon?: string;
-  }): ActivityReason {
+  }): Promise<ActivityReason> {
     const id = "ar-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const newReason: ActivityReason = {
       id,
@@ -1201,11 +1233,11 @@ class MeetingStore {
     if (!this.data.activityReasons) {
       this.data.activityReasons = [...DEFAULT_ACTIVITY_REASONS];
     }
-    setDoc(doc(db, "activityReasons", id), newReason);
+    await setDoc(doc(db, "activityReasons", id), newReason);
     return newReason;
   }
 
-  updateActivityReason(id: string, updates: Partial<ActivityReason>): void {
+  async updateActivityReason(id: string, updates: Partial<ActivityReason>): Promise<void> {
     if (!this.data.activityReasons) {
       this.data.activityReasons = [...DEFAULT_ACTIVITY_REASONS];
     }
@@ -1215,39 +1247,39 @@ class MeetingStore {
         ...this.data.activityReasons[idx],
         ...updates,
       };
-      updateDoc(doc(db, "activityReasons", id), updates);
+      await updateDoc(doc(db, "activityReasons", id), updates);
     }
   }
 
-  deleteActivityReason(id: string): void {
+  async deleteActivityReason(id: string): Promise<void> {
     if (!this.data.activityReasons) {
       this.data.activityReasons = [...DEFAULT_ACTIVITY_REASONS];
     }
-    deleteDoc(doc(db, "activityReasons", id));
+    await deleteDoc(doc(db, "activityReasons", id));
   }
 
-  resetActivityReasonsToDefault(): void {
+  async resetActivityReasonsToDefault(): Promise<void> {
     const batch = writeBatch(db);
     // Delete existing
     this.data.activityReasons.forEach(r => batch.delete(doc(db, "activityReasons", r.id)));
     // Add default
     DEFAULT_ACTIVITY_REASONS.forEach(r => batch.set(doc(db, "activityReasons", r.id), r));
-    batch.commit();
+    await batch.commit();
   }
 
-  resetScoresOnly(): void {
+  async resetScoresOnly(): Promise<void> {
     const batch = writeBatch(db);
     this.data.teams.forEach(t => batch.update(doc(db, "teams", t.id), { points: 0 }));
     this.data.members.forEach(m => batch.update(doc(db, "members", m.id), { points: 0 }));
     this.data.transactions.forEach(tx => batch.delete(doc(db, "transactions", tx.id)));
-    batch.commit();
+    await batch.commit();
   }
 
-  resetToDefaults(): void {
+  async resetToDefaults(): Promise<void> {
     const batch = writeBatch(db);
     
     // 1. Reset Config
-    batch.set(doc(db, "settings", "meeting"), DEFAULT_CONFIG);
+    batch.set(doc(db, "config", "meeting"), DEFAULT_CONFIG);
     
     // 2. Clear and Reset Teams
     this.data.teams.forEach(t => batch.delete(doc(db, "teams", t.id)));
@@ -1261,57 +1293,101 @@ class MeetingStore {
     this.data.transactions.forEach(tx => batch.delete(doc(db, "transactions", tx.id)));
     this.data.attendance.forEach(a => batch.delete(doc(db, "attendance", a.id)));
     
-    batch.commit();
+    await batch.commit();
   }
 
   exportDataJson(): string {
     return JSON.stringify(this.data, null, 2);
   }
 
-  importDataJson(jsonStr: string): boolean {
+  async importDataJson(jsonStr: string): Promise<{ success: boolean; error?: string }> {
     try {
       const parsed = JSON.parse(jsonStr) as MeetingData;
-      if (parsed && parsed.teams && parsed.members) {
-        const batch = writeBatch(db);
-        
-        // 1. Settings
-        if (parsed.config) {
-          batch.set(doc(db, "settings", "meeting"), parsed.config);
-        }
-
-        // 2. Teams
-        parsed.teams.forEach((t) => batch.set(doc(db, "teams", t.id), t));
-
-        // 3. Members
-        parsed.members.forEach((m) => batch.set(doc(db, "members", m.id), m));
-
-        // 4. Activity Reasons
-        if (parsed.activityReasons) {
-          parsed.activityReasons.forEach((r) => batch.set(doc(db, "activityReasons", r.id), r));
-        }
-
-        // 5. Events
-        if (parsed.events) {
-          parsed.events.forEach((e) => batch.set(doc(db, "events", e.id), e));
-        }
-
-        // 6. Transactions (limit to avoid batch size issues if needed, but let's try all first)
-        if (parsed.transactions) {
-          parsed.transactions.forEach((tx) => batch.set(doc(db, "transactions", tx.id), tx));
-        }
-
-        // 7. Attendance
-        if (parsed.attendance) {
-          parsed.attendance.forEach((a) => batch.set(doc(db, "attendance", a.id), a));
-        }
-
-        batch.commit();
-        return true;
+      if (!parsed || !parsed.teams || !parsed.members) {
+        return { success: false, error: "تنسيق الملف غير صالح" };
       }
-    } catch (e) {
-      console.error("Failed to parse imported json:", e);
+
+      // Collect all operations
+      const ops: Array<{ ref: any; data: any; type: "set" | "delete" }> = [];
+
+      // 1. Settings
+      if (parsed.config) {
+        ops.push({ ref: doc(db, "config", "meeting"), data: parsed.config, type: "set" });
+      }
+
+      // 2. Teams
+      parsed.teams.forEach((t) => {
+        ops.push({ ref: doc(db, "teams", t.id), data: t, type: "set" });
+      });
+
+      // 3. Members
+      parsed.members.forEach((m) => {
+        ops.push({ ref: doc(db, "members", m.id), data: m, type: "set" });
+      });
+
+      // 4. Activity Reasons
+      if (parsed.activityReasons) {
+        parsed.activityReasons.forEach((r) => {
+          ops.push({ ref: doc(db, "activityReasons", r.id), data: r, type: "set" });
+        });
+      }
+
+      // 5. Events
+      if (parsed.events) {
+        parsed.events.forEach((e) => {
+          ops.push({ ref: doc(db, "events", e.id), data: e, type: "set" });
+        });
+      }
+
+      // 6. Transactions
+      if (parsed.transactions) {
+        parsed.transactions.forEach((tx) => {
+          ops.push({ ref: doc(db, "transactions", tx.id), data: tx, type: "set" });
+        });
+      }
+
+      // 7. Attendance
+      if (parsed.attendance) {
+        parsed.attendance.forEach((a) => {
+          ops.push({ ref: doc(db, "attendance", a.id), data: a, type: "set" });
+        });
+      }
+
+      // 8. Audit Logs
+      if (parsed.auditLogs) {
+        parsed.auditLogs.forEach((log) => {
+          ops.push({ ref: doc(db, "auditLogs", log.id), data: log, type: "set" });
+        });
+      }
+
+      // Commit in chunks of 500 (Firestore limit)
+      const CHUNK_SIZE = 450;
+      for (let i = 0; i < ops.length; i += CHUNK_SIZE) {
+        const chunk = ops.slice(i, i + CHUNK_SIZE);
+        const batch = writeBatch(db);
+        chunk.forEach((op) => {
+          if (op.type === "set") {
+            batch.set(op.ref, op.data);
+          } else {
+            batch.delete(op.ref);
+          }
+        });
+        await batch.commit();
+      }
+
+      // Update local data too
+      this.data = {
+        ...this.data,
+        ...parsed,
+        lastSaved: new Date().toISOString()
+      };
+      this.notify();
+
+      return { success: true };
+    } catch (e: any) {
+      console.error("Failed to import json:", e);
+      return { success: false, error: e.message };
     }
-    return false;
   }
   /**
    * مزامنة كافة البيانات الحالية إلى ملف جوجل شيت المرتبط
@@ -1404,6 +1480,16 @@ class MeetingStore {
       console.error("Sync from sheets failed:", error);
       return { success: false, error: error.message };
     }
+  }
+
+  private autoSyncTimer: any = null;
+  private triggerAutoSync() {
+    if (this.autoSyncTimer) clearTimeout(this.autoSyncTimer);
+    this.autoSyncTimer = setTimeout(() => {
+      if (googleSheets.getSpreadsheetId() && authStore.hasAccessToken()) {
+        this.syncToSheets();
+      }
+    }, 15000); // Sync every 15 seconds after last change
   }
 }
 

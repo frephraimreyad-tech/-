@@ -85,7 +85,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
     onClose();
   };
 
-  const handleAddNewMember = (e: React.FormEvent) => {
+  const handleAddNewMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!team || !newMemberName.trim()) return;
 
@@ -95,7 +95,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
       return;
     }
 
-    const res = meetingStore.addMember(
+    const res = await meetingStore.addMember(
       {
         name: newMemberName.trim(),
         teamId: team.id,
@@ -117,7 +117,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
     setTimeout(() => setToastMsg(null), 3000);
   };
 
-  const handleAwardTeamPoints = (e: React.FormEvent) => {
+  const handleAwardTeamPoints = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!team) return;
     if (!currentUser.permissions.canAwardPoints) {
@@ -126,7 +126,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
       setTimeout(() => setToastMsg(null), 3500);
       return;
     }
-    const res = meetingStore.awardPoints(
+    const res = await meetingStore.awardPoints(
       {
         targetType: "team",
         targetId: team.id,
@@ -646,8 +646,8 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                             {/* Quick +25 points button for member */}
                             <button
                               type="button"
-                              onClick={() => {
-                                meetingStore.awardPoints({
+                              onClick={async () => {
+                                await meetingStore.awardPoints({
                                   targetType: "member",
                                   targetId: member.id,
                                   points: 25,

@@ -114,8 +114,10 @@ class AuthStore {
   private accessToken: string | null = null;
   private listeners: Array<() => void> = [];
   private isSigningIn = false;
+  private readonly TOKEN_KEY = "google_access_token";
 
   constructor() {
+    this.accessToken = sessionStorage.getItem(this.TOKEN_KEY);
     this.loadSession();
     this.initFirebaseObserver();
   }
@@ -156,6 +158,10 @@ class AuthStore {
     return this.accessToken;
   }
 
+  hasAccessToken(): boolean {
+    return !!this.accessToken && !!this.googleUser;
+  }
+
   subscribe(listener: () => void): () => void {
     this.listeners.push(listener);
     return () => {
@@ -184,9 +190,9 @@ class AuthStore {
         throw new Error('Failed to get access token');
       }
       this.accessToken = credential.accessToken;
-      
-      // Also try to find this user in our members list if they are not super admin
-      // This part will be handled by the UI/Store after login
+      if (this.accessToken) {
+        sessionStorage.setItem(this.TOKEN_KEY, this.accessToken);
+      }
       
       this.notify();
       return { success: true };
@@ -256,6 +262,7 @@ class AuthStore {
   async logout() {
     await auth.signOut();
     this.accessToken = null;
+    sessionStorage.removeItem(this.TOKEN_KEY);
     this.setCurrentUser(SUPER_ADMIN_USER);
   }
 }

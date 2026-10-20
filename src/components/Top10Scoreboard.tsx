@@ -35,9 +35,9 @@ import { AdminPanel } from "./AdminPanel";
 import { AdminDashboard } from "./AdminDashboard";
 import { QRScannerModal } from "./QRScannerModal";
 import { UserSwitcherModal } from "./UserSwitcherModal";
-
 export const Top10Scoreboard: React.FC = () => {
   const [data, setData] = useState(meetingStore.getData());
+  const [isLoading, setIsLoading] = useState(meetingStore.getIsLoading());
   const [currentUser, setCurrentUser] = useState<SystemUser>(authStore.getCurrentUser());
   const [selectedTeam, setSelectedTeam] = useState<ProcessedMeetingTeam | null>(null);
   const [isMuted, setIsMuted] = useState(false);
@@ -55,6 +55,7 @@ export const Top10Scoreboard: React.FC = () => {
   useEffect(() => {
     const unsubStore = meetingStore.subscribe(() => {
       setData({ ...meetingStore.getData() });
+      setIsLoading(meetingStore.getIsLoading());
     });
     const unsubAuth = authStore.subscribe(() => {
       setCurrentUser(authStore.getCurrentUser());
@@ -216,7 +217,7 @@ export const Top10Scoreboard: React.FC = () => {
     confettiRef.current?.celebrateWinner();
   };
 
-  const handleQuickAdd = (e: React.MouseEvent, team: ProcessedMeetingTeam, points = 50) => {
+  const handleQuickAdd = async (e: React.MouseEvent, team: ProcessedMeetingTeam, points = 50) => {
     e.stopPropagation();
     if (!currentUser.permissions.canAwardPoints) {
       sounds.playClose();
@@ -224,7 +225,7 @@ export const Top10Scoreboard: React.FC = () => {
       setTimeout(() => setToastMsg(null), 3500);
       return;
     }
-    const res = meetingStore.awardPoints(
+    const res = await meetingStore.awardPoints(
       {
         targetType: "team",
         targetId: team.id,
@@ -240,6 +241,21 @@ export const Top10Scoreboard: React.FC = () => {
       sounds.playClose();
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen w-full bg-[#070A1E] flex flex-col items-center justify-center gap-6" dir="rtl">
+        <div className="relative w-24 h-24">
+          <div className="absolute inset-0 border-4 border-blue-500/20 rounded-full animate-pulse" />
+          <div className="absolute inset-0 border-t-4 border-blue-500 rounded-full animate-spin" />
+        </div>
+        <div className="space-y-2 text-center">
+          <h2 className="text-2xl font-black text-white tracking-widest animate-pulse">جاري جلب البيانات...</h2>
+          <p className="text-blue-400 font-bold">يرجى الانتظار، جاري المزامنة مع السحاب ⚡</p>
+        </div>
+      </div>
+    );
+  }
 
   // If Admin View is active, render AdminDashboard
   if (viewMode === "admin") {

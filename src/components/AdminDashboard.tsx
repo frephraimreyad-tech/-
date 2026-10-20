@@ -266,7 +266,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
   // ==========================================
   // Team Management Handlers (Add, Edit, Delete)
   // ==========================================
-  const handleCreateTeam = (e: React.FormEvent) => {
+  const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isUnlocked && currentUser.role !== "admin") {
       showFeedback("لوحة التحكم مقفلة! يرجى إدخال الرمز السري أولاً", "error");
@@ -278,7 +278,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
       return;
     }
 
-    const res = meetingStore.addTeam(
+    const res = await meetingStore.addTeam(
       {
         name: newTeamName.trim(),
         icon: newTeamIcon || "🦅",
@@ -307,7 +307,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
     }
   };
 
-  const handleUpdateTeam = (e: React.FormEvent) => {
+  const handleUpdateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTeam) return;
 
@@ -316,7 +316,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
       return;
     }
 
-    const res = meetingStore.updateTeam(
+    const res = await meetingStore.updateTeam(
       editingTeam.id,
       {
         name: editingTeam.name.trim(),
@@ -339,7 +339,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
     }
   };
 
-  const handleDeleteTeamConfirm = () => {
+  const handleDeleteTeamConfirm = async () => {
     if (!teamToDelete) return;
 
     if (!isUnlocked && currentUser.role !== "admin") {
@@ -347,7 +347,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
       return;
     }
 
-    const res = meetingStore.deleteTeam(teamToDelete.id, currentUser);
+    const res = await meetingStore.deleteTeam(teamToDelete.id, currentUser);
     if (res.success) {
       sounds.playVictory();
       showFeedback(`تم حذف فريق (${teamToDelete.name}) بنجاح!`, "success");
@@ -361,7 +361,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
   // ==========================================
   // Points Management Handlers
   // ==========================================
-  const handleApplyTeamPoints = (teamId: string, deltaPoints: number, reasonText: string, categoryText: string) => {
+  const handleApplyTeamPoints = async (teamId: string, deltaPoints: number, reasonText: string, categoryText: string) => {
     if (!isUnlocked && currentUser.role !== "admin") {
       showFeedback("لوحة التحكم مقفلة! أدخل الرمز السري لتحديث النقاط", "error");
       return;
@@ -370,7 +370,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
     const team = data.teams.find((t) => t.id === teamId);
     if (!team) return;
 
-    const res = meetingStore.awardPoints(
+    const res = await meetingStore.awardPoints(
       {
         targetType: "team",
         targetId: team.id,
@@ -391,7 +391,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
     }
   };
 
-  const handleQuickPointsSubmit = (e: React.FormEvent) => {
+  const handleQuickPointsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pointTargetTeamId) {
       showFeedback("يرجى اختيار الفريق أولاً", "error");
@@ -407,19 +407,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
     const finalPoints = pointOperation === "deduct" ? -Math.abs(amount) : Math.abs(amount);
     const finalReason = pointReason.trim() || (pointOperation === "deduct" ? "خصم نقاط بسبب مخالفة" : "رصد نقاط نشاط إضافي");
 
-    handleApplyTeamPoints(pointTargetTeamId, finalPoints, finalReason, pointCategory);
+    await handleApplyTeamPoints(pointTargetTeamId, finalPoints, finalReason, pointCategory);
     setCustomPointAmount("");
     setPointReason("");
   };
 
   // Reset team points to 0 with confirmation
-  const handleResetTeamPoints = (team: CustomTeam) => {
+  const handleResetTeamPoints = async (team: CustomTeam) => {
     if (!isUnlocked && currentUser.role !== "admin") {
       showFeedback("لوحة التحكم مقفلة!", "error");
       return;
     }
     if (window.confirm(`هل أنت متأكد من تصفير نقاط فريق (${team.name})؟ ستصبح نقاطه 0.`)) {
-      meetingStore.awardPoints(
+      await meetingStore.awardPoints(
         {
           targetType: "team",
           targetId: team.id,
@@ -1890,8 +1890,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                   <button
                     key={pts}
                     type="button"
-                    onClick={() => {
-                      handleApplyTeamPoints(
+                    onClick={async () => {
+                      await handleApplyTeamPoints(
                         teamForPointsAdjust.id,
                         pts,
                         `رصد نقاط سريع (+${pts} XP) من شاشة التعديل`,
@@ -1911,8 +1911,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                   <button
                     key={pts}
                     type="button"
-                    onClick={() => {
-                      handleApplyTeamPoints(
+                    onClick={async () => {
+                      await handleApplyTeamPoints(
                         teamForPointsAdjust.id,
                         pts,
                         `خصم نقاط (${pts} XP) من شاشة التعديل`,
