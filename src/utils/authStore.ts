@@ -12,11 +12,11 @@ export interface SystemUser {
 }
 
 export const SUPER_ADMIN_USER: SystemUser = {
-  id: "super-admin-01",
-  name: "الخادم المسؤول (مدير النظام)",
+  id: "mem-1",
+  name: "أبونا افرايم رياض",
   role: "admin",
   roleLabel: "مدير النظام",
-  accessCode: "9999",
+  accessCode: "7777",
   permissions: {
     canAwardPoints: true,
     canEditTeams: true,
