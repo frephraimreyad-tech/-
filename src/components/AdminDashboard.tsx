@@ -37,6 +37,7 @@ import { sounds } from "../utils/soundEffects";
 import { QRScannerModal } from "./QRScannerModal";
 import { UserSwitcherModal } from "./UserSwitcherModal";
 import { AdminPanel } from "./AdminPanel";
+import { googleSheets } from "../utils/googleSheets";
 
 interface AdminDashboardProps {
   onBackToScoreboard: () => void;
@@ -726,6 +727,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
             <Clock className="h-4 w-4" />
             <span>سجل المعاملات والتاريخ 📜</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              sounds.playTap();
+              setActiveTab("google_sheets" as any);
+            }}
+            className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+              (activeTab as any) === "google_sheets"
+                ? "bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-lg shadow-emerald-500/20 font-black scale-102"
+                : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800"
+            }`}
+          >
+            <Share2 className="h-4 w-4" />
+            <span>ربط Google Sheets 📊</span>
+          </button>
         </div>
 
         {/* ========================================================= */}
@@ -1364,6 +1381,187 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 5: GOOGLE SHEETS SYNC (ربط وجدولة المزامنة) */}
+        {/* ========================================================= */}
+        {(activeTab as any) === "google_sheets" && (
+          <div className="rounded-3xl border border-slate-800 bg-[#0B132B]/85 backdrop-blur-xl p-5 sm:p-7 shadow-2xl space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+              <div>
+                <h3 className="text-lg font-black text-white flex items-center gap-2">
+                  <Share2 className="h-5 w-5 text-emerald-400" />
+                  <span>ربط ومزامنة جداول بيانات جوجل (Google Sheets)</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  احتفظ بنسخة احتياطية دائمة ومجانية من كافة بيانات الاجتماع والفرق والدرجات في حسابك الخاص
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Connection Status */}
+              <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
+                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                  <RefreshCw className="h-4 w-4 text-blue-400" />
+                  <span>حالة الاتصال والربط</span>
+                </h4>
+                
+                {!authStore.getGoogleUser() ? (
+                  <div className="space-y-3">
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs leading-relaxed">
+                      ⚠️ لم يتم تسجيل الدخول بحساب جوجل. يرجى تسجيل الدخول أولاً لتمكين المزامنة مع جداول البيانات.
+                    </div>
+                    <button
+                      onClick={async () => {
+                        sounds.playTap();
+                        const res = await authStore.loginWithGoogle();
+                        if (res.success) {
+                          showFeedback("تم تسجيل الدخول بحساب جوجل بنجاح!", "success");
+                        } else {
+                          showFeedback(res.error || "فشل تسجيل الدخول", "error");
+                        }
+                      }}
+                      className="w-full py-3 rounded-xl bg-white text-slate-900 font-black text-xs flex items-center justify-center gap-2 hover:bg-slate-100 transition-all cursor-pointer"
+                    >
+                      <img src="https://www.google.com/favicon.ico" className="h-4 w-4" alt="Google" />
+                      <span>تسجيل الدخول باستخدام Google</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+                      {authStore.getGoogleUser()?.photoURL && (
+                        <div className="h-10 w-10 rounded-full border-2 border-emerald-500 overflow-hidden shrink-0">
+                          <img src={authStore.getGoogleUser()?.photoURL || ""} alt="User" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-black text-white truncate">{authStore.getGoogleUser()?.displayName}</div>
+                        <div className="text-[10px] text-slate-400 truncate">{authStore.getGoogleUser()?.email}</div>
+                      </div>
+                      <button 
+                        onClick={() => authStore.logout()}
+                        className="text-[10px] font-bold text-rose-400 hover:text-rose-300"
+                      >
+                        خروج
+                      </button>
+                    </div>
+
+                    {!googleSheets.getSpreadsheetId() ? (
+                      <div className="space-y-3">
+                        <p className="text-xs text-slate-300">
+                          جاهز للربط! يمكنك إنشاء ملف شيت جديد الآن ليبدأ النظام في حفظ البيانات عليه.
+                        </p>
+                        <button
+                          onClick={async () => {
+                            try {
+                              sounds.playTap();
+                              showFeedback("جاري إنشاء ملف الشيت...", "info");
+                              const id = await googleSheets.createMeetingSheet(`بيانات اجتماع الشباب - ${data.config.meetingName}`);
+                              showFeedback("تم إنشاء الملف وربطه بنجاح! 🎉", "success");
+                              setData({ ...meetingStore.getData() }); // Refresh
+                            } catch (e: any) {
+                              showFeedback(e.message, "error");
+                            }
+                          }}
+                          className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
+                        >
+                          إنشاء ملف شيت جديد للاجتماع 📊
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/30">
+                          <div className="text-[10px] text-slate-400 block mb-1">معرف الملف المرتبط:</div>
+                          <code className="text-[10px] text-blue-300 font-mono break-all">{googleSheets.getSpreadsheetId()}</code>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => window.open(`https://docs.google.com/spreadsheets/d/${googleSheets.getSpreadsheetId()}`, "_blank")}
+                            className="flex-1 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-bold border border-slate-700 transition-all cursor-pointer"
+                          >
+                            فتح الملف في جوجل 🔗
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (window.confirm("هل أنت متأكد من إلغاء ربط هذا الملف؟ لن يتم حذف البيانات من جوجل ولكن سيتوقف الموقع عن استخدامه.")) {
+                                googleSheets.setSpreadsheetId("");
+                                setData({ ...meetingStore.getData() });
+                              }
+                            }}
+                            className="px-3 py-2 rounded-lg bg-rose-950/30 text-rose-400 hover:bg-rose-500 hover:text-white text-[11px] font-bold border border-rose-500/30 transition-all cursor-pointer"
+                          >
+                            إلغاء الربط
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Sync Actions */}
+              <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-5">
+                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-amber-400" />
+                  <span>عمليات المزامنة والنسخ</span>
+                </h4>
+
+                <div className="grid grid-cols-1 gap-3">
+                  <button
+                    disabled={!googleSheets.getSpreadsheetId()}
+                    onClick={async () => {
+                      sounds.playTap();
+                      showFeedback("جاري رفع البيانات إلى جوجل...", "info");
+                      const res = await meetingStore.syncToSheets();
+                      if (res.success) {
+                        showFeedback("تم رفع كافة البيانات بنجاح! ✅", "success");
+                      } else {
+                        showFeedback(res.error || "فشل الرفع", "error");
+                      }
+                    }}
+                    className="group relative overflow-hidden p-4 rounded-xl border border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 transition-all text-right disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-black text-blue-300">رفع البيانات (Upload)</span>
+                      <ArrowRight className="h-4 w-4 text-blue-400 -rotate-90" />
+                    </div>
+                    <p className="text-[10px] text-slate-400">تحديث ملف الشيت بالبيانات الموجودة حالياً في الموقع (الفرق، الأعضاء، النقاط)</p>
+                  </button>
+
+                  <button
+                    disabled={!googleSheets.getSpreadsheetId()}
+                    onClick={async () => {
+                      if (window.confirm("هل أنت متأكد؟ هذا سيقوم باستبدال البيانات الحالية في الموقع بالبيانات الموجودة في جوجل شيت.")) {
+                        sounds.playTap();
+                        showFeedback("جاري جلب البيانات من جوجل...", "info");
+                        const res = await meetingStore.syncFromSheets();
+                        if (res.success) {
+                          showFeedback("تم استيراد البيانات بنجاح! 📥", "success");
+                        } else {
+                          showFeedback(res.error || "فشل الاستيراد", "error");
+                        }
+                      }
+                    }}
+                    className="group relative overflow-hidden p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition-all text-right disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-black text-emerald-300">جلب البيانات (Download)</span>
+                      <ArrowRight className="h-4 w-4 text-emerald-400 rotate-90" />
+                    </div>
+                    <p className="text-[10px] text-slate-400">تحميل البيانات من جوجل شيت إلى الموقع (مفيد لاستعادة نسخة سابقة أو مزامنة جهاز آخر)</p>
+                  </button>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-800/50 border border-slate-700 text-[10px] text-slate-400 leading-relaxed">
+                  <span className="font-bold text-slate-300 block mb-1">نصيحة للمدير:</span>
+                  يمكنك تعديل درجات الفرق أو أسماء الأعضاء يدوياً من ملف الشيت في جوجل، ثم الضغط على "جلب البيانات" لتظهر التعديلات هنا فوراً.
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

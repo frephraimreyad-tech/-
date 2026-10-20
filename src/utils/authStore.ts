@@ -1,4 +1,19 @@
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  onAuthStateChanged, 
+  User
+} from 'firebase/auth';
+import firebaseConfig from '../../firebase-applet-config.json';
 import type { CustomMember, MemberPermissions, RoleType } from "../types";
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope('https://www.googleapis.com/auth/spreadsheets');
+googleProvider.addScope('https://www.googleapis.com/auth/drive.file');
 
 export interface SystemUser {
   id: string;
@@ -9,6 +24,7 @@ export interface SystemUser {
   teamName?: string;
   accessCode: string;
   permissions: MemberPermissions;
+  email?: string;
 }
 
 export const SUPER_ADMIN_USER: SystemUser = {
@@ -44,12 +60,12 @@ export function getRoleDefaultPermissions(role: RoleType): MemberPermissions {
       };
     case "leader":
       return {
-        canAwardPoints: false, // مٌقيد تماماً عن رصد النقاط اليدوية
-        canEditTeams: false, // مٌقيد عن تعديل بيانات الفرق
-        canEditMembers: false, // مٌقيد عن تعديل بيانات الأعضاء
+        canAwardPoints: false,
+        canEditTeams: false,
+        canEditMembers: false,
         canManagePermissions: false,
         canCreateEvents: false,
-        canScanAttendance: true, // مسموح له فقط بمسح QR لتسجيل حضور أعضاء مجموعته
+        canScanAttendance: true,
         canExportData: true,
         canClearLogs: false,
       };
@@ -94,10 +110,24 @@ const AUTH_STORAGE_KEY = "meeting_active_auth_user_v2";
 
 class AuthStore {
   private currentUser: SystemUser = SUPER_ADMIN_USER;
+  private googleUser: User | null = null;
+  private accessToken: string | null = null;
   private listeners: Array<() => void> = [];
+  private isSigningIn = false;
 
   constructor() {
     this.loadSession();
+    this.initFirebaseObserver();
+  }
+
+  private initFirebaseObserver() {
+    onAuthStateChanged(auth, async (user) => {
+      this.googleUser = user;
+      if (!user) {
+        this.accessToken = null;
+      }
+      this.notify();
+    });
   }
 
   private loadSession() {
@@ -116,6 +146,14 @@ class AuthStore {
 
   getCurrentUser(): SystemUser {
     return this.currentUser;
+  }
+
+  getGoogleUser(): User | null {
+    return this.googleUser;
+  }
+
+  async getAccessToken(): Promise<string | null> {
+    return this.accessToken;
   }
 
   subscribe(listener: () => void): () => void {
@@ -137,6 +175,29 @@ class AuthStore {
     this.notify();
   }
 
+  async loginWithGoogle(): Promise<{ success: boolean; error?: string }> {
+    try {
+      this.isSigningIn = true;
+      const result = await signInWithPopup(auth, googleProvider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (!credential?.accessToken) {
+        throw new Error('Failed to get access token');
+      }
+      this.accessToken = credential.accessToken;
+      
+      // Also try to find this user in our members list if they are not super admin
+      // This part will be handled by the UI/Store after login
+      
+      this.notify();
+      return { success: true };
+    } catch (error: any) {
+      console.error('Google login error:', error);
+      return { success: false, error: error.message };
+    } finally {
+      this.isSigningIn = false;
+    }
+  }
+
   loginWithCode(
     code: string,
     allMembers: CustomMember[],
@@ -147,13 +208,11 @@ class AuthStore {
       return { success: false, error: "برجاء إدخال كود المرور" };
     }
 
-    // 1. Check Super Admin
     if (cleanCode === SUPER_ADMIN_USER.accessCode || cleanCode.toUpperCase() === "ADMIN") {
       this.setCurrentUser(SUPER_ADMIN_USER);
       return { success: true, user: SUPER_ADMIN_USER };
     }
 
-    // 2. Search in Members
     const member = allMembers.find(
       (m) =>
         m.accessCode === cleanCode ||
@@ -194,7 +253,9 @@ class AuthStore {
     return !!this.currentUser.permissions[permKey];
   }
 
-  logout() {
+  async logout() {
+    await auth.signOut();
+    this.accessToken = null;
     this.setCurrentUser(SUPER_ADMIN_USER);
   }
 }

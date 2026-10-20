@@ -14,6 +14,7 @@ import type {
 } from "../types";
 import { type SystemUser, SUPER_ADMIN_USER, getRoleDefaultPermissions } from "./authStore";
 import { db } from "./firebase";
+import { googleSheets } from "./googleSheets";
 import { 
   doc, 
   collection, 
@@ -1311,6 +1312,98 @@ class MeetingStore {
       console.error("Failed to parse imported json:", e);
     }
     return false;
+  }
+  /**
+   * مزامنة كافة البيانات الحالية إلى ملف جوجل شيت المرتبط
+   */
+  async syncToSheets(): Promise<{ success: boolean; error?: string }> {
+    try {
+      const spreadsheetId = googleSheets.getSpreadsheetId();
+      if (!spreadsheetId) {
+        return { success: false, error: "لم يتم ربط ملف جوجل شيت بعد" };
+      }
+
+      // 1. Teams
+      const teamValues = this.data.teams.map(t => [
+        t.id, t.name, t.icon, t.color, t.slogan || "", t.leaderName || "", t.points
+      ]);
+      await googleSheets.updateSheetData("Teams!A2", teamValues);
+
+      // 2. Members
+      const memberValues = this.data.members.map(m => [
+        m.id, m.name, m.teamId, m.role, m.roleLabel || "", m.points, m.accessCode, m.phone || "", m.notes || "", JSON.stringify(m.permissions || {}), m.nameEn || ""
+      ]);
+      await googleSheets.updateSheetData("Members!A2", memberValues);
+
+      // 3. Transactions
+      const txValues = this.data.transactions.slice(0, 100).map(tx => [
+        tx.id, tx.timestamp, tx.targetType, tx.targetId, tx.targetName, tx.teamId, tx.teamName, tx.points, tx.reason, tx.category || "", tx.executorName || "", tx.executorRole || ""
+      ]);
+      await googleSheets.updateSheetData("Transactions!A2", txValues);
+
+      // 4. Config
+      const configValues = [
+        ["meetingName", this.data.config.meetingName],
+        ["churchName", this.data.config.churchName],
+        ["seasonName", this.data.config.seasonName],
+        ["subTitle", this.data.config.subTitle],
+      ];
+      await googleSheets.updateSheetData("Config!A2", configValues);
+
+      return { success: true };
+    } catch (error: any) {
+      console.error("Sync to sheets failed:", error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * جلب البيانات من ملف جوجل شيت وتحديث الحالة المحلية
+   */
+  async syncFromSheets(): Promise<{ success: boolean; error?: string }> {
+    try {
+      const spreadsheetId = googleSheets.getSpreadsheetId();
+      if (!spreadsheetId) {
+        return { success: false, error: "لم يتم ربط ملف جوجل شيت بعد" };
+      }
+
+      // 1. Teams
+      const teamRows = await googleSheets.readSheetData("Teams!A2:G");
+      const teams: CustomTeam[] = teamRows.map((row: any) => ({
+        id: row[0],
+        name: row[1],
+        icon: row[2],
+        color: row[3],
+        slogan: row[4],
+        leaderName: row[5],
+        points: parseInt(row[6]) || 0,
+      }));
+
+      // 2. Members
+      const memberRows = await googleSheets.readSheetData("Members!A2:K");
+      const members: CustomMember[] = memberRows.map((row: any) => ({
+        id: row[0],
+        name: row[1],
+        teamId: row[2],
+        role: row[3] as RoleType,
+        roleLabel: row[4],
+        points: parseInt(row[5]) || 0,
+        accessCode: row[6],
+        phone: row[7],
+        notes: row[8],
+        permissions: row[9] ? JSON.parse(row[9]) : {},
+        nameEn: row[10],
+      }));
+
+      if (teams.length > 0) this.data.teams = teams;
+      if (members.length > 0) this.data.members = members;
+
+      this.notify();
+      return { success: true };
+    } catch (error: any) {
+      console.error("Sync from sheets failed:", error);
+      return { success: false, error: error.message };
+    }
   }
 }
 
