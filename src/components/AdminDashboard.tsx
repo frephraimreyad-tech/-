@@ -40,6 +40,7 @@ import { AdminPanel } from "./AdminPanel";
 
 interface AdminDashboardProps {
   onBackToScoreboard: () => void;
+  initialPanelTab?: "quick_score" | "reasons" | "teams" | "members" | "events" | "permissions" | "log" | "settings";
 }
 
 // Preset Colors for Teams
@@ -65,7 +66,7 @@ const TEAM_PRESET_ICONS = [
 const ADMIN_PIN_KEY = "admin_dashboard_simple_pin_v1";
 const ADMIN_UNLOCKED_SESSION_KEY = "admin_dashboard_unlocked_session_v1";
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboard }) => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboard, initialPanelTab }) => {
   // Store Data & User State
   const [data, setData] = useState(meetingStore.getData());
   const [currentUser, setCurrentUser] = useState<SystemUser>(authStore.getCurrentUser());
@@ -118,7 +119,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
   // Other Modals
   const [showQRScanner, setShowQRScanner] = useState<boolean>(false);
   const [showUserSwitcher, setShowUserSwitcher] = useState<boolean>(false);
-  const [showAdvancedPanel, setShowAdvancedPanel] = useState<boolean>(false);
+  const [showAdvancedPanel, setShowAdvancedPanel] = useState<boolean>(!!initialPanelTab);
+  const [panelTab, setPanelTab] = useState<"quick_score" | "reasons" | "teams" | "members" | "events" | "permissions" | "log" | "settings" | undefined>(initialPanelTab);
 
   // Toast / Feedback Alert
   const [feedback, setFeedback] = useState<{ text: string; type: "success" | "error" | "info" } | null>(null);
@@ -432,7 +434,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
   };
 
   if (showAdvancedPanel) {
-    return <AdminPanel onBackToScoreboard={() => setShowAdvancedPanel(false)} />;
+    return <AdminPanel onBackToScoreboard={() => {
+        setShowAdvancedPanel(false);
+        setPanelTab(undefined);
+    }} initialTab={panelTab} />;
   }
 
   return (

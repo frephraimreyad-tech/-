@@ -23,6 +23,7 @@ import {
   ArrowDown,
   TrendingUp,
   TrendingDown,
+  Edit2,
 } from "lucide-react";
 import type { ProcessedMeetingTeam } from "../types";
 import { meetingStore } from "../utils/meetingStore";
@@ -43,6 +44,7 @@ export const Top10Scoreboard: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"scoreboard" | "admin">("scoreboard");
+  const [adminInitialTab, setAdminInitialTab] = useState<any>(undefined);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showUserSwitcher, setShowUserSwitcher] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -241,7 +243,13 @@ export const Top10Scoreboard: React.FC = () => {
 
   // If Admin View is active, render AdminDashboard
   if (viewMode === "admin") {
-    return <AdminDashboard onBackToScoreboard={() => setViewMode("scoreboard")} />;
+    return <AdminDashboard 
+      onBackToScoreboard={() => {
+        setViewMode("scoreboard");
+        setAdminInitialTab(undefined);
+      }} 
+      initialPanelTab={adminInitialTab}
+    />;
   }
 
   return (
@@ -281,9 +289,24 @@ export const Top10Scoreboard: React.FC = () => {
                   </span>
                 </div>
 
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight leading-tight">
-                  {data.config.meetingName}
-                </h1>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight leading-tight">
+                    {data.config.meetingName}
+                  </h1>
+                  {currentUser.role === "admin" && (
+                    <button
+                      onClick={() => {
+                        sounds.playTap();
+                        setAdminInitialTab("settings");
+                        setViewMode("admin");
+                      }}
+                      className="p-1.5 rounded-lg bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700 transition-all cursor-pointer"
+                      title="تعديل اسم الاجتماع والكنيسة"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
                 <p className="text-[10px] sm:text-xs text-slate-300 font-medium">
                   {data.config.subTitle} • المس أي فريق لعرض قائمة الأعضاء والنقاط
                 </p>

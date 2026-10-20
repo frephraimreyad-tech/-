@@ -54,6 +54,7 @@ import { UserSwitcherModal } from "./UserSwitcherModal";
 
 interface AdminPanelProps {
   onBackToScoreboard: () => void;
+  initialTab?: "quick_score" | "reasons" | "teams" | "members" | "events" | "permissions" | "log" | "settings";
 }
 
 const EMOJI_OPTIONS = ["🦁", "⚔️", "📜", "🕊️", "⭐", "👑", "🛡️", "⚓", "🌿", "📖", "❤️", "🔥", "⛵", "🦅", "💡", "🎺"];
@@ -86,10 +87,10 @@ const REASON_EMOJI_OPTIONS = [
   "🎯", "⏰", "📖", "💡", "❤️", "✨", "🏓", "🎵", "🏆", "🦁", "⚔️", "📜", "🕊️", "⭐", "👑", "🛡️", "🔥", "⛵", "🌿"
 ];
 
-export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard }) => {
+export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, initialTab }) => {
   const [activeTab, setActiveTab] = useState<
     "quick_score" | "reasons" | "teams" | "members" | "events" | "permissions" | "log" | "settings"
-  >("quick_score");
+  >(initialTab || "quick_score");
 
   // Auth User
   const [currentUser, setCurrentUser] = useState<SystemUser>(authStore.getCurrentUser());

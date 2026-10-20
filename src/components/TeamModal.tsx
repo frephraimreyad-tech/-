@@ -46,6 +46,8 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [showTeamScanner, setShowTeamScanner] = useState(false);
   const [showScannerForMember, setShowScannerForMember] = useState<CustomMember | null>(null);
+  const [showAddMemberForm, setShowAddMemberForm] = useState(false);
+  const [newMemberName, setNewMemberName] = useState("");
 
   useEffect(() => {
     const unsub = authStore.subscribe(() => {
@@ -81,6 +83,38 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
   const handleClose = () => {
     sounds.playClose();
     onClose();
+  };
+
+  const handleAddNewMember = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!team || !newMemberName.trim()) return;
+
+    if (!currentUser.permissions.canEditMembers) {
+      setToastMsg("⚠️ صلاحية إضافة أعضاء مقصورة على المسؤولين فقط.");
+      setTimeout(() => setToastMsg(null), 3000);
+      return;
+    }
+
+    const res = meetingStore.addMember(
+      {
+        name: newMemberName.trim(),
+        teamId: team.id,
+        role: "member",
+        roleLabel: "مشارك",
+        initialPoints: 0,
+      },
+      currentUser
+    );
+
+    if (res.success) {
+      sounds.playVictory();
+      setToastMsg(`تم إضافة العضو "${newMemberName}" بنجاح!`);
+      setNewMemberName("");
+      setShowAddMemberForm(false);
+    } else {
+      setToastMsg(`❌ فشل إضافة العضو: ${res.error || "خطأ غير معروف"}`);
+    }
+    setTimeout(() => setToastMsg(null), 3000);
   };
 
   const handleAwardTeamPoints = (e: React.FormEvent) => {
@@ -421,6 +455,23 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                   </div>
                 {/* Filter and Sort Controls */}
                 <div className="flex items-center gap-2 overflow-x-auto pb-1 flex-wrap sm:flex-nowrap">
+                  {currentUser.permissions.canEditMembers && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playTap();
+                        setShowAddMemberForm(!showAddMemberForm);
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                        showAddMemberForm
+                          ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow-lg shadow-emerald-500/20"
+                          : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30"
+                      }`}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>إضافة عضو جديد 👤</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -476,6 +527,47 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                     </div>
                   </div>
                 </div>
+
+                {/* Add Member Form */}
+                {showAddMemberForm && (
+                  <motion.form
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    onSubmit={handleAddNewMember}
+                    className="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 space-y-3 shadow-inner"
+                  >
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-emerald-400 flex items-center gap-2">
+                        <Plus className="h-3 w-3" />
+                        <span>بيانات العضو الجديد لفريق {team.name}:</span>
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddMemberForm(false)}
+                        className="text-slate-500 hover:text-white transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newMemberName}
+                        onChange={(e) => setNewMemberName(e.target.value)}
+                        placeholder="اكتب اسم العضو الرباعي هنا..."
+                        className="flex-1 h-10 px-4 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-emerald-400 placeholder:text-slate-600"
+                        autoFocus
+                        required
+                      />
+                      <button
+                        type="submit"
+                        className="px-6 h-10 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-lg shadow-emerald-900/20 transition-all active:scale-95"
+                      >
+                        إضافة الآن ✅
+                      </button>
+                    </div>
+                  </motion.form>
+                )}
 
                 {/* Member Search */}
                 <div className="relative">
