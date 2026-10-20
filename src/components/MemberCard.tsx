@@ -14,7 +14,11 @@ export const MemberCard: React.FC<MemberCardProps> = ({ member, team, onClose })
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
 
   useEffect(() => {
-    QRCode.toDataURL(member.accessCode, {
+    // Generate a full URL that includes the access code as a query parameter
+    const baseUrl = window.location.origin + window.location.pathname;
+    const loginUrl = `${baseUrl}?code=${member.accessCode}`;
+
+    QRCode.toDataURL(loginUrl, {
       width: 200,
       margin: 1,
       color: {

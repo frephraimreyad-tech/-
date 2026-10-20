@@ -75,6 +75,27 @@ export const Top10Scoreboard: React.FC = () => {
     return () => document.removeEventListener("fullscreenchange", handleFsChange);
   }, []);
 
+  // Handle auto-login from URL QR Code
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (code && !isLoading && data.members.length > 0) {
+      const result = authStore.loginWithCode(code, data.members, data.teams);
+      if (result.success) {
+        // Clear the query param from URL without refreshing to keep it clean
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+        
+        sounds.playVictory();
+        setToastMsg(`مرحباً بك يا ${result.user?.name}! تم تسجيل دخولك بنجاح.`);
+        setTimeout(() => setToastMsg(null), 5000);
+      } else {
+        setToastMsg("كود الدخول من الـ QR غير صحيح أو منتهي الصلاحية.");
+        setTimeout(() => setToastMsg(null), 5000);
+      }
+    }
+  }, [isLoading, data.members, data.teams]);
+
   const processedTeams = useMemo(() => {
     return meetingStore.getProcessedTeams();
   }, [data]);
