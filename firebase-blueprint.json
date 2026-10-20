@@ -1,0 +1,145 @@
+{
+  "collections": {
+    "config": {
+      "documents": {
+        "meeting": {
+          "fields": {
+            "meetingName": "string",
+            "subTitle": "string",
+            "churchName": "string",
+            "seasonName": "string",
+            "enableSounds": "boolean",
+            "autoIdleSeconds": "number",
+            "lastSaved": "timestamp"
+          }
+        }
+      }
+    },
+    "teams": {
+      "documents": {
+        "__auto_id__": {
+          "fields": {
+            "id": "string",
+            "name": "string",
+            "icon": "string",
+            "color": "string",
+            "slogan": "string",
+            "description": "string",
+            "points": "number",
+            "leaderName": "string"
+          }
+        }
+      }
+    },
+    "members": {
+      "documents": {
+        "__auto_id__": {
+          "fields": {
+            "id": "string",
+            "name": "string",
+            "nameEn": "string?",
+            "teamId": "string",
+            "role": "string",
+            "roleLabel": "string",
+            "points": "number",
+            "phone": "string?",
+            "accessCode": "string",
+            "permissions": "map"
+          }
+        }
+      }
+    },
+    "transactions": {
+      "documents": {
+        "__auto_id__": {
+          "fields": {
+            "id": "string",
+            "timestamp": "timestamp",
+            "targetType": "string",
+            "targetId": "string",
+            "targetName": "string",
+            "teamId": "string",
+            "teamName": "string",
+            "points": "number",
+            "reason": "string",
+            "category": "string",
+            "executorId": "string",
+            "executorName": "string",
+            "executorRole": "string",
+            "notes": "string?"
+          }
+        }
+      }
+    },
+    "activityReasons": {
+      "documents": {
+        "__auto_id__": {
+          "fields": {
+            "id": "string",
+            "text": "string",
+            "category": "string",
+            "points": "number",
+            "icon": "string"
+          }
+        }
+      }
+    },
+    "events": {
+      "documents": {
+        "__auto_id__": {
+          "fields": {
+            "id": "string",
+            "title": "string",
+            "date": "string",
+            "description": "string",
+            "qrCode": "string",
+            "attendancePoints": "number",
+            "punctualityBonusPoints": "number",
+            "isActive": "boolean",
+            "createdAt": "timestamp",
+            "createdBy": "string"
+          }
+        }
+      }
+    },
+    "attendance": {
+      "documents": {
+        "__auto_id__": {
+          "fields": {
+            "id": "string",
+            "eventId": "string",
+            "eventTitle": "string",
+            "memberId": "string",
+            "memberName": "string",
+            "teamId": "string",
+            "teamName": "string",
+            "scannedAt": "timestamp",
+            "scannedByUserId": "string",
+            "scannedByUserName": "string",
+            "pointsAwarded": "number",
+            "isPunctual": "boolean"
+          }
+        }
+      }
+    },
+    "auditLogs": {
+      "documents": {
+        "__auto_id__": {
+          "fields": {
+            "id": "string",
+            "timestamp": "timestamp",
+            "userId": "string",
+            "userName": "string",
+            "userRole": "string",
+            "action": "string",
+            "targetType": "string",
+            "targetId": "string",
+            "targetName": "string",
+            "details": "string",
+            "status": "string"
+          }
+        }
+      }
+    }
+  }
+}
