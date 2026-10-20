@@ -380,6 +380,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
   const [newMemberPhone, setNewMemberPhone] = useState("");
   const [newMemberAvatarUrl, setNewMemberAvatarUrl] = useState("");
   const [memberSearchTerm, setMemberSearchTerm] = useState("");
+  const [memberSubTab, setMemberSubTab] = useState<RoleType>("member");
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
 
   const handleSaveMember = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -392,18 +394,44 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
       return;
     }
 
-    await meetingStore.addMember({
-      name: newMemberName,
-      teamId: newMemberTeamId,
-      role: newMemberRole,
-      phone: newMemberPhone,
-      avatarUrl: newMemberAvatarUrl,
-    });
-    sounds.playTap();
-    showFeedback(`تم إضافة "${newMemberName}" إلى أعضاء الفريق!`);
+    if (editingMemberId) {
+      await meetingStore.updateMember(editingMemberId, {
+        name: newMemberName,
+        teamId: newMemberTeamId,
+        role: newMemberRole,
+        phone: newMemberPhone,
+        avatarUrl: newMemberAvatarUrl,
+      });
+      sounds.playVictory();
+      showFeedback(`تم تحديث بيانات "${newMemberName}" بنجاح!`);
+    } else {
+      await meetingStore.addMember({
+        name: newMemberName,
+        teamId: newMemberTeamId,
+        role: newMemberRole,
+        phone: newMemberPhone,
+        avatarUrl: newMemberAvatarUrl,
+      });
+      sounds.playTap();
+      showFeedback(`تم إضافة "${newMemberName}" إلى أعضاء الفريق!`);
+    }
+    
+    setEditingMemberId(null);
     setNewMemberName("");
     setNewMemberPhone("");
     setNewMemberAvatarUrl("");
+  };
+
+  const handleStartEditMember = (member: CustomMember) => {
+    setEditingMemberId(member.id);
+    setNewMemberName(member.name);
+    setNewMemberTeamId(member.teamId);
+    setNewMemberRole(member.role as any);
+    setNewMemberPhone(member.phone || "");
+    setNewMemberAvatarUrl(member.avatarUrl || "");
+    sounds.playTap();
+    // Scroll to form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDeleteMember = (memberId: string, name: string) => {
@@ -1754,10 +1782,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
           <div className="space-y-6">
             {/* Add Member Form */}
             <div className="rounded-3xl border border-slate-800 bg-[#0B132B]/80 p-5 sm:p-7 shadow-xl space-y-5">
-              <h2 className="text-lg font-black text-sky-300 flex items-center gap-2">
-                <Users className="h-5 w-5 text-sky-400" />
-                <span>إضافة مشارك / خادم جديد للفريق</span>
-              </h2>
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="h-9 w-9 rounded-xl bg-sky-500/20 border border-sky-500/30 flex items-center justify-center text-sky-400">
+                      {editingMemberId ? <Edit2 className="h-5 w-5" /> : <Users className="h-5 w-5" />}
+                    </span>
+                    <h2 className="text-lg sm:text-xl font-black text-white">
+                      {editingMemberId ? "تعديل بيانات العضو" : "إضافة مشارك / خادم جديد للفريق"}
+                    </h2>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    {editingMemberId ? "قم بتعديل بيانات العضو الحالي ثم اضغط حفظ" : "إضافة الأعضاء وتوزيعهم على الفرق وتحديد أدوارهم (قائد، خادم، أو مشارك)."}
+                  </p>
+                </div>
+                {editingMemberId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingMemberId(null);
+                      setNewMemberName("");
+                      setNewMemberPhone("");
+                      setNewMemberAvatarUrl("");
+                      sounds.playClose();
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white text-xs font-bold transition-all active:scale-95 cursor-pointer"
+                  >
+                    إلغاء التعديل
+                  </button>
+                )}
+              </div>
 
               <form onSubmit={handleSaveMember} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1833,31 +1887,77 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                 <div className="pt-2">
                   <button
                     type="submit"
-                    className="w-full h-11 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                    className={`w-full h-11 rounded-xl font-black text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      editingMemberId ? 'bg-amber-500 hover:bg-amber-400 text-slate-950' : 'bg-sky-500 hover:bg-sky-400 text-slate-950'
+                    }`}
                   >
-                    <Plus className="h-4 w-4" />
-                    <span>إضافة المشارك للفريق</span>
+                    {editingMemberId ? <CheckCircle className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                    <span>{editingMemberId ? "حفظ التعديلات" : "إضافة المشارك للفريق"}</span>
                   </button>
                 </div>
               </form>
             </div>
 
+            {/* Sub-tabs for roles */}
+            <div className="flex items-center gap-2 p-1 bg-slate-900/80 rounded-2xl border border-slate-800 mb-4 overflow-x-auto no-scrollbar">
+              <button
+                onClick={() => setMemberSubTab("member")}
+                className={`px-4 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap cursor-pointer ${
+                  memberSubTab === "member" ? "bg-emerald-500 text-slate-950 shadow-md" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                المخدومين / المشاركين ({data.members.filter(m => m.role === "member").length})
+              </button>
+              <button
+                onClick={() => setMemberSubTab("leader")}
+                className={`px-4 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap cursor-pointer ${
+                  memberSubTab === "leader" ? "bg-sky-500 text-slate-950 shadow-md" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                قادة المجموعات ({data.members.filter(m => m.role === "leader").length})
+              </button>
+              <button
+                onClick={() => setMemberSubTab("servant")}
+                className={`px-4 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap cursor-pointer ${
+                  memberSubTab === "servant" ? "bg-amber-500 text-slate-950 shadow-md" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                الخدام / المسؤولين ({data.members.filter(m => m.role === "servant" || m.role === "admin").length})
+              </button>
+            </div>
+
             {/* Search and List */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-base font-bold text-white">قائمة الأعضاء المسجلين ({data.members.length})</h3>
-                <input
-                  type="text"
-                  value={memberSearchTerm}
-                  onChange={(e) => setMemberSearchTerm(e.target.value)}
-                  placeholder="ابحث باسم المشارك..."
-                  className="w-64 h-9 px-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder:text-slate-500"
-                />
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <h3 className="text-sm font-black text-white flex items-center gap-2">
+                  <Users className="h-4 w-4 text-sky-400" />
+                  <span>
+                    {memberSubTab === "member" ? "قائمة المخدومين" : memberSubTab === "leader" ? "قائمة القادة" : "قائمة الخدام والمسؤولين"}
+                  </span>
+                </h3>
+                <div className="relative">
+                  <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+                  <input
+                    type="text"
+                    value={memberSearchTerm}
+                    onChange={(e) => setMemberSearchTerm(e.target.value)}
+                    placeholder="ابحث بالاسم أو الكود..."
+                    className="w-full sm:w-64 h-9 pr-8 pl-3 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-sky-500 shadow-inner"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {data.members
-                  .filter((m) => !memberSearchTerm || m.name.toLowerCase().includes(memberSearchTerm.toLowerCase()))
+                  .filter((m) => {
+                    const matchesRole = memberSubTab === "servant" 
+                      ? (m.role === "servant" || m.role === "admin" || m.role === "priest")
+                      : m.role === memberSubTab;
+                    const matchesSearch = !memberSearchTerm || 
+                      m.name.toLowerCase().includes(memberSearchTerm.toLowerCase()) ||
+                      (m.accessCode && m.accessCode.toLowerCase().includes(memberSearchTerm.toLowerCase()));
+                    return matchesRole && matchesSearch;
+                  })
                   .map((m) => {
                     const team = data.teams.find((t) => t.id === m.teamId);
                     return (
@@ -1910,6 +2010,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                             {m.points} XP
                           </span>
                           <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditMember(m)}
+                              className="p-1.5 rounded-lg bg-slate-800/90 hover:bg-emerald-500 hover:text-slate-950 text-emerald-400 border border-emerald-500/30 transition-all cursor-pointer shadow-xs active:scale-90"
+                              title="تعديل بيانات العضو"
+                            >
+                              <Edit2 className="h-3.5 w-3.5" />
+                            </button>
                             <button
                               type="button"
                               onClick={() => handleOpenEditMemberPerms(m)}

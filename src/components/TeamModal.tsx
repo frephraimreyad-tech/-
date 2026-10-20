@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   X,
+  User,
   Trophy,
   Sparkles,
   Zap,
@@ -604,44 +605,67 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                       return (
                         <div
                           key={member.id}
-                          className={`p-3.5 rounded-2xl border transition-all shadow-xs flex items-center justify-between gap-3 ${
+                          className={`p-3 sm:p-4 rounded-2xl border transition-all shadow-sm flex items-center gap-3.5 ${
                             isLeader
-                              ? "border-amber-500/40 bg-gradient-to-l from-amber-950/25 via-slate-900/80 to-slate-900"
+                              ? "border-amber-500/40 bg-gradient-to-l from-amber-950/30 via-slate-900/80 to-slate-900"
                               : isServant
-                              ? "border-purple-500/40 bg-gradient-to-l from-purple-950/25 via-slate-900/80 to-slate-900"
-                              : "border-slate-800/80 bg-slate-900/60"
+                              ? "border-purple-500/40 bg-gradient-to-l from-purple-950/30 via-slate-900/80 to-slate-900"
+                              : "border-slate-800/80 bg-slate-900/60 hover:bg-slate-900/80"
                           }`}
                         >
-                          <div className="space-y-1 min-w-0 flex-1">
+                          {/* Member Avatar */}
+                          <div className="relative shrink-0">
+                            <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full border-2 border-slate-700/50 bg-slate-800 overflow-hidden flex items-center justify-center shadow-md">
+                              {member.avatarUrl ? (
+                                <img src={member.avatarUrl} alt={member.name} className="h-full w-full object-cover" />
+                              ) : (
+                                <User className="h-6 w-6 sm:h-7 sm:w-7 text-slate-500" />
+                              )}
+                            </div>
+                            {isLeader && (
+                              <div className="absolute -bottom-1 -right-1 bg-amber-500 rounded-full p-1 border-2 border-slate-900 shadow-sm">
+                                <Crown className="h-2.5 w-2.5 text-slate-950" />
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="space-y-0.5 min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-bold text-sm sm:text-base text-white truncate">
+                              <span className="font-bold text-sm sm:text-base text-white truncate leading-tight">
                                 {member.name}
                               </span>
                               {isLeader && (
-                                <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/30">
-                                  قائد فريق
+                                <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-[9px] font-black border border-amber-500/30">
+                                  قائد
                                 </span>
                               )}
                               {isServant && (
-                                <span className="px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 text-[10px] font-bold border border-purple-500/30">
+                                <span className="px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 text-[9px] font-black border border-purple-500/30">
                                   خادم
                                 </span>
                               )}
                             </div>
 
-                            {member.phone && (
-                              <div className="flex items-center gap-1 text-[11px] text-slate-400 font-mono">
-                                <Phone className="h-3 w-3 text-slate-500" />
-                                <span>{member.phone}</span>
-                              </div>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {member.phone && (
+                                <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
+                                  <Phone className="h-2.5 w-2.5 text-slate-500" />
+                                  <span>{member.phone}</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0">
-                            <span className="px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-black font-mono flex items-center gap-1">
-                              <Zap className="h-3 w-3" />
-                              <span>{member.points || 0} XP</span>
-                            </span>
+                            <div className="text-left" dir="ltr">
+                               <div className="flex items-center gap-1 text-amber-400">
+                                  <span className="text-[10px] font-bold text-amber-500/70 font-arabic">XP</span>
+                                  <span className="text-sm sm:text-base font-black font-mono leading-none">
+                                     {member.points.toLocaleString("en-US")}
+                                  </span>
+                               </div>
+                               <div className="text-[8px] text-slate-500 font-bold text-right" dir="rtl">نقاط العضو</div>
+                            </div>
 
                             {/* Quick +25 points button for member */}
                             <button
