@@ -373,6 +373,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
   const [newMemberTeamId, setNewMemberTeamId] = useState(data.teams[0]?.id || "");
   const [newMemberRole, setNewMemberRole] = useState<"member" | "leader" | "servant">("member");
   const [newMemberPhone, setNewMemberPhone] = useState("");
+  const [newMemberAvatarUrl, setNewMemberAvatarUrl] = useState("");
   const [memberSearchTerm, setMemberSearchTerm] = useState("");
 
   const handleSaveMember = async (e: React.FormEvent) => {
@@ -391,11 +392,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
       teamId: newMemberTeamId,
       role: newMemberRole,
       phone: newMemberPhone,
+      avatarUrl: newMemberAvatarUrl,
     });
     sounds.playTap();
     showFeedback(`تم إضافة "${newMemberName}" إلى أعضاء الفريق!`);
     setNewMemberName("");
     setNewMemberPhone("");
+    setNewMemberAvatarUrl("");
   };
 
   const handleDeleteMember = (memberId: string, name: string) => {
@@ -1793,6 +1796,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-300 block">رابط صورة العضو (اختياري):</label>
+                    <div className="relative">
+                      <input
+                        type="url"
+                        value={newMemberAvatarUrl}
+                        onChange={(e) => setNewMemberAvatarUrl(e.target.value)}
+                        placeholder="https://example.com/photo.jpg"
+                        className="w-full h-11 pl-10 pr-4 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-sky-400"
+                      />
+                      <Camera className="absolute left-3 top-3 h-5 w-5 text-slate-500" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-300 block">رقم الهاتف أو الواتساب (اختياري):</label>
                     <input
                       type="text"
@@ -1802,16 +1819,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                       className="w-full h-11 px-4 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-sky-400"
                     />
                   </div>
+                </div>
 
-                  <div className="flex items-end">
-                    <button
-                      type="submit"
-                      className="w-full h-11 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      <Plus className="h-4 w-4" />
-                      <span>إضافة المشارك للفريق</span>
-                    </button>
-                  </div>
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    className="w-full h-11 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>إضافة المشارك للفريق</span>
+                  </button>
                 </div>
               </form>
             </div>
@@ -1837,9 +1854,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                     return (
                       <div
                         key={m.id}
-                        className="p-3.5 rounded-2xl bg-[#0B132B]/80 border border-slate-800 flex items-center justify-between gap-2 shadow-sm"
+                        className="p-3.5 rounded-2xl bg-[#0B132B]/80 border border-slate-800 flex items-center justify-between gap-3 shadow-sm"
                       >
-                        <div className="min-w-0 space-y-1">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="h-12 w-12 rounded-full overflow-hidden bg-slate-800 border-2 border-slate-700 shrink-0 flex items-center justify-center">
+                            {m.avatarUrl ? (
+                              <img src={m.avatarUrl} alt={m.name} className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="h-full w-full flex items-center justify-center text-slate-500 bg-slate-800">
+                                <Users className="h-6 w-6" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 space-y-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-bold text-sm text-white truncate">{m.name}</span>
                             <span
@@ -1867,8 +1894,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                           </p>
                           {m.phone && <p className="text-[10px] text-slate-500 font-mono">{m.phone}</p>}
                         </div>
+                      </div>
 
-                        <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <div className="flex flex-col items-end gap-1.5 shrink-0">
                           <span className="text-xs font-black font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
                             {m.points} XP
                           </span>
@@ -3125,13 +3153,64 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
             <div className="space-y-1 pr-6">
               <div className="flex items-center gap-2">
                 <span className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
-                  <KeyRound className="h-5 w-5" />
+                  <Edit2 className="h-5 w-5" />
                 </span>
-                <h3 className="text-lg font-black text-white">تعديل كود الوصول وصلاحيات العضو</h3>
+                <h3 className="text-lg font-black text-white">تعديل بيانات العضو</h3>
               </div>
               <p className="text-xs text-slate-400">
-                العضو: <span className="text-amber-300 font-bold">{editingMember.name}</span>
+                تحديث البيانات الأساسية والصلاحيات للعضو: <span className="text-amber-300 font-bold">{editingMember.name}</span>
               </p>
+            </div>
+
+            <div className="space-y-4">
+              {/* Basic Details Section */}
+              <div className="space-y-3 p-3 rounded-2xl bg-slate-900/50 border border-slate-800">
+                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-wider">البيانات الشخصية</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 block pr-1">اسم العضو:</label>
+                    <input
+                      type="text"
+                      defaultValue={editingMember.name}
+                      onBlur={async (e) => {
+                        if (e.target.value.trim() && e.target.value !== editingMember.name) {
+                          await meetingStore.updateMember(editingMember.id, { name: e.target.value.trim() }, currentUser);
+                        }
+                      }}
+                      className="w-full h-10 px-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 block pr-1">رقم الهاتف:</label>
+                    <input
+                      type="text"
+                      defaultValue={editingMember.phone}
+                      onBlur={async (e) => {
+                        if (e.target.value !== editingMember.phone) {
+                          await meetingStore.updateMember(editingMember.id, { phone: e.target.value.trim() }, currentUser);
+                        }
+                      }}
+                      className="w-full h-10 px-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 block pr-1">رابط الصورة الشخصية (Avatar URL):</label>
+                  <input
+                    type="url"
+                    defaultValue={editingMember.avatarUrl}
+                    onBlur={async (e) => {
+                      if (e.target.value !== editingMember.avatarUrl) {
+                        await meetingStore.updateMember(editingMember.id, { avatarUrl: e.target.value.trim() }, currentUser);
+                      }
+                    }}
+                    placeholder="https://example.com/photo.jpg"
+                    className="w-full h-10 px-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              <div className="h-px bg-slate-800 my-2" />
             </div>
 
             <form onSubmit={handleSaveMemberPerms} className="space-y-4">

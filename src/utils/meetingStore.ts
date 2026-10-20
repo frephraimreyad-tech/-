@@ -197,10 +197,8 @@ class MeetingStore {
       querySnap.forEach((doc) => {
         teams.push({ ...doc.data(), id: doc.id } as CustomTeam);
       });
-      if (teams.length > 0) {
-        this.data.teams = teams;
-        this.notify();
-      }
+      this.data.teams = teams;
+      this.notify();
     });
 
     // Listen to Members
@@ -215,10 +213,8 @@ class MeetingStore {
           permissions: { ...defaults, ...(m.permissions || {}) }
         } as CustomMember);
       });
-      if (members.length > 0) {
-        this.data.members = members;
-        this.notify();
-      }
+      this.data.members = members;
+      this.notify();
     });
 
     // Listen to Transactions
@@ -570,6 +566,7 @@ class MeetingStore {
       roleLabel?: string;
       phone?: string;
       notes?: string;
+      avatarUrl?: string;
       initialPoints?: number;
       accessCode?: string;
       permissions?: Partial<MemberPermissions>;
@@ -601,7 +598,7 @@ class MeetingStore {
     const newMember: CustomMember = {
       id,
       name: memberData.name.trim(),
-      nameEn: memberData.nameEn?.trim(),
+      nameEn: memberData.nameEn?.trim() || "",
       teamId: memberData.teamId,
       role,
       roleLabel:
@@ -614,8 +611,9 @@ class MeetingStore {
           ? "أب كاهن"
           : "مشارك"),
       points: memberData.initialPoints || 0,
-      phone: memberData.phone?.trim(),
-      notes: memberData.notes?.trim(),
+      phone: memberData.phone?.trim() || "",
+      notes: memberData.notes?.trim() || "",
+      avatarUrl: memberData.avatarUrl || "",
       accessCode,
       permissions: {
         ...defaults,
@@ -870,7 +868,7 @@ class MeetingStore {
       points,
       reason,
       category: category || "عام",
-      notes: notes || undefined,
+      notes: notes || "",
       executorId: executor?.id || "admin",
       executorName: executor?.name || "المسؤول المختص",
       executorRole: executor?.role || "admin",
