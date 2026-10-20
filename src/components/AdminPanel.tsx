@@ -161,6 +161,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
   const [newEventPoints, setNewEventPoints] = useState(30);
   const [newEventBonus, setNewEventBonus] = useState(15);
   const [newEventStartTime, setNewEventStartTime] = useState("18:30");
+  const [newEventDate, setNewEventDate] = useState(new Date().toISOString().slice(0, 10));
   const [newEventCode, setNewEventCode] = useState("");
 
   // --- Permissions Management State ---
@@ -636,6 +637,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
         title: newEventTitle,
         description: newEventDesc,
         attendancePoints: newEventPoints,
+        date: newEventDate,
         startTime: newEventStartTime,
         punctualityBonusPoints: newEventBonus,
         qrCode: newEventCode || undefined,
@@ -650,6 +652,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
       setNewEventPoints(30);
       setNewEventBonus(15);
       setNewEventStartTime("18:30");
+      setNewEventDate(new Date().toISOString().slice(0, 10));
       setNewEventCode("");
     } else {
       sounds.playClose();
@@ -1995,6 +1998,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                         value={newEventTitle}
                         onChange={(e) => setNewEventTitle(e.target.value)}
                         placeholder="مثال: اجتماع الجمعة - لقاء دراسة الإنجيل"
+                        className="w-full h-10 px-3 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-teal-400"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-300 block">تاريخ الفعالية:</label>
+                      <input
+                        type="date"
+                        value={newEventDate}
+                        onChange={(e) => setNewEventDate(e.target.value)}
                         className="w-full h-10 px-3 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-teal-400"
                         required
                       />

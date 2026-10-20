@@ -25,7 +25,7 @@ import {
   TrendingDown,
   Edit2,
 } from "lucide-react";
-import type { ProcessedMeetingTeam } from "../types";
+import type { CustomMember, ProcessedMeetingTeam } from "../types";
 import { meetingStore } from "../utils/meetingStore";
 import { sounds } from "../utils/soundEffects";
 import { authStore, type SystemUser } from "../utils/authStore";
@@ -35,6 +35,7 @@ import { AdminPanel } from "./AdminPanel";
 import { AdminDashboard } from "./AdminDashboard";
 import { QRScannerModal } from "./QRScannerModal";
 import { UserSwitcherModal } from "./UserSwitcherModal";
+import { MemberCard } from "./MemberCard";
 export const Top10Scoreboard: React.FC = () => {
   const [data, setData] = useState(meetingStore.getData());
   const [isLoading, setIsLoading] = useState(meetingStore.getIsLoading());
@@ -75,6 +76,17 @@ export const Top10Scoreboard: React.FC = () => {
     return () => document.removeEventListener("fullscreenchange", handleFsChange);
   }, []);
 
+  // Rank change and position shift animation tracking
+  const prevRanksRef = useRef<Record<string, number>>({});
+  const prevPointsRef = useRef<Record<string, number>>({});
+  const isFirstRenderRef = useRef<boolean>(true);
+  const [rankChanges, setRankChanges] = useState<
+    Record<string, { delta: number; type: "up" | "down"; timestamp: number }>
+  >({});
+  const [pointDeltas, setPointDeltas] = useState<Record<string, { delta: number; timestamp: number }>>({});
+  const [newLeaderNotice, setNewLeaderNotice] = useState<{ teamName: string; icon: string } | null>(null);
+  const [showMemberCardOnLogin, setShowMemberCardOnLogin] = useState<CustomMember | null>(null);
+
   // Handle auto-login from URL QR Code
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -88,6 +100,13 @@ export const Top10Scoreboard: React.FC = () => {
         
         sounds.playVictory();
         setToastMsg(`مرحباً بك يا ${result.user?.name}! تم تسجيل دخولك بنجاح.`);
+        
+        // Find the full member object to show the card
+        const member = data.members.find(m => m.id === result.user?.id);
+        if (member) {
+          setShowMemberCardOnLogin(member);
+        }
+
         setTimeout(() => setToastMsg(null), 5000);
       } else {
         setToastMsg("كود الدخول من الـ QR غير صحيح أو منتهي الصلاحية.");
@@ -99,16 +118,6 @@ export const Top10Scoreboard: React.FC = () => {
   const processedTeams = useMemo(() => {
     return meetingStore.getProcessedTeams();
   }, [data]);
-
-  // Rank change and position shift animation tracking
-  const prevRanksRef = useRef<Record<string, number>>({});
-  const prevPointsRef = useRef<Record<string, number>>({});
-  const isFirstRenderRef = useRef<boolean>(true);
-  const [rankChanges, setRankChanges] = useState<
-    Record<string, { delta: number; type: "up" | "down"; timestamp: number }>
-  >({});
-  const [pointDeltas, setPointDeltas] = useState<Record<string, { delta: number; timestamp: number }>>({});
-  const [newLeaderNotice, setNewLeaderNotice] = useState<{ teamName: string; icon: string } | null>(null);
 
   useEffect(() => {
     if (isFirstRenderRef.current) {
@@ -845,6 +854,15 @@ export const Top10Scoreboard: React.FC = () => {
       {/* User Switcher / PIN Login Modal */}
       {showUserSwitcher && (
         <UserSwitcherModal onClose={() => setShowUserSwitcher(false)} />
+      )}
+
+      {/* Auto-shown Member Card on Login */}
+      {showMemberCardOnLogin && (
+        <MemberCard
+          member={showMemberCardOnLogin}
+          team={data.teams.find((t) => t.id === showMemberCardOnLogin.teamId)}
+          onClose={() => setShowMemberCardOnLogin(null)}
+        />
       )}
     </div>
   );

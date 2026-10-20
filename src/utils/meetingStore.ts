@@ -922,6 +922,7 @@ class MeetingStore {
       title: string;
       description?: string;
       attendancePoints?: number;
+      date?: string; // New: Custom date
       startTime?: string;
       punctualityBonusPoints?: number;
       qrCode?: string;
@@ -951,7 +952,7 @@ class MeetingStore {
     const newEvent: EventSession = {
       id,
       title: eventData.title.trim(),
-      date: new Date().toISOString().slice(0, 10),
+      date: eventData.date || new Date().toISOString().slice(0, 10),
       description: eventData.description?.trim() || "",
       qrCode,
       attendancePoints: eventData.attendancePoints ?? 30,
@@ -1036,11 +1037,12 @@ class MeetingStore {
       return { success: false, error: "غير مصرح لك بمسح QR لتسجيل الحضور" };
     }
 
-    // 2. Find Event by ID or QR Code
+    // 2. Find Event by ID or QR Code (Clean & Case-insensitive)
+    const cleanEventId = (eventIdOrCode || "").trim().toLowerCase();
     const event = this.data.events.find(
       (e) =>
-        e.id === eventIdOrCode ||
-        e.qrCode.toLowerCase() === eventIdOrCode.trim().toLowerCase()
+        e.id.toLowerCase() === cleanEventId ||
+        e.qrCode.trim().toLowerCase() === cleanEventId
     );
     if (!event) {
       return { success: false, error: "رمز الفعالية غير صالح أو الفعالية غير موجودة" };
@@ -1050,12 +1052,25 @@ class MeetingStore {
       return { success: false, error: "هذه الفعالية غير نشطة حالياً ولا تقبل تسجيل الحضور" };
     }
 
-    // 3. Find Member (by ID or Access Code)
+    // 3. Find Member (by ID or Access Code or URL)
+    let cleanMemberCode = (memberId || "").trim();
+    if (cleanMemberCode.includes("?code=") || cleanMemberCode.includes("&code=")) {
+      try {
+        const urlMatch = cleanMemberCode.match(/[?&]code=([^&#]+)/);
+        if (urlMatch && urlMatch[1]) {
+          cleanMemberCode = decodeURIComponent(urlMatch[1]).trim();
+        }
+      } catch {}
+    }
+    const lowerMemberCode = cleanMemberCode.toLowerCase();
+
     const member = this.data.members.find(
-      (m) => m.id === memberId || m.accessCode === memberId
+      (m) =>
+        m.id.toLowerCase() === lowerMemberCode ||
+        (m.accessCode && m.accessCode.trim().toLowerCase() === lowerMemberCode)
     );
     if (!member) {
-      return { success: false, error: "العضو المحدد غير موجود في قاعدة البيانات" };
+      return { success: false, error: `العضو صاحب الكود (${cleanMemberCode}) غير موجود في قاعدة البيانات` };
     }
 
     // Leader restriction check: if leader, check if member is in their team (optional check, or leader registering for their team)

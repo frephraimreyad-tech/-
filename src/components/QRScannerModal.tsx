@@ -11,6 +11,10 @@ import {
   Clock,
   ShieldCheck,
   RefreshCw,
+  Search,
+  Upload,
+  UserCheck,
+  Check,
   Zap,
 } from "lucide-react";
 import type { CustomMember, EventSession, ProcessedMeetingTeam } from "../types";
@@ -19,6 +23,7 @@ import { authStore, type SystemUser } from "../utils/authStore";
 import { sounds } from "../utils/soundEffects";
 
 interface QRScannerModalProps {
+  onClose: () => void;
   defaultTeamId?: string;
   defaultMemberId?: string;
   defaultEventId?: string;
@@ -33,17 +38,15 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   const [currentUser, setCurrentUser] = useState<SystemUser>(authStore.getCurrentUser());
   const data = meetingStore.getData();
 
-  const [scanMode, setScanMode] = useState<"camera" | "code_select">("camera");
-  const [selectedMemberId, setSelectedMemberId] = useState<string>(
-    defaultMemberId || ""
-  );
-  const [selectedEventId, setSelectedEventId] = useState<string>(
-    defaultEventId || ""
-  );
+  const [scanMode, setScanMode] = useState<"camera" | "code_select">("code_select");
+  const [selectedEventId, setSelectedEventId] = useState<string>(defaultEventId || "");
+  const [selectedMemberId, setSelectedMemberId] = useState<string>(defaultMemberId || "");
   const [manualCode, setManualCode] = useState<string>("");
+  const [memberSearchQuery, setMemberSearchQuery] = useState<string>("");
   const [isPunctual, setIsPunctual] = useState<boolean>(true);
-  const [isScanning, setIsScanning] = useState<boolean>(false);
+  const [isScanningLive, setIsScanningLive] = useState<boolean>(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isProcessingFile, setIsProcessingFile] = useState<boolean>(false);
 
   const [scanResult, setScanResult] = useState<{
     type: "success" | "error";
@@ -53,6 +56,8 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   } | null>(null);
 
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
+  const fileInputCameraRef = useRef<HTMLInputElement | null>(null);
+  const fileInputGalleryRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const unsub = authStore.subscribe(() => {
@@ -62,7 +67,6 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   }, []);
 
   // Filter members list based on logged-in user
-  // If team leader, filter to their team members
   const availableMembers = React.useMemo(() => {
     if (currentUser.role === "leader" && currentUser.teamId) {
       return data.members.filter((m) => m.teamId === currentUser.teamId);
@@ -73,113 +77,210 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     return data.members;
   }, [data.members, currentUser, defaultTeamId]);
 
-  // Set default selected member
+  // Auto-select the most recent active event if none provided
+  useEffect(() => {
+    if (!selectedEventId && data.events.length > 0) {
+      const activeEvents = data.events.filter((e) => e.isActive);
+      if (activeEvents.length > 0) {
+        const latest = [...activeEvents].sort(
+          (a, b) =>
+            new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+        )[0];
+        setSelectedEventId(latest.id);
+      } else {
+        setSelectedEventId(data.events[0].id);
+      }
+    }
+  }, [data.events, selectedEventId]);
+
+  // Set default selected member if available and none selected yet
   useEffect(() => {
     if (!selectedMemberId && availableMembers.length > 0) {
       setSelectedMemberId(availableMembers[0].id);
     }
   }, [availableMembers, selectedMemberId]);
 
-  // Start Camera QR Scanner
-  const startScanner = async () => {
-    setCameraError(null);
-    try {
-      if (html5QrCodeRef.current) {
-        try {
+  // Currently selected Event object
+  const currentEvent = React.useMemo(() => {
+    return data.events.find((e) => e.id === selectedEventId) || data.events[0];
+  }, [data.events, selectedEventId]);
+
+  // Currently selected Member object
+  const currentMember = React.useMemo(() => {
+    return data.members.find((m) => m.id === selectedMemberId);
+  }, [data.members, selectedMemberId]);
+
+  // Attendance map for the currently selected event
+  const attendedMemberIdsSet = React.useMemo(() => {
+    if (!currentEvent || !data.attendance) return new Set<string>();
+    return new Set(
+      data.attendance
+        .filter((a) => a.eventId === currentEvent.id)
+        .map((a) => a.memberId)
+    );
+  }, [data.attendance, currentEvent]);
+
+  // Filtered members list for quick check-in checklist
+  const filteredChecklistMembers = React.useMemo(() => {
+    const q = memberSearchQuery.trim().toLowerCase();
+    if (!q) return availableMembers;
+    return availableMembers.filter(
+      (m) =>
+        m.name.toLowerCase().includes(q) ||
+        (m.accessCode && m.accessCode.toLowerCase().includes(q)) ||
+        (m.roleLabel && m.roleLabel.toLowerCase().includes(q))
+    );
+  }, [availableMembers, memberSearchQuery]);
+
+  // Clean up Html5Qrcode instance
+  const stopLiveScanner = async () => {
+    if (html5QrCodeRef.current) {
+      try {
+        if (html5QrCodeRef.current.isScanning) {
           await html5QrCodeRef.current.stop();
-        } catch {}
+        }
+        await html5QrCodeRef.current.clear();
+      } catch (e) {
+        console.warn("Error stopping QR scanner:", e);
+      }
+      html5QrCodeRef.current = null;
+    }
+    setIsScanningLive(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      stopLiveScanner();
+    };
+  }, []);
+
+  // Start Live Camera QR Stream
+  const startLiveScanner = async () => {
+    setCameraError(null);
+    await stopLiveScanner();
+
+    try {
+      const qrRegion = document.getElementById("qr-camera-stream");
+      if (!qrRegion) {
+        setCameraError("عنصر الكاميرا غير جاهز بعد، يرجى المحاولة مرة أخرى.");
+        return;
       }
 
       const qr = new Html5Qrcode("qr-camera-stream");
       html5QrCodeRef.current = qr;
 
-      setIsScanning(true);
-      await qr.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-        },
-        (decodedText) => {
-          handleProcessQRCode(decodedText);
-        },
-        () => {
-          // Frame scan error (ignore standard not found)
-        }
-      );
-    } catch (err: any) {
-      console.warn("Camera start error, falling back to selection mode:", err);
-      setCameraError("تعذر تشغيل الكاميرا مباشرة. يمكنك اختيار الفعالية أو إدخال الكود أدناه.");
-      setIsScanning(false);
-      setScanMode("code_select");
-    }
-  };
-
-  const stopScanner = async () => {
-    if (html5QrCodeRef.current) {
+      // Try environment facing camera first
       try {
-        await html5QrCodeRef.current.stop();
-        html5QrCodeRef.current = null;
-      } catch {}
-    }
-    setIsScanning(false);
-  };
-
-  useEffect(() => {
-    if (scanMode === "camera") {
-      startScanner();
-    } else {
-      stopScanner();
-    }
-    return () => {
-      stopScanner();
-    };
-  }, [scanMode]);
-
-  const handleProcessQRCode = async (codeOrId: string) => {
-    let processedCode = codeOrId.trim();
-    
-    // If the scanned code is a URL (from our member cards), extract the 'code' parameter
-    if (processedCode.includes("?code=") || processedCode.includes("&code=")) {
-      try {
-        const url = new URL(processedCode);
-        const codeParam = url.searchParams.get("code");
-        if (codeParam) {
-          processedCode = codeParam;
+        await qr.start(
+          { facingMode: "environment" },
+          {
+            fps: 10,
+            qrbox: { width: 240, height: 240 },
+          },
+          (decodedText) => {
+            handleProcessQRCode(decodedText);
+          },
+          () => {}
+        );
+        setIsScanningLive(true);
+      } catch (envErr) {
+        // Fallback to any available camera device
+        console.warn("FacingMode environment failed, trying available cameras:", envErr);
+        const cameras = await Html5Qrcode.getCameras();
+        if (cameras && cameras.length > 0) {
+          const selectedCam = cameras[cameras.length - 1]; // usually rear camera
+          await qr.start(
+            selectedCam.id,
+            {
+              fps: 10,
+              qrbox: { width: 240, height: 240 },
+            },
+            (decodedText) => {
+              handleProcessQRCode(decodedText);
+            },
+            () => {}
+          );
+          setIsScanningLive(true);
+        } else {
+          throw envErr;
         }
-      } catch (e) {
-        // Not a valid URL, use as is
       }
+    } catch (err: any) {
+      console.warn("Live camera start failed:", err);
+      setIsScanningLive(false);
+      setCameraError(
+        "البث المباشر للكاميرا محظور بواسطة متصفح الهاتف أو سياسة الأمان. استخدم زر «التقاط صورة الكود بالكاميرا» أدناه، فهو يعمل بنسبة 100% على كافة الهواتف دون أذونات معقدة."
+      );
     }
+  };
 
-    // Determine target event and member
-    let targetEventId = selectedEventId;
-    let targetMemberId = selectedMemberId;
+  // Scan QR from File (Photo from camera or gallery)
+  const handleScanImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    // Logic: 
-    // 1. If we have an event selected but NO member selected -> The scanned code MUST be a member
-    // 2. If we have a member selected but NO event selected -> The scanned code MUST be an event
-    // 3. If we have both selected (manual mode) -> The scanned code is ignored or used as event code fallback
-    
-    if (targetEventId && !targetMemberId) {
-      targetMemberId = processedCode; // Scanned a member card
-    } else if (!targetEventId && targetMemberId) {
-      targetEventId = processedCode; // Scanned an event QR
-    } else if (!targetEventId && !targetMemberId) {
-      // Nothing selected, let's try to figure it out
-      // Usually, we want the admin to at least pick the event first
+    setIsProcessingFile(true);
+    setScanResult(null);
+    setCameraError(null);
+
+    try {
+      // Ensure we have an Html5Qrcode instance
+      let qr = html5QrCodeRef.current;
+      if (!qr) {
+        qr = new Html5Qrcode("qr-file-scan-hidden");
+        html5QrCodeRef.current = qr;
+      }
+
+      const decodedText = await qr.scanFile(file, false);
+      if (decodedText) {
+        handleProcessQRCode(decodedText);
+      } else {
+        throw new Error("لم يتم العثور على رمز QR في الصورة");
+      }
+    } catch (err: any) {
+      console.warn("File QR scan error:", err);
       sounds.playClose();
       setScanResult({
         type: "error",
-        title: "تحديد غير مكتمل",
-        message: "برجاء اختيار الفعالية أولاً من القائمة، ثم ابدأ في مسح كارنيهات الأعضاء.",
+        title: "تعذر قراءة الرمز من الصورة",
+        message: "تأكد من وضوح رمز QR في الصورة الملتقطة وقربه الكافي من العدسة.",
+      });
+    } finally {
+      setIsProcessingFile(false);
+      // Reset input so same file can be captured again
+      e.target.value = "";
+    }
+  };
+
+  // Core Attendance Recording Processor
+  const handleProcessQRCode = async (codeOrId: string) => {
+    let processedCode = (codeOrId || "").trim();
+
+    // If scanned code is a full URL, extract ?code= or &code=
+    if (processedCode.includes("?code=") || processedCode.includes("&code=")) {
+      try {
+        const match = processedCode.match(/[?&]code=([^&#]+)/);
+        if (match && match[1]) {
+          processedCode = decodeURIComponent(match[1]).trim();
+        }
+      } catch {}
+    }
+
+    const targetEventId = selectedEventId || (currentEvent ? currentEvent.id : "");
+    if (!targetEventId) {
+      sounds.playClose();
+      setScanResult({
+        type: "error",
+        title: "لم يتم اختيار الفعالية",
+        message: "برجاء اختيار الفعالية من القائمة المنسدلة أولاً.",
       });
       return;
     }
 
+    // Call meetingStore
     const res = await meetingStore.recordQRAttendance({
       eventIdOrCode: targetEventId,
-      memberId: targetMemberId,
+      memberId: processedCode,
       isPunctual,
       executor: currentUser,
     });
@@ -189,26 +290,63 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       setScanResult({
         type: "success",
         title: "تم تسجيل الحضور بنجاح! 🎉",
-        message: `العضو: ${res.member?.name} | الفعالية: ${res.event?.title}. تم إضافة +${res.pointsAwarded} XP لرصيده.`,
+        message: `العضو: ${res.member?.name} | الفعالية: ${res.event?.title}. تم إضافة +${res.pointsAwarded} XP لرصيده وللفريق.`,
         points: res.pointsAwarded,
       });
-      
-      // If we are in "Scan multiple members for one event" mode, 
-      // clear the scan result after a delay so we can scan the next person
-      if (defaultEventId) {
-        setTimeout(() => setScanResult(null), 3000);
-      }
+
+      // Clear input
+      setManualCode("");
+    } else {
+      sounds.playClose();
+      setScanResult({
+        type: "error",
+        title: "تعذر تسجيل الحضور",
+        message: res.error || "تأكد من صحة كود العضو أو عدم تكرار تسجيله مسبقاً.",
+      });
+    }
+  };
+
+  // Direct 1-tap Attendance for a specific member
+  const handleDirectRegisterMember = async (member: CustomMember) => {
+    sounds.playTap();
+    setScanResult(null);
+
+    const targetEventId = selectedEventId || (currentEvent ? currentEvent.id : "");
+    if (!targetEventId) {
+      setScanResult({
+        type: "error",
+        title: "لم يتم تحديد الفعالية",
+        message: "يرجى اختيار الفعالية أولاً.",
+      });
+      return;
+    }
+
+    const res = await meetingStore.recordQRAttendance({
+      eventIdOrCode: targetEventId,
+      memberId: member.id,
+      isPunctual,
+      executor: currentUser,
+    });
+
+    if (res.success) {
+      sounds.playVictory();
+      setScanResult({
+        type: "success",
+        title: "تم تسجيل الحضور بنجاح! 🎉",
+        message: `العضو: ${res.member?.name} | الفعالية: ${res.event?.title}. تم رصد +${res.pointsAwarded} XP فوراً!`,
+        points: res.pointsAwarded,
+      });
     } else {
       sounds.playClose();
       setScanResult({
         type: "error",
         title: "فشل في التسجيل",
-        message: res.error || "تأكد من صحة الكود أو عدم تكرار التسجيل.",
+        message: res.error || "حدث خطأ أثناء رصد النقاط.",
       });
     }
   };
 
-  const handleManualSubmit = (e: React.FormEvent) => {
+  const handleManualCodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualCode.trim()) return;
     handleProcessQRCode(manualCode.trim());
@@ -219,15 +357,37 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn"
       dir="rtl"
     >
-      <div className="relative w-full max-w-lg rounded-3xl border border-slate-700 bg-[#0B132B] p-5 sm:p-6 shadow-2xl text-slate-100 space-y-4 max-h-[92vh] overflow-y-auto">
+      {/* Hidden container for file-based QR decoding */}
+      <div id="qr-file-scan-hidden" className="hidden" />
+
+      {/* Hidden native camera capture input (100% reliable on Android & iOS) */}
+      <input
+        ref={fileInputCameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleScanImageFile}
+      />
+
+      {/* Hidden gallery file input */}
+      <input
+        ref={fileInputGalleryRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleScanImageFile}
+      />
+
+      <div className="relative w-full max-w-lg rounded-3xl border border-slate-700 bg-[#0B132B] p-4 sm:p-6 shadow-2xl text-slate-100 space-y-4 max-h-[92vh] overflow-y-auto">
         {/* Close Button */}
         <button
           onClick={() => {
-            stopScanner();
+            stopLiveScanner();
             sounds.playClose();
             onClose();
           }}
-          className="absolute top-4 left-4 p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer"
+          className="absolute top-4 left-4 p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer z-10"
         >
           <X className="h-5 w-5" />
         </button>
@@ -235,192 +395,86 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         {/* Header */}
         <div className="space-y-1 pr-6">
           <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/20 text-amber-400">
-              <Camera className="h-4 w-4" />
+            <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400">
+              <QrCode className="h-5 w-5" />
             </span>
             <h3 className="text-lg sm:text-xl font-black text-white">
-              مسح QR لتسجيل حضور الفعالية 📱
+              رصد الحضور وبونص الموعد 📱
             </h3>
           </div>
           <p className="text-xs text-slate-400">
-            المستخدم المنفذ:{" "}
+            المنفذ:{" "}
             <span className="text-amber-300 font-bold">
               {currentUser.name} ({currentUser.roleLabel})
             </span>
           </p>
         </div>
 
-        {/* Selector Section */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3.5 space-y-4">
-          {/* Event Selector (Primary if scanning members) */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-black text-slate-300 flex items-center gap-1.5">
-              <QrCode className="h-3.5 w-3.5 text-teal-400" />
-              <span>الفعالية الحالية:</span>
+        {/* 1. Global Event Selector Card */}
+        <div className="rounded-2xl border border-teal-500/30 bg-slate-900/90 p-3.5 space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-black text-teal-300 flex items-center gap-1.5">
+              <QrCode className="h-4 w-4 text-teal-400" />
+              <span>الفعالية المستهدفة لتسجيل الحضور:</span>
             </label>
-            <select
-              value={selectedEventId}
-              onChange={(e) => {
-                setSelectedEventId(e.target.value);
-                setScanResult(null);
-              }}
-              className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-xs sm:text-sm font-bold text-white focus:outline-none focus:border-teal-400"
-            >
-              <option value="">-- اختر الفعالية أولاً --</option>
-              {data.events.map((evt) => (
-                <option key={evt.id} value={evt.id}>
-                  {evt.title} ({evt.isActive ? "نشطة" : "مغلقة"})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Member Selector (Optional if scanning cards) */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-black text-slate-300 flex items-center gap-1.5">
-              <Users className="h-3.5 w-3.5 text-sky-400" />
-              <span>المشارك المستهدف (اختياري عند مسح الكارنيهات):</span>
-            </label>
-            <select
-              value={selectedMemberId}
-              onChange={(e) => {
-                setSelectedMemberId(e.target.value);
-                setScanResult(null);
-              }}
-              className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-xs sm:text-sm font-bold text-white focus:outline-none focus:border-sky-400"
-            >
-              <option value="">-- أو اختر المشارك يدويًا هنا --</option>
-              {availableMembers.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name} ({m.points} XP)
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Punctuality Info */}
-          <div className="flex items-center gap-2 pt-1 text-[11px] text-emerald-400 font-bold bg-emerald-500/5 p-2 rounded-lg border border-emerald-500/10">
-            <Clock className="h-3.5 w-3.5" />
-            <span>الاحتساب التلقائي للبونص مفعل بناءً على وقت الفعالية المجدول.</span>
-          </div>
-        </div>
-
-        {/* Mode Switcher Tabs */}
-        <div className="flex items-center gap-2 bg-slate-900 p-1 rounded-2xl border border-slate-800">
-          <button
-            type="button"
-            onClick={() => setScanMode("camera")}
-            className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-              scanMode === "camera"
-                ? "bg-amber-500 text-slate-950 shadow-sm"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <Camera className="h-3.5 w-3.5" />
-            <span>كاميرا الهاتف 📷</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setScanMode("code_select")}
-            className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-              scanMode === "code_select"
-                ? "bg-amber-500 text-slate-950 shadow-sm"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <QrCode className="h-3.5 w-3.5" />
-            <span>اختيار الفعالية أو الكود 🎯</span>
-          </button>
-        </div>
-
-        {/* CAMERA SCANNER AREA */}
-        {scanMode === "camera" && (
-          <div className="space-y-3">
-            <div className="relative rounded-2xl overflow-hidden border-2 border-dashed border-amber-500/50 bg-black min-h-[220px] flex items-center justify-center">
-              <div id="qr-camera-stream" className="w-full max-w-[320px]" />
-              {!isScanning && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center text-xs text-slate-400 bg-black/60">
-                  <p>اضغط لتشغيل الكاميرا ومسح كود الفعالية</p>
-                  <button
-                    onClick={startScanner}
-                    className="mt-2 px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-black"
-                  >
-                    تشغيل الكاميرا
-                  </button>
-                </div>
-              )}
-            </div>
-            <p className="text-[11px] text-center text-slate-400">
-              وجّه الكاميرا نحو رمز QR الفعالية المعروض على الشاشة ليتم التسجيل فورياً.
-            </p>
-          </div>
-        )}
-
-        {/* CODE SELECT / ACTIVE EVENTS LIST */}
-        {scanMode === "code_select" && (
-          <div className="space-y-3">
-            {cameraError && (
-              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs">
-                {cameraError}
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <span className="text-xs font-bold text-slate-300 block">
-                الفعاليات النشطة حالياً (تسجيل فوري بضغطة زر):
+            {currentEvent?.isActive ? (
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-[10px] font-black text-emerald-400">
+                نشطة وتقبل الحضور
               </span>
-              <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                {data.events.map((evt) => (
-                  <div
-                    key={evt.id}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/50 transition-all gap-2"
-                  >
-                    <div className="overflow-hidden">
-                      <div className="text-xs font-black text-white truncate">{evt.title}</div>
-                      <div className="text-[10px] text-emerald-400 font-mono">
-                        +{evt.attendancePoints} XP {isPunctual ? `(+${evt.punctualityBonusPoints} بونص)` : ""}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleProcessQRCode(evt.qrCode)}
-                      className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black shrink-0 transition-all active:scale-95 cursor-pointer"
-                    >
-                      تسجيل الحضور ✨
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <form onSubmit={handleManualSubmit} className="pt-2 flex gap-2">
-              <input
-                type="text"
-                value={manualCode}
-                onChange={(e) => setManualCode(e.target.value)}
-                placeholder="أو اكتب رمز الفعالية يدويًا..."
-                className="flex-1 rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400 font-mono"
-              />
-              <button
-                type="submit"
-                className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-black text-xs hover:bg-amber-400 transition-all active:scale-95 cursor-pointer"
-              >
-                تحقق ورصد
-              </button>
-            </form>
+            ) : (
+              <span className="px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-[10px] font-black text-rose-400">
+                مغلقة
+              </span>
+            )}
           </div>
-        )}
+
+          <select
+            value={selectedEventId}
+            onChange={(e) => {
+              sounds.playTap();
+              setSelectedEventId(e.target.value);
+              setScanResult(null);
+            }}
+            className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-xs sm:text-sm font-bold text-white focus:outline-none focus:border-teal-400 cursor-pointer"
+          >
+            {data.events.map((evt) => (
+              <option key={evt.id} value={evt.id}>
+                {evt.title} ({evt.isActive ? "نشطة" : "مغلقة"})
+              </option>
+            ))}
+          </select>
+
+          {/* Event Metadata & Automatic Punctuality Bonus Details */}
+          {currentEvent && (
+            <div className="flex items-center justify-between text-[11px] text-slate-300 pt-1 border-t border-slate-800/80 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-emerald-400 font-bold">
+                  +{currentEvent.attendancePoints} XP حضور
+                </span>
+                {currentEvent.punctualityBonusPoints > 0 && (
+                  <span className="font-mono text-amber-400 font-bold flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {currentEvent.startTime || "غير محدد"} (+{currentEvent.punctualityBonusPoints} XP بونص مبكر)
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px] text-emerald-400/90 font-medium">
+                ⚡ بونص الحضور المبكر يحتسب تلقائياً
+              </span>
+            </div>
+          )}
+        </div>
 
         {/* FEEDBACK RESULT ALERT */}
         {scanResult && (
           <div
-            className={`p-4 rounded-2xl border space-y-1 animate-scaleIn ${
+            className={`p-3.5 rounded-2xl border space-y-1 animate-scaleIn ${
               scanResult.type === "success"
-                ? "bg-emerald-950/80 border-emerald-500/60 text-emerald-200"
-                : "bg-rose-950/80 border-rose-500/60 text-rose-200"
+                ? "bg-emerald-950/85 border-emerald-500/70 text-emerald-200"
+                : "bg-rose-950/85 border-rose-500/70 text-rose-200"
             }`}
           >
-            <div className="flex items-center gap-2 font-black text-sm">
+            <div className="flex items-center gap-2 font-black text-xs sm:text-sm">
               {scanResult.type === "success" ? (
                 <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0" />
               ) : (
@@ -428,7 +482,282 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
               )}
               <span>{scanResult.title}</span>
             </div>
-            <p className="text-xs leading-relaxed opacity-90">{scanResult.message}</p>
+            <p className="text-xs leading-relaxed opacity-95 pr-7">{scanResult.message}</p>
+          </div>
+        )}
+
+        {/* Mode Switcher Tabs */}
+        <div className="flex items-center gap-2 bg-slate-900 p-1.5 rounded-2xl border border-slate-800">
+          <button
+            type="button"
+            onClick={() => {
+              sounds.playTap();
+              stopLiveScanner();
+              setScanMode("code_select");
+            }}
+            className={`flex-1 py-2 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+              scanMode === "code_select"
+                ? "bg-amber-500 text-slate-950 shadow-md"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <Zap className="h-4 w-4" />
+            <span>اختيار العضو أو الكود 🎯</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              sounds.playTap();
+              setScanMode("camera");
+            }}
+            className={`flex-1 py-2 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+              scanMode === "camera"
+                ? "bg-amber-500 text-slate-950 shadow-md"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <Camera className="h-4 w-4" />
+            <span>كاميرا الهاتف 📷</span>
+          </button>
+        </div>
+
+        {/* ---------------- SECTION 1: CODE & DIRECT SELECT TAB ---------------- */}
+        {scanMode === "code_select" && (
+          <div className="space-y-4">
+            {/* Quick 1: Direct Button for Selected Member */}
+            <div className="p-3.5 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-2.5">
+              <label className="text-xs font-black text-sky-400 flex items-center gap-1.5">
+                <Users className="h-4 w-4" />
+                <span>اختر عضواً وسجل حضوره فوراً:</span>
+              </label>
+
+              <div className="flex gap-2">
+                <select
+                  value={selectedMemberId}
+                  onChange={(e) => {
+                    sounds.playTap();
+                    setSelectedMemberId(e.target.value);
+                  }}
+                  className="flex-1 rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-xs sm:text-sm font-bold text-white focus:outline-none focus:border-sky-400"
+                >
+                  <option value="">-- اختر العضو من القائمة --</option>
+                  {availableMembers.map((m) => {
+                    const isAttended = attendedMemberIdsSet.has(m.id);
+                    return (
+                      <option key={m.id} value={m.id}>
+                        {isAttended ? "✅ " : "○ "}
+                        {m.name} ({m.points} XP) {isAttended ? "- حاضر مسبقاً" : ""}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {currentMember && (
+                <div className="pt-1">
+                  {attendedMemberIdsSet.has(currentMember.id) ? (
+                    <div className="w-full py-2.5 px-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-black text-center flex items-center justify-center gap-1.5">
+                      <Check className="h-4 w-4 text-emerald-400" />
+                      <span>{currentMember.name} مسجل حضوره في هذه الفعالية مسبقاً ✅</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleDirectRegisterMember(currentMember)}
+                      className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      <span>
+                        تسجيل حضور «{currentMember.name}» الآن (+
+                        {currentEvent?.attendancePoints || 30} XP)
+                      </span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Quick 2: Manual Code Input (Card Code / TET6DD / URL) */}
+            <div className="p-3.5 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-2">
+              <label className="text-xs font-black text-amber-300 flex items-center gap-1.5">
+                <QrCode className="h-4 w-4" />
+                <span>أو أدخل كود الكارنيه (المكتوب تحت QR) أو الصق الرابط:</span>
+              </label>
+
+              <form onSubmit={handleManualCodeSubmit} className="flex gap-2">
+                <input
+                  type="text"
+                  value={manualCode}
+                  onChange={(e) => setManualCode(e.target.value)}
+                  placeholder="مثال: TET6DD أو 1234 أو كود العضو..."
+                  className="flex-1 rounded-xl bg-slate-950 border border-slate-700 px-3 py-2.5 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400 font-mono tracking-wider"
+                />
+                <button
+                  type="submit"
+                  className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all active:scale-95 cursor-pointer shadow-md shadow-amber-500/20 shrink-0"
+                >
+                  رصد بالكود 🎯
+                </button>
+              </form>
+            </div>
+
+            {/* Quick 3: Fast Member Checklist (Single-tap attendance for each person) */}
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-300">
+                  قائمة تسجيل الحضور السريع بلمسة واحدة:
+                </span>
+                <span className="text-[11px] text-slate-400 font-mono">
+                  {attendedMemberIdsSet.size} / {availableMembers.length} حاضرين
+                </span>
+              </div>
+
+              {/* Search box */}
+              <div className="relative">
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                <input
+                  type="text"
+                  value={memberSearchQuery}
+                  onChange={(e) => setMemberSearchQuery(e.target.value)}
+                  placeholder="ابحث بالاسم لتسجيله سريعاً..."
+                  className="w-full h-9 pr-9 pl-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-teal-400"
+                />
+              </div>
+
+              {/* Members List */}
+              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
+                {filteredChecklistMembers.map((member) => {
+                  const isAttended = attendedMemberIdsSet.has(member.id);
+                  const team = data.teams.find((t) => t.id === member.teamId);
+
+                  return (
+                    <div
+                      key={member.id}
+                      className={`flex items-center justify-between p-2.5 rounded-xl border transition-all gap-2 ${
+                        isAttended
+                          ? "bg-emerald-950/20 border-emerald-500/30 text-emerald-200"
+                          : "bg-slate-900 border-slate-800 hover:border-slate-700"
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-black text-white truncate">
+                            {member.name}
+                          </span>
+                          {member.accessCode && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-slate-800 text-[10px] text-amber-300 font-mono">
+                              {member.accessCode}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                          <span>{team?.name || "عام"}</span>
+                          <span>•</span>
+                          <span className="text-amber-400/90 font-mono">{member.points} XP</span>
+                        </div>
+                      </div>
+
+                      {isAttended ? (
+                        <span className="px-3 py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-xs font-black flex items-center gap-1 shrink-0">
+                          <Check className="h-3.5 w-3.5" />
+                          <span>حاضر ✅</span>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleDirectRegisterMember(member)}
+                          className="px-3 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-black shrink-0 transition-all active:scale-95 cursor-pointer shadow-sm"
+                        >
+                          رصد الحضور ✨
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ---------------- SECTION 2: CAMERA TAB ---------------- */}
+        {scanMode === "camera" && (
+          <div className="space-y-3.5">
+            {cameraError && (
+              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs leading-relaxed space-y-1">
+                <div className="font-bold flex items-center gap-1 text-amber-300">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>تنبيه أمان المتصفح:</span>
+                </div>
+                <p>{cameraError}</p>
+              </div>
+            )}
+
+            {/* Guaranteed 1-Tap Camera Capture Button */}
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  fileInputCameraRef.current?.click();
+                }}
+                disabled={isProcessingFile}
+                className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-sm shadow-xl shadow-amber-500/25 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Camera className="h-5 w-5" />
+                <span>
+                  {isProcessingFile
+                    ? "جاري قراءة الرمز..."
+                    : "📸 التقاط صورة للكود بكاميرا الهاتف (مضمون 100%)"}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  fileInputGalleryRef.current?.click();
+                }}
+                disabled={isProcessingFile}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Upload className="h-4 w-4 text-sky-400" />
+                <span>اختيار صورة كود من المعرض أو ألبوم الصور 🖼️</span>
+              </button>
+            </div>
+
+            {/* Optional Live Camera Video Stream Area */}
+            <div className="pt-2 border-t border-slate-800/80 space-y-2">
+              <span className="text-[11px] font-bold text-slate-400 block">
+                أو جرب البث المباشر المستمر للكاميرا:
+              </span>
+
+              <div className="relative rounded-2xl overflow-hidden border-2 border-dashed border-slate-700 bg-black min-h-[190px] flex items-center justify-center">
+                <div id="qr-camera-stream" className="w-full max-w-[300px]" />
+                {!isScanningLive && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center text-xs text-slate-400 bg-black/75 space-y-2">
+                    <p>اضغط لبدء البث المباشر عبر الكاميرا</p>
+                    <button
+                      type="button"
+                      onClick={startLiveScanner}
+                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-black text-xs active:scale-95 transition-all cursor-pointer"
+                    >
+                      تشغيل البث المباشر للكاميرا 🎥
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {isScanningLive && (
+                <button
+                  type="button"
+                  onClick={stopLiveScanner}
+                  className="w-full py-1.5 text-xs text-rose-400 hover:text-rose-300 font-bold bg-rose-950/30 rounded-lg cursor-pointer"
+                >
+                  إيقاف البث المباشر ⏹️
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -436,7 +765,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/60 border border-slate-800 text-[10px] text-slate-400">
           <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0" />
           <span>
-            يتم التحقق تلقائياً من صحة الكود، ومنع تكرار الحضور للعضو في نفس الفعالية، مع توثيق العملية في سجل المراجعة.
+            يتم التحقق تلقائياً من منع تكرار الحضور للعضو في نفس الفعالية، واحتساب النقاط فورياً.
           </span>
         </div>
       </div>
