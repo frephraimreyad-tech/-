@@ -38,6 +38,7 @@ import { QRScannerModal } from "./QRScannerModal";
 import { UserSwitcherModal } from "./UserSwitcherModal";
 import { AdminPanel } from "./AdminPanel";
 import { googleSheets } from "../utils/googleSheets";
+import { ShareLinksModal } from "./ShareLinksModal";
 
 interface AdminDashboardProps {
   onBackToScoreboard: () => void;
@@ -85,6 +86,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
   const [pinError, setPinError] = useState<string | null>(null);
   const [showChangePinModal, setShowChangePinModal] = useState<boolean>(false);
   const [newPinValue, setNewPinValue] = useState<string>("");
+  const [showShareLinks, setShowShareLinks] = useState<boolean>(false);
 
   // Navigation Tabs in Admin Dashboard
   const [activeTab, setActiveTab] = useState<"teams" | "quick_points" | "security" | "history">("teams");
@@ -555,6 +557,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
               <span>إعدادات شاملة ⚙️</span>
             </button>
 
+            {/* Share & Separate Links Button */}
+            <button
+              type="button"
+              onClick={() => {
+                sounds.playTap();
+                setShowShareLinks(true);
+              }}
+              className="px-3.5 py-1.5 rounded-2xl bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95"
+              title="فصل ومشاركة الروابط: رابط الجمهور ورابط الخدام"
+            >
+              <Share2 className="h-3.5 w-3.5" />
+              <span>فصل الروابط 🔗</span>
+            </button>
+
             {/* Back to Public Scoreboard */}
             <button
               type="button"
@@ -859,18 +875,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                         </div>
                       </div>
 
-                      {/* Team Details (Leader & Members) */}
-                      <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-slate-800/80 text-slate-300">
-                        <div className="p-2 rounded-xl bg-slate-900/60 border border-slate-800">
-                          <span className="text-[10px] text-slate-500 block">القائد:</span>
-                          <span className="font-bold text-white truncate block">
-                            {team.leaderName || "غير محدد"}
+                      {/* Team Hierarchy Details: Leader -> Servant -> Makhdoumeen */}
+                      <div className="grid grid-cols-3 gap-1.5 text-xs pt-1 border-t border-slate-800/80 text-slate-300">
+                        <div className="p-2 rounded-xl bg-amber-950/20 border border-amber-500/20 text-center">
+                          <span className="text-[10px] text-amber-400/80 block font-bold">👑 القائد</span>
+                          <span className="font-black text-amber-200 text-[11px] truncate block mt-0.5">
+                            {team.leaderName || (team.leadersCount > 0 ? `${team.leadersCount}` : "—")}
                           </span>
                         </div>
-                        <div className="p-2 rounded-xl bg-slate-900/60 border border-slate-800">
-                          <span className="text-[10px] text-slate-500 block">الأعضاء:</span>
-                          <span className="font-bold text-sky-400 block">
-                            {team.membersCount} عضو
+                        <div className="p-2 rounded-xl bg-purple-950/20 border border-purple-500/20 text-center">
+                          <span className="text-[10px] text-purple-300/80 block font-bold">✝️ الخدام</span>
+                          <span className="font-black text-purple-200 text-[11px] block mt-0.5">
+                            {team.servantsCount || 0}
+                          </span>
+                        </div>
+                        <div className="p-2 rounded-xl bg-teal-950/20 border border-teal-500/20 text-center">
+                          <span className="text-[10px] text-teal-300/80 block font-bold">👥 المخدومين</span>
+                          <span className="font-black text-teal-200 text-[11px] block mt-0.5">
+                            {team.makhdoumeenCount !== undefined ? team.makhdoumeenCount : team.membersCount}
                           </span>
                         </div>
                       </div>
@@ -2100,6 +2122,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
       {/* User Switcher Modal */}
       {showUserSwitcher && (
         <UserSwitcherModal onClose={() => setShowUserSwitcher(false)} />
+      )}
+
+      {/* Share Links Modal */}
+      {showShareLinks && (
+        <ShareLinksModal onClose={() => setShowShareLinks(false)} />
       )}
     </div>
   );

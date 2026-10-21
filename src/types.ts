@@ -35,6 +35,8 @@ export interface CustomTeam {
   description?: string;
   points: number;
   leaderName?: string;
+  avatarUrl?: string;
+  logoUrl?: string;
 }
 
 export interface ScoreTransaction {
@@ -133,6 +135,7 @@ export interface MeetingConfig {
   enableSounds: boolean;
   autoIdleSeconds: number;
   dailyChallenge?: DailyChallenge;
+  hideAdminButtonFromPublic?: boolean;
 }
 
 export interface MeetingData {
@@ -151,6 +154,8 @@ export interface ProcessedMeetingTeam extends CustomTeam {
   rank: number;
   membersCount: number;
   leadersCount: number;
+  servantsCount?: number;
+  makhdoumeenCount?: number;
   members: CustomMember[];
   isTied: boolean;
 }

@@ -121,6 +121,10 @@ class SoundManager {
       // Audio error ignored
     }
   }
+
+  playSuccess(): void {
+    this.playVictory();
+  }
 }
 
 export const sounds = new SoundManager();

@@ -308,6 +308,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
   const [newTeamSlogan, setNewTeamSlogan] = useState("");
   const [newTeamLeader, setNewTeamLeader] = useState("");
   const [newTeamPoints, setNewTeamPoints] = useState(0);
+  const [newTeamAvatarUrl, setNewTeamAvatarUrl] = useState("");
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
 
   const handleSaveTeam = async (e: React.FormEvent) => {
@@ -324,6 +325,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
         color: newTeamColor,
         slogan: newTeamSlogan.trim(),
         leaderName: newTeamLeader.trim(),
+        avatarUrl: newTeamAvatarUrl.trim(),
       });
       sounds.playTap();
       showFeedback("تم تحديث بيانات الفريق بنجاح!");
@@ -336,6 +338,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
         slogan: newTeamSlogan,
         leaderName: newTeamLeader,
         initialPoints: newTeamPoints,
+        avatarUrl: newTeamAvatarUrl.trim(),
       });
       sounds.playTap();
       showFeedback(`تم إضافة "${newTeamName}" بنجاح إلى الفرق!`);
@@ -345,6 +348,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
     setNewTeamName("");
     setNewTeamSlogan("");
     setNewTeamLeader("");
+    setNewTeamAvatarUrl("");
     setNewTeamPoints(0);
   };
 
@@ -355,6 +359,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
     setNewTeamColor(team.color);
     setNewTeamSlogan(team.slogan || "");
     setNewTeamLeader(team.leaderName || "");
+    setNewTeamAvatarUrl(team.avatarUrl || "");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -376,11 +381,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
   // --- Member Management Form State ---
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberTeamId, setNewMemberTeamId] = useState(data.teams[0]?.id || "");
-  const [newMemberRole, setNewMemberRole] = useState<"member" | "leader" | "servant">("member");
+  const [newMemberRole, setNewMemberRole] = useState<"member" | "leader" | "servant">("leader");
   const [newMemberPhone, setNewMemberPhone] = useState("");
   const [newMemberAvatarUrl, setNewMemberAvatarUrl] = useState("");
   const [memberSearchTerm, setMemberSearchTerm] = useState("");
-  const [memberSubTab, setMemberSubTab] = useState<RoleType>("member");
+  const [memberSubTab, setMemberSubTab] = useState<RoleType>("leader");
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
 
   const handleSaveMember = async (e: React.FormEvent) => {
@@ -1102,14 +1107,32 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                     onChange={(e) => setSelectedTargetId(e.target.value)}
                     className="w-full h-12 px-4 rounded-2xl bg-slate-900 border border-slate-700 text-sm font-bold text-white focus:outline-none focus:border-sky-400"
                   >
-                    {data.members.map((m) => {
-                      const t = data.teams.find((x) => x.id === m.teamId);
-                      return (
-                        <option key={m.id} value={m.id}>
-                          {m.name} ({m.roleLabel || "مشارك"}) • فريق {t?.name || "عام"} (رصيده: {m.points} XP)
-                        </option>
-                      );
-                    })}
+                    {[...data.members]
+                      .sort((a, b) => {
+                        const getRolePriority = (role?: RoleType): number => {
+                          if (role === "leader" || role === "admin" || role === "priest") return 1;
+                          if (role === "servant") return 2;
+                          return 3;
+                        };
+                        const pA = getRolePriority(a.role);
+                        const pB = getRolePriority(b.role);
+                        if (pA !== pB) return pA - pB;
+                        return a.name.localeCompare(b.name, "ar");
+                      })
+                      .map((m) => {
+                        const t = data.teams.find((x) => x.id === m.teamId);
+                        const roleTag =
+                          m.role === "leader"
+                            ? "👑 قائد"
+                            : m.role === "servant"
+                            ? "✝️ خادم"
+                            : "👥 مخدوم";
+                        return (
+                          <option key={m.id} value={m.id}>
+                            {m.name} [{roleTag}] • فريق {t?.name || "عام"} ({m.points} XP)
+                          </option>
+                        );
+                      })}
                   </select>
                 )}
               </div>
@@ -1682,6 +1705,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                   </div>
                 </div>
 
+                {/* Team Avatar URL input */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-300 block">رابط أو صورة الفريق التعريفية (اختياري):</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={newTeamAvatarUrl}
+                      onChange={(e) => setNewTeamAvatarUrl(e.target.value)}
+                      placeholder="https://example.com/team-badge.png"
+                      className="flex-1 h-11 px-4 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400"
+                      dir="ltr"
+                    />
+                    {newTeamAvatarUrl && (
+                      <div className="h-11 w-11 rounded-xl overflow-hidden border border-amber-400 shrink-0">
+                        <img src={newTeamAvatarUrl} alt="" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {!editingTeamId && (
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-300 block">الرصيد الافتتاحي للنقاط:</label>
@@ -1718,10 +1761,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div
-                          className="h-12 w-12 rounded-xl flex items-center justify-center text-2xl border shrink-0"
+                          className="h-12 w-12 rounded-xl flex items-center justify-center text-2xl border shrink-0 overflow-hidden"
                           style={{ backgroundColor: `${team.color}25`, borderColor: team.color }}
                         >
-                          {team.icon}
+                          {team.avatarUrl ? (
+                            <img src={team.avatarUrl} alt={team.name} className="w-full h-full object-cover" />
+                          ) : (
+                            team.icon
+                          )}
                         </div>
                         <div className="min-w-0 space-y-0.5">
                           <h4 className="text-base font-bold text-white truncate">{team.name}</h4>
@@ -1850,9 +1897,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                       onChange={(e) => setNewMemberRole(e.target.value as any)}
                       className="w-full h-11 px-4 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-sky-400"
                     >
-                      <option value="member">مشارك في الاجتماع</option>
-                      <option value="leader">قائد الفريق</option>
-                      <option value="servant">خادم رفيق</option>
+                      <option value="leader">قائد الفريق 👑</option>
+                      <option value="servant">خادم رفيق ✝️</option>
+                      <option value="member">مخدوم / مشارك في الاجتماع 👥</option>
                     </select>
                   </div>
                 </div>
@@ -1898,31 +1945,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
               </form>
             </div>
 
-            {/* Sub-tabs for roles */}
+            {/* Sub-tabs for roles: Leader -> Servant -> Makhdoumeen */}
             <div className="flex items-center gap-2 p-1 bg-slate-900/80 rounded-2xl border border-slate-800 mb-4 overflow-x-auto no-scrollbar">
               <button
-                onClick={() => setMemberSubTab("member")}
-                className={`px-4 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap cursor-pointer ${
-                  memberSubTab === "member" ? "bg-emerald-500 text-slate-950 shadow-md" : "text-slate-400 hover:text-white"
-                }`}
-              >
-                المخدومين / المشاركين ({data.members.filter(m => m.role === "member").length})
-              </button>
-              <button
                 onClick={() => setMemberSubTab("leader")}
-                className={`px-4 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap cursor-pointer ${
-                  memberSubTab === "leader" ? "bg-sky-500 text-slate-950 shadow-md" : "text-slate-400 hover:text-white"
+                className={`px-4 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                  memberSubTab === "leader" ? "bg-amber-500 text-slate-950 shadow-md" : "text-slate-400 hover:text-white"
                 }`}
               >
-                قادة المجموعات ({data.members.filter(m => m.role === "leader").length})
+                <span>👑 قادة المجموعات</span>
+                <span className="opacity-80">({data.members.filter(m => m.role === "leader").length})</span>
               </button>
               <button
                 onClick={() => setMemberSubTab("servant")}
-                className={`px-4 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap cursor-pointer ${
-                  memberSubTab === "servant" ? "bg-amber-500 text-slate-950 shadow-md" : "text-slate-400 hover:text-white"
+                className={`px-4 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                  memberSubTab === "servant" ? "bg-purple-600 text-white shadow-md" : "text-slate-400 hover:text-white"
                 }`}
               >
-                الخدام / المسؤولين ({data.members.filter(m => m.role === "servant" || m.role === "admin").length})
+                <span>✝️ الخدام / المسؤولين</span>
+                <span className="opacity-80">({data.members.filter(m => m.role === "servant" || m.role === "admin" || m.role === "priest").length})</span>
+              </button>
+              <button
+                onClick={() => setMemberSubTab("member")}
+                className={`px-4 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                  memberSubTab === "member" ? "bg-emerald-500 text-slate-950 shadow-md" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <span>👥 المخدومين / المشاركين</span>
+                <span className="opacity-80">({data.members.filter(m => m.role === "member" || !m.role).length})</span>
               </button>
             </div>
 

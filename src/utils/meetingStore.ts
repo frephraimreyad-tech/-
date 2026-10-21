@@ -52,6 +52,7 @@ const DEFAULT_CONFIG: MeetingConfig = {
   seasonName: "موسم النهضة الروحية ٢٠٢٦",
   enableSounds: true,
   autoIdleSeconds: 50,
+  hideAdminButtonFromPublic: false,
   dailyChallenge: {
     id: "dc-today-01",
     title: "تحدي حفظ آية اللقاء والاشتراك الجماعي",
@@ -65,9 +66,9 @@ const DEFAULT_CONFIG: MeetingConfig = {
 };
 
 const DEFAULT_TEAMS: CustomTeam[] = [
-  { id: "team-1", name: "فريق مارمرقس", icon: "🦁", color: "#EAB308", slogan: "كاروز الديار المصرية", leaderName: "أنطونيوس إدوار", points: 1250 },
-  { id: "team-2", name: "فريق أثناسيوس", icon: "⚔️", color: "#3B82F6", slogan: "حامي الإيمان المستقيم", leaderName: "مينا شهيد", points: 1120 },
-  { id: "team-3", name: "فريق الأنبا شنودة", icon: "📜", color: "#10B981", slogan: "رئيس المتوحدين", leaderName: "د. مينا ماهر", points: 980 },
+  { id: "team-1", name: "فريق مارمرقس", icon: "🦁", color: "#EAB308", slogan: "كاروز الديار المصرية", leaderName: "أنطونيوس إدوار", points: 1250, avatarUrl: "https://images.unsplash.com/photo-1546182990-dffeafbe841d?w=400&auto=format&fit=crop&q=80" },
+  { id: "team-2", name: "فريق أثناسيوس", icon: "⚔️", color: "#3B82F6", slogan: "حامي الإيمان المستقيم", leaderName: "مينا شهيد", points: 1120, avatarUrl: "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=400&auto=format&fit=crop&q=80" },
+  { id: "team-3", name: "فريق الأنبا شنودة", icon: "📜", color: "#10B981", slogan: "رئيس المتوحدين", leaderName: "د. مينا ماهر", points: 980, avatarUrl: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&auto=format&fit=crop&q=80" },
 ];
 
 export const DEFAULT_MEMBERS: CustomMember[] = [
@@ -368,13 +369,31 @@ class MeetingStore {
 
     const list: ProcessedMeetingTeam[] = teams.map((team) => {
       const teamMembers = members.filter((m) => m.teamId === team.id);
-      const leadersCount = teamMembers.filter((m) => m.role === "leader").length;
+      
+      // ترتيب أعضاء الفريق: القائد أولاً ثم الخادم ثم المخدومين
+      const getRolePriority = (role?: RoleType): number => {
+        if (role === "leader" || role === "admin" || role === "priest") return 1;
+        if (role === "servant") return 2;
+        return 3;
+      };
+      teamMembers.sort((a, b) => {
+        const pA = getRolePriority(a.role);
+        const pB = getRolePriority(b.role);
+        if (pA !== pB) return pA - pB;
+        return (b.points || 0) - (a.points || 0);
+      });
+
+      const leadersCount = teamMembers.filter((m) => m.role === "leader" || m.role === "admin" || m.role === "priest").length;
+      const servantsCount = teamMembers.filter((m) => m.role === "servant").length;
+      const makhdoumeenCount = teamMembers.filter((m) => m.role === "member" || !m.role).length;
 
       return {
         ...team,
         rank: 0,
         membersCount: teamMembers.length,
         leadersCount,
+        servantsCount,
+        makhdoumeenCount,
         members: teamMembers,
         isTied: false,
       };
@@ -406,6 +425,7 @@ class MeetingStore {
       description?: string;
       leaderName?: string;
       initialPoints?: number;
+      avatarUrl?: string;
     },
     executor?: SystemUser
   ): Promise<{ success: boolean; team?: CustomTeam; error?: string }> {
@@ -434,6 +454,7 @@ class MeetingStore {
       description: teamData.description?.trim() || "",
       points: teamData.initialPoints || 0,
       leaderName: teamData.leaderName?.trim() || "",
+      avatarUrl: (teamData as any).avatarUrl?.trim() || "",
     };
     this.data.teams.push(newTeam);
 

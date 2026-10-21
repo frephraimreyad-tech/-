@@ -21,12 +21,13 @@ import {
   Lock,
   ShieldCheck,
 } from "lucide-react";
-import type { CustomMember, ProcessedMeetingTeam } from "../types";
+import type { CustomMember, ProcessedMeetingTeam, RoleType } from "../types";
 import { sounds } from "../utils/soundEffects";
 import { meetingStore } from "../utils/meetingStore";
 import { formatArabicTimestamp } from "../utils/dateFormatter";
 import { authStore, type SystemUser } from "../utils/authStore";
 import { QRScannerModal } from "./QRScannerModal";
+import { TeamPhotoModal } from "./TeamPhotoModal";
 
 interface TeamModalProps {
   team: ProcessedMeetingTeam | null;
@@ -37,7 +38,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
   const [currentUser, setCurrentUser] = useState<SystemUser>(authStore.getCurrentUser());
   const [teamTab, setTeamTab] = useState<"members" | "history">("members");
   const [memberSearch, setMemberSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState<"all" | "leaders" | "members">("all");
+  const [roleFilter, setRoleFilter] = useState<"all" | "leaders" | "servants" | "members">("all");
   const [sortOrder, setSortOrder] = useState<"points" | "alpha">("points");
   const [idleSeconds, setIdleSeconds] = useState(50);
   const [quickAddPoints, setQuickAddPoints] = useState<number>(50);
@@ -48,7 +49,9 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
   const [showTeamScanner, setShowTeamScanner] = useState(false);
   const [showScannerForMember, setShowScannerForMember] = useState<CustomMember | null>(null);
   const [showAddMemberForm, setShowAddMemberForm] = useState(false);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [newMemberName, setNewMemberName] = useState("");
+  const [newMemberRole, setNewMemberRole] = useState<RoleType>("member");
 
   useEffect(() => {
     const unsub = authStore.subscribe(() => {
@@ -96,12 +99,19 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
       return;
     }
 
+    const roleLabel =
+      newMemberRole === "leader"
+        ? "قائد"
+        : newMemberRole === "servant"
+        ? "خادم"
+        : "مخدوم";
+
     const res = await meetingStore.addMember(
       {
         name: newMemberName.trim(),
         teamId: team.id,
-        role: "member",
-        roleLabel: "مشارك",
+        role: newMemberRole,
+        roleLabel,
         initialPoints: 0,
       },
       currentUser
@@ -149,14 +159,22 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
     setTimeout(() => setToastMsg(null), 3000);
   };
 
+  const getRolePriority = (role?: RoleType): number => {
+    if (role === "leader" || role === "admin" || role === "priest") return 1;
+    if (role === "servant") return 2;
+    return 3; // "member" or other
+  };
+
   const filteredMembers = useMemo(() => {
     if (!team) return [];
     let list = [...team.members];
 
     if (roleFilter === "leaders") {
-      list = list.filter((m) => m.role === "leader");
+      list = list.filter((m) => m.role === "leader" || m.role === "admin" || m.role === "priest");
+    } else if (roleFilter === "servants") {
+      list = list.filter((m) => m.role === "servant");
     } else if (roleFilter === "members") {
-      list = list.filter((m) => m.role !== "leader");
+      list = list.filter((m) => m.role === "member" || (!m.role));
     }
 
     if (memberSearch.trim()) {
@@ -169,14 +187,34 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
       );
     }
 
-    if (sortOrder === "points") {
-      list.sort((a, b) => (b.points || 0) - (a.points || 0));
-    } else {
-      list.sort((a, b) => a.name.localeCompare(b.name, "ar"));
-    }
+    // ترتيب المجموعات: القائد أولاً ثم الخادم ثم المخدومين
+    list.sort((a, b) => {
+      const pA = getRolePriority(a.role);
+      const pB = getRolePriority(b.role);
+      if (pA !== pB) return pA - pB;
+
+      if (sortOrder === "points") {
+        return (b.points || 0) - (a.points || 0);
+      }
+      return a.name.localeCompare(b.name, "ar");
+    });
 
     return list;
   }, [team, roleFilter, memberSearch, sortOrder]);
+
+  // تقسيم المجموعات وفق الترتيب: القائد ثم الخادم ثم المخدومين
+  const leadersList = useMemo(
+    () => filteredMembers.filter((m) => m.role === "leader" || m.role === "admin" || m.role === "priest"),
+    [filteredMembers]
+  );
+  const servantsList = useMemo(
+    () => filteredMembers.filter((m) => m.role === "servant"),
+    [filteredMembers]
+  );
+  const makhdoumeenList = useMemo(
+    () => filteredMembers.filter((m) => m.role === "member" || !m.role),
+    [filteredMembers]
+  );
 
   if (!team) return null;
 
@@ -229,14 +267,28 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pl-12 sm:pl-20">
               <div className="flex items-center gap-4">
                 <div
-                  className="flex h-16 w-16 sm:h-20 sm:w-20 shrink-0 items-center justify-center rounded-2xl shadow-xl text-3xl sm:text-4xl border-2"
+                  onClick={() => setShowPhotoModal(true)}
+                  className="relative group/modalphoto flex h-16 w-16 sm:h-20 sm:w-20 shrink-0 items-center justify-center rounded-2xl shadow-xl text-3xl sm:text-4xl border-2 overflow-hidden cursor-pointer"
                   style={{
                     backgroundColor: `${team.color}25`,
                     borderColor: team.color,
                     boxShadow: `0 0 25px ${team.color}40`,
                   }}
+                  title="انقر لتعديل أو تحميل صورة الفريق 📸"
                 >
-                  <span>{team.icon}</span>
+                  {team.avatarUrl ? (
+                    <img
+                      src={team.avatarUrl}
+                      alt={team.name}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover/modalphoto:scale-110"
+                    />
+                  ) : (
+                    <span>{team.icon}</span>
+                  )}
+                  <div className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover/modalphoto:opacity-100 flex flex-col items-center justify-center text-amber-300 transition-opacity">
+                    <Camera className="h-5 w-5" />
+                    <span className="text-[10px] font-black mt-0.5">صورة</span>
+                  </div>
                 </div>
 
                 <div className="space-y-1">
@@ -479,29 +531,62 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                       sounds.playTap();
                       setRoleFilter("all");
                     }}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                        roleFilter === "all"
-                          ? "bg-sky-500 text-slate-950 shadow-md"
-                          : "bg-slate-800/80 text-slate-300 hover:bg-slate-700"
-                      }`}
-                    >
-                      الكل ({team.members.length})
-                    </button>
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                      roleFilter === "all"
+                        ? "bg-sky-500 text-slate-950 shadow-md font-black"
+                        : "bg-slate-800/80 text-slate-300 hover:bg-slate-700"
+                    }`}
+                  >
+                    الكل ({team.members.length})
+                  </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        sounds.playTap();
-                        setRoleFilter("leaders");
-                      }}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                        roleFilter === "leaders"
-                          ? "bg-amber-500 text-slate-950 shadow-md"
-                          : "bg-slate-800/80 text-slate-300 hover:bg-slate-700"
-                      }`}
-                    >
-                      القادة ({team.leadersCount})
-                    </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playTap();
+                      setRoleFilter("leaders");
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+                      roleFilter === "leaders"
+                        ? "bg-amber-500 text-slate-950 shadow-md font-black"
+                        : "bg-slate-800/80 text-slate-300 hover:bg-slate-700"
+                    }`}
+                  >
+                    <span>القادة 👑</span>
+                    <span>({team.members.filter((m) => m.role === "leader" || m.role === "admin" || m.role === "priest").length})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playTap();
+                      setRoleFilter("servants");
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+                      roleFilter === "servants"
+                        ? "bg-purple-600 text-white shadow-md font-black"
+                        : "bg-slate-800/80 text-slate-300 hover:bg-slate-700"
+                    }`}
+                  >
+                    <span>الخدام ✝️</span>
+                    <span>({team.members.filter((m) => m.role === "servant").length})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playTap();
+                      setRoleFilter("members");
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+                      roleFilter === "members"
+                        ? "bg-teal-500 text-slate-950 shadow-md font-black"
+                        : "bg-slate-800/80 text-slate-300 hover:bg-slate-700"
+                    }`}
+                  >
+                    <span>المخدومين 👥</span>
+                    <span>({team.members.filter((m) => m.role === "member" || !m.role).length})</span>
+                  </button>
 
                     <div className="mr-auto sm:mr-0 pl-1">
                       <button
@@ -550,7 +635,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                         <X className="h-4 w-4" />
                       </button>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <input
                         type="text"
                         value={newMemberName}
@@ -560,9 +645,18 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                         autoFocus
                         required
                       />
+                      <select
+                        value={newMemberRole}
+                        onChange={(e) => setNewMemberRole(e.target.value as RoleType)}
+                        className="h-10 px-3 rounded-xl bg-slate-950 border border-slate-800 text-xs font-bold text-white focus:outline-none focus:border-emerald-400 shrink-0"
+                      >
+                        <option value="leader">👑 قائد مجموعة</option>
+                        <option value="servant">✝️ خادم رفيق</option>
+                        <option value="member">👥 مخدوم / مشارك</option>
+                      </select>
                       <button
                         type="submit"
-                        className="px-6 h-10 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-lg shadow-emerald-900/20 transition-all active:scale-95"
+                        className="px-6 h-10 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-lg shadow-emerald-900/20 transition-all active:scale-95 shrink-0"
                       >
                         إضافة الآن ✅
                       </button>
@@ -591,15 +685,348 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                   )}
                 </div>
 
-                {/* Members Cards Grid */}
+                {/* Members Cards: Organised as Leader -> Servant -> Makhdoumeen */}
                 {filteredMembers.length === 0 ? (
                   <div className="py-12 text-center text-slate-400 text-sm">
                     لا يوجد أعضاء مطابقين للبحث في هذا الفريق.
                   </div>
+                ) : roleFilter === "all" ? (
+                  <div className="space-y-6">
+                    {/* SECTION 1: قادة المجموعة (Leader) */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between pb-2 border-b border-amber-500/20">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-amber-500/20 text-amber-300 text-sm font-black border border-amber-500/30">
+                            👑
+                          </span>
+                          <div>
+                            <h4 className="text-sm font-black text-amber-300 flex items-center gap-2">
+                              <span>قادة المجموعة</span>
+                              <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-mono border border-amber-500/30">
+                                {leadersList.length}
+                              </span>
+                            </h4>
+                            <p className="text-[10px] text-slate-400">المرتبة الأولى: قيادة الأسرة والتنسيق المباشر</p>
+                          </div>
+                        </div>
+                        {currentUser.permissions.canEditMembers && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sounds.playTap();
+                              setNewMemberRole("leader");
+                              setShowAddMemberForm(true);
+                            }}
+                            className="text-[11px] font-bold text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-2.5 py-1 rounded-lg transition-all"
+                          >
+                            + إضافة قائد
+                          </button>
+                        )}
+                      </div>
+
+                      {leadersList.length === 0 ? (
+                        <div className="p-3.5 rounded-2xl bg-slate-900/40 border border-dashed border-amber-500/20 text-center text-slate-500 text-xs">
+                          لا يوجد قادة مسجلين في هذا الفريق حتى الآن.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {leadersList.map((member) => (
+                            <div
+                              key={member.id}
+                              className="p-3 sm:p-4 rounded-2xl border transition-all shadow-sm flex items-center gap-3.5 border-amber-500/40 bg-gradient-to-l from-amber-950/30 via-slate-900/80 to-slate-900"
+                            >
+                              <div className="relative shrink-0">
+                                <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full border-2 border-amber-500/60 bg-slate-800 overflow-hidden flex items-center justify-center shadow-md">
+                                  {member.avatarUrl ? (
+                                    <img src={member.avatarUrl} alt={member.name} className="h-full w-full object-cover" />
+                                  ) : (
+                                    <User className="h-6 w-6 sm:h-7 sm:w-7 text-amber-400" />
+                                  )}
+                                </div>
+                                <div className="absolute -bottom-1 -right-1 bg-amber-500 rounded-full p-1 border-2 border-slate-900 shadow-sm" title="قائد مجموعة">
+                                  <Crown className="h-2.5 w-2.5 text-slate-950" />
+                                </div>
+                              </div>
+
+                              <div className="space-y-0.5 min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-bold text-sm sm:text-base text-white truncate leading-tight">
+                                    {member.name}
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-[10px] font-black border border-amber-500/40 flex items-center gap-1">
+                                    <span>👑</span>
+                                    <span>قائد</span>
+                                  </span>
+                                </div>
+                                {member.phone && (
+                                  <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
+                                    <Phone className="h-2.5 w-2.5 text-slate-500" />
+                                    <span>{member.phone}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <div className="text-left" dir="ltr">
+                                  <div className="flex items-center gap-1 text-amber-400">
+                                    <span className="text-[10px] font-bold text-amber-500/70 font-arabic">XP</span>
+                                    <span className="text-sm sm:text-base font-black font-mono leading-none">
+                                      {member.points.toLocaleString("en-US")}
+                                    </span>
+                                  </div>
+                                  <div className="text-[8px] text-slate-500 font-bold text-right" dir="rtl">نقاط القائد</div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    await meetingStore.awardPoints({
+                                      targetType: "member",
+                                      targetId: member.id,
+                                      points: 25,
+                                      reason: `نقطة تميز للقائد: ${member.name}`,
+                                      category: "تحدي قيادي",
+                                    });
+                                    sounds.playTap();
+                                    setToastMsg(`تم إضافة +25 XP للقائد ${member.name}!`);
+                                    setTimeout(() => setToastMsg(null), 2500);
+                                  }}
+                                  className="h-8 w-8 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-400 text-xs font-bold border border-slate-700 flex items-center justify-center transition-all cursor-pointer"
+                                  title="إضافة +25 نقطة للقائد فوراً"
+                                >
+                                  +25
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* SECTION 2: خدام ورعاة المجموعة (Servant) */}
+                    <div className="space-y-3 pt-2">
+                      <div className="flex items-center justify-between pb-2 border-b border-purple-500/20">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-purple-500/20 text-purple-300 text-sm font-black border border-purple-500/30">
+                            ✝️
+                          </span>
+                          <div>
+                            <h4 className="text-sm font-black text-purple-300 flex items-center gap-2">
+                              <span>خدام ورعاة المجموعة</span>
+                              <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-mono border border-purple-500/30">
+                                {servantsList.length}
+                              </span>
+                            </h4>
+                            <p className="text-[10px] text-slate-400">المرتبة الثانية: الخدمة والرعاية الروحية</p>
+                          </div>
+                        </div>
+                        {currentUser.permissions.canEditMembers && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sounds.playTap();
+                              setNewMemberRole("servant");
+                              setShowAddMemberForm(true);
+                            }}
+                            className="text-[11px] font-bold text-purple-300 hover:text-purple-200 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 px-2.5 py-1 rounded-lg transition-all"
+                          >
+                            + إضافة خادم
+                          </button>
+                        )}
+                      </div>
+
+                      {servantsList.length === 0 ? (
+                        <div className="p-3.5 rounded-2xl bg-slate-900/40 border border-dashed border-purple-500/20 text-center text-slate-500 text-xs">
+                          لا يوجد خدام مسجلين في هذا الفريق حالياً.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {servantsList.map((member) => (
+                            <div
+                              key={member.id}
+                              className="p-3 sm:p-4 rounded-2xl border transition-all shadow-sm flex items-center gap-3.5 border-purple-500/40 bg-gradient-to-l from-purple-950/30 via-slate-900/80 to-slate-900"
+                            >
+                              <div className="relative shrink-0">
+                                <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full border-2 border-purple-500/60 bg-slate-800 overflow-hidden flex items-center justify-center shadow-md">
+                                  {member.avatarUrl ? (
+                                    <img src={member.avatarUrl} alt={member.name} className="h-full w-full object-cover" />
+                                  ) : (
+                                    <User className="h-6 w-6 sm:h-7 sm:w-7 text-purple-400" />
+                                  )}
+                                </div>
+                                <div className="absolute -bottom-1 -right-1 bg-purple-600 rounded-full p-1 border-2 border-slate-900 shadow-sm text-[9px] text-white flex items-center justify-center" title="خادم">
+                                  ✝️
+                                </div>
+                              </div>
+
+                              <div className="space-y-0.5 min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-bold text-sm sm:text-base text-white truncate leading-tight">
+                                    {member.name}
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 text-[10px] font-black border border-purple-500/40 flex items-center gap-1">
+                                    <span>✝️</span>
+                                    <span>خادم</span>
+                                  </span>
+                                </div>
+                                {member.phone && (
+                                  <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
+                                    <Phone className="h-2.5 w-2.5 text-slate-500" />
+                                    <span>{member.phone}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <div className="text-left" dir="ltr">
+                                  <div className="flex items-center gap-1 text-amber-400">
+                                    <span className="text-[10px] font-bold text-amber-500/70 font-arabic">XP</span>
+                                    <span className="text-sm sm:text-base font-black font-mono leading-none">
+                                      {member.points.toLocaleString("en-US")}
+                                    </span>
+                                  </div>
+                                  <div className="text-[8px] text-slate-500 font-bold text-right" dir="rtl">نقاط الخادم</div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    await meetingStore.awardPoints({
+                                      targetType: "member",
+                                      targetId: member.id,
+                                      points: 25,
+                                      reason: `نقطة تميز للخادم: ${member.name}`,
+                                      category: "خدمة ومحبة",
+                                    });
+                                    sounds.playTap();
+                                    setToastMsg(`تم إضافة +25 XP للخادم ${member.name}!`);
+                                    setTimeout(() => setToastMsg(null), 2500);
+                                  }}
+                                  className="h-8 w-8 rounded-xl bg-slate-800 hover:bg-purple-600 hover:text-white text-purple-300 text-xs font-bold border border-slate-700 flex items-center justify-center transition-all cursor-pointer"
+                                  title="إضافة +25 نقطة للخادم فوراً"
+                                >
+                                  +25
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* SECTION 3: مخدومين المجموعة (Makhdoumeen) */}
+                    <div className="space-y-3 pt-2">
+                      <div className="flex items-center justify-between pb-2 border-b border-teal-500/20">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-teal-500/20 text-teal-300 text-sm font-black border border-teal-500/30">
+                            👥
+                          </span>
+                          <div>
+                            <h4 className="text-sm font-black text-teal-300 flex items-center gap-2">
+                              <span>مخدومين وأعضاء المجموعة</span>
+                              <span className="px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 text-[10px] font-mono border border-teal-500/30">
+                                {makhdoumeenList.length}
+                              </span>
+                            </h4>
+                            <p className="text-[10px] text-slate-400">المرتبة الثالثة: الشباب والمشاركون في الأسرة</p>
+                          </div>
+                        </div>
+                        {currentUser.permissions.canEditMembers && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sounds.playTap();
+                              setNewMemberRole("member");
+                              setShowAddMemberForm(true);
+                            }}
+                            className="text-[11px] font-bold text-teal-300 hover:text-teal-200 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 px-2.5 py-1 rounded-lg transition-all"
+                          >
+                            + إضافة مخدوم
+                          </button>
+                        )}
+                      </div>
+
+                      {makhdoumeenList.length === 0 ? (
+                        <div className="p-3.5 rounded-2xl bg-slate-900/40 border border-dashed border-teal-500/20 text-center text-slate-500 text-xs">
+                          لا يوجد مخدومين مسجلين في هذا الفريق حتى الآن.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {makhdoumeenList.map((member) => (
+                            <div
+                              key={member.id}
+                              className="p-3 sm:p-4 rounded-2xl border transition-all shadow-sm flex items-center gap-3.5 border-slate-800/80 bg-slate-900/60 hover:bg-slate-900/80"
+                            >
+                              <div className="relative shrink-0">
+                                <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full border-2 border-slate-700/50 bg-slate-800 overflow-hidden flex items-center justify-center shadow-md">
+                                  {member.avatarUrl ? (
+                                    <img src={member.avatarUrl} alt={member.name} className="h-full w-full object-cover" />
+                                  ) : (
+                                    <User className="h-6 w-6 sm:h-7 sm:w-7 text-slate-500" />
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="space-y-0.5 min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-bold text-sm sm:text-base text-white truncate leading-tight">
+                                    {member.name}
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-md bg-teal-500/20 text-teal-300 text-[10px] font-bold border border-teal-500/30 flex items-center gap-1">
+                                    <span>👥</span>
+                                    <span>مخدوم</span>
+                                  </span>
+                                </div>
+                                {member.phone && (
+                                  <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
+                                    <Phone className="h-2.5 w-2.5 text-slate-500" />
+                                    <span>{member.phone}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <div className="text-left" dir="ltr">
+                                  <div className="flex items-center gap-1 text-amber-400">
+                                    <span className="text-[10px] font-bold text-amber-500/70 font-arabic">XP</span>
+                                    <span className="text-sm sm:text-base font-black font-mono leading-none">
+                                      {member.points.toLocaleString("en-US")}
+                                    </span>
+                                  </div>
+                                  <div className="text-[8px] text-slate-500 font-bold text-right" dir="rtl">نقاط العضو</div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    await meetingStore.awardPoints({
+                                      targetType: "member",
+                                      targetId: member.id,
+                                      points: 25,
+                                      reason: `نقطة تميز للمشارك: ${member.name}`,
+                                      category: "تحدي فردي",
+                                    });
+                                    sounds.playTap();
+                                    setToastMsg(`تم إضافة +25 XP للمشارك ${member.name}!`);
+                                    setTimeout(() => setToastMsg(null), 2500);
+                                  }}
+                                  className="h-8 w-8 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-400 text-xs font-bold border border-slate-700 flex items-center justify-center transition-all cursor-pointer"
+                                  title="إضافة +25 نقطة للمشارك فوراً"
+                                >
+                                  +25
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 ) : (
+                  /* Single Filtered Category Grid */
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {filteredMembers.map((member) => {
-                      const isLeader = member.role === "leader";
+                      const isLeader = member.role === "leader" || member.role === "admin" || member.role === "priest";
                       const isServant = member.role === "servant";
 
                       return (
@@ -613,7 +1040,6 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                               : "border-slate-800/80 bg-slate-900/60 hover:bg-slate-900/80"
                           }`}
                         >
-                          {/* Member Avatar */}
                           <div className="relative shrink-0">
                             <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full border-2 border-slate-700/50 bg-slate-800 overflow-hidden flex items-center justify-center shadow-md">
                               {member.avatarUrl ? (
@@ -623,8 +1049,13 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                               )}
                             </div>
                             {isLeader && (
-                              <div className="absolute -bottom-1 -right-1 bg-amber-500 rounded-full p-1 border-2 border-slate-900 shadow-sm">
+                              <div className="absolute -bottom-1 -right-1 bg-amber-500 rounded-full p-1 border-2 border-slate-900 shadow-sm" title="قائد مجموعة">
                                 <Crown className="h-2.5 w-2.5 text-slate-950" />
+                              </div>
+                            )}
+                            {isServant && (
+                              <div className="absolute -bottom-1 -right-1 bg-purple-600 rounded-full p-1 border-2 border-slate-900 shadow-sm text-[9px] text-white flex items-center justify-center" title="خادم">
+                                ✝️
                               </div>
                             )}
                           </div>
@@ -635,39 +1066,44 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                                 {member.name}
                               </span>
                               {isLeader && (
-                                <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-[9px] font-black border border-amber-500/30">
-                                  قائد
+                                <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-[10px] font-black border border-amber-500/40 flex items-center gap-1">
+                                  <span>👑</span>
+                                  <span>قائد</span>
                                 </span>
                               )}
                               {isServant && (
-                                <span className="px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 text-[9px] font-black border border-purple-500/30">
-                                  خادم
+                                <span className="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 text-[10px] font-black border border-purple-500/40 flex items-center gap-1">
+                                  <span>✝️</span>
+                                  <span>خادم</span>
+                                </span>
+                              )}
+                              {!isLeader && !isServant && (
+                                <span className="px-2 py-0.5 rounded-md bg-teal-500/20 text-teal-300 text-[10px] font-bold border border-teal-500/30 flex items-center gap-1">
+                                  <span>👥</span>
+                                  <span>مخدوم</span>
                                 </span>
                               )}
                             </div>
 
-                            <div className="flex items-center gap-2">
-                              {member.phone && (
-                                <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
-                                  <Phone className="h-2.5 w-2.5 text-slate-500" />
-                                  <span>{member.phone}</span>
-                                </div>
-                              )}
-                            </div>
+                            {member.phone && (
+                              <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
+                                <Phone className="h-2.5 w-2.5 text-slate-500" />
+                                <span>{member.phone}</span>
+                              </div>
+                            )}
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0">
                             <div className="text-left" dir="ltr">
-                               <div className="flex items-center gap-1 text-amber-400">
-                                  <span className="text-[10px] font-bold text-amber-500/70 font-arabic">XP</span>
-                                  <span className="text-sm sm:text-base font-black font-mono leading-none">
-                                     {member.points.toLocaleString("en-US")}
-                                  </span>
-                               </div>
-                               <div className="text-[8px] text-slate-500 font-bold text-right" dir="rtl">نقاط العضو</div>
+                              <div className="flex items-center gap-1 text-amber-400">
+                                <span className="text-[10px] font-bold text-amber-500/70 font-arabic">XP</span>
+                                <span className="text-sm sm:text-base font-black font-mono leading-none">
+                                  {member.points.toLocaleString("en-US")}
+                                </span>
+                              </div>
+                              <div className="text-[8px] text-slate-500 font-bold text-right" dir="rtl">نقاط العضو</div>
                             </div>
 
-                            {/* Quick +25 points button for member */}
                             <button
                               type="button"
                               onClick={async () => {
@@ -675,7 +1111,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                                   targetType: "member",
                                   targetId: member.id,
                                   points: 25,
-                                  reason: `نقطة تميز للمشارك: ${member.name}`,
+                                  reason: `نقطة تميز: ${member.name}`,
                                   category: "تحدي فردي",
                                 });
                                 sounds.playTap();
@@ -683,7 +1119,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                                 setTimeout(() => setToastMsg(null), 2500);
                               }}
                               className="h-8 w-8 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-400 text-xs font-bold border border-slate-700 flex items-center justify-center transition-all cursor-pointer"
-                              title="إضافة +25 نقطة للمشارك فوراً"
+                              title="إضافة +25 نقطة فوراً"
                             >
                               +25
                             </button>
@@ -794,6 +1230,18 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
             )}
           </div>
         </motion.div>
+
+        {/* Team Photo Upload Modal */}
+        {showPhotoModal && (
+          <TeamPhotoModal
+            team={team}
+            onClose={() => setShowPhotoModal(false)}
+            onSuccess={(msg) => {
+              setToastMsg(msg);
+              setTimeout(() => setToastMsg(null), 4000);
+            }}
+          />
+        )}
       </div>
     </AnimatePresence>
   );

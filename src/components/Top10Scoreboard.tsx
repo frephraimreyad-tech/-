@@ -25,6 +25,11 @@ import {
   TrendingDown,
   Edit2,
   X,
+  Tv,
+  LayoutGrid,
+  List,
+  Share2,
+  Link2,
 } from "lucide-react";
 import type { CustomMember, ProcessedMeetingTeam } from "../types";
 import { meetingStore } from "../utils/meetingStore";
@@ -32,25 +37,32 @@ import { sounds } from "../utils/soundEffects";
 import { authStore, type SystemUser } from "../utils/authStore";
 import { ConfettiCanvas, type ConfettiCanvasRef } from "./ConfettiCanvas";
 import { TeamModal } from "./TeamModal";
+import { TeamPhotoModal } from "./TeamPhotoModal";
 import { AdminPanel } from "./AdminPanel";
 import { AdminDashboard } from "./AdminDashboard";
 import { QRScannerModal } from "./QRScannerModal";
 import { UserSwitcherModal } from "./UserSwitcherModal";
-import { MemberCard } from "./MemberCard";
 import { DailyChallengeBanner } from "./DailyChallengeBanner";
+import { ShareLinksModal } from "./ShareLinksModal";
+
 export const Top10Scoreboard: React.FC = () => {
   const [data, setData] = useState(meetingStore.getData());
   const [isLoading, setIsLoading] = useState(meetingStore.getIsLoading());
   const [currentUser, setCurrentUser] = useState<SystemUser>(authStore.getCurrentUser());
   const [selectedTeam, setSelectedTeam] = useState<ProcessedMeetingTeam | null>(null);
+  const [photoUploadTeam, setPhotoUploadTeam] = useState<ProcessedMeetingTeam | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isTvMode, setIsTvMode] = useState<boolean>(false);
+  const [tvScale, setTvScale] = useState<"normal" | "large" | "xl">("large");
+  const [tvColumns, setTvColumns] = useState<"single" | "grid">("single");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"points-desc" | "points-asc">("points-desc");
   const [viewMode, setViewMode] = useState<"scoreboard" | "admin">("scoreboard");
   const [adminInitialTab, setAdminInitialTab] = useState<any>(undefined);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showUserSwitcher, setShowUserSwitcher] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [toasts, setToasts] = useState<
     Array<{
@@ -59,6 +71,7 @@ export const Top10Scoreboard: React.FC = () => {
       title: string;
       message: string;
       teamIcon?: string;
+      teamAvatarUrl?: string;
       timestamp: number;
     }>
   >([]);
@@ -70,6 +83,7 @@ export const Top10Scoreboard: React.FC = () => {
     title: string;
     message: string;
     teamIcon?: string;
+    teamAvatarUrl?: string;
   }) => {
     const newToast = {
       ...toast,
@@ -116,6 +130,20 @@ export const Top10Scoreboard: React.FC = () => {
     return () => document.removeEventListener("fullscreenchange", handleFsChange);
   }, []);
 
+  // Escape key handler for fullscreen presentation mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isFullscreen) {
+        if (document.fullscreenElement) {
+          document.exitFullscreen?.().catch(() => {});
+        }
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
+
   // Rank change and position shift animation tracking
   const prevRanksRef = useRef<Record<string, number>>({});
   const prevPointsRef = useRef<Record<string, number>>({});
@@ -124,8 +152,7 @@ export const Top10Scoreboard: React.FC = () => {
     Record<string, { delta: number; type: "up" | "down"; timestamp: number }>
   >({});
   const [pointDeltas, setPointDeltas] = useState<Record<string, { delta: number; timestamp: number }>>({});
-  const [newLeaderNotice, setNewLeaderNotice] = useState<{ teamName: string; icon: string } | null>(null);
-  const [showMemberCardOnLogin, setShowMemberCardOnLogin] = useState<CustomMember | null>(null);
+  const [newLeaderNotice, setNewLeaderNotice] = useState<{ teamName: string; icon: string; avatarUrl?: string } | null>(null);
 
   // Handle auto-login from URL QR Code
   useEffect(() => {
@@ -141,15 +168,9 @@ export const Top10Scoreboard: React.FC = () => {
         sounds.playVictory();
         addToast({
           type: "success",
-          title: "تسجيل دخول كود QR",
-          message: `مرحباً بك يا ${result.user?.name}! تم تسجيل دخولك بنجاح.`,
+          title: "لوحة الشرف الكبرى 🏆",
+          message: `مرحباً بك يا ${result.user?.name}! تم تسجيل دخولك بنجاح والانتقال مباشرة إلى لوحة الشرف الكبرى.`,
         });
-        
-        // Find the full member object to show the card
-        const member = data.members.find(m => m.id === result.user?.id);
-        if (member) {
-          setShowMemberCardOnLogin(member);
-        }
       } else {
         addToast({
           type: "warning",
@@ -159,6 +180,36 @@ export const Top10Scoreboard: React.FC = () => {
       }
     }
   }, [isLoading, data.members, data.teams]);
+
+  // Handle direct URL mode routing (?mode=admin or ?mode=public or ?admin=1)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get("mode");
+    const admin = params.get("admin");
+    if (mode === "admin" || admin === "true" || admin === "1" || window.location.pathname === "/admin") {
+      setViewMode("admin");
+    }
+  }, []);
+
+  // Secret shortcut (Ctrl+Shift+A) to toggle Admin Dashboard from anywhere
+  useEffect(() => {
+    const handleAdminHotkey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && (e.key === "A" || e.key === "a")) {
+        e.preventDefault();
+        sounds.playVictory();
+        setViewMode((prev) => (prev === "admin" ? "scoreboard" : "admin"));
+      }
+    };
+    window.addEventListener("keydown", handleAdminHotkey);
+    return () => window.removeEventListener("keydown", handleAdminHotkey);
+  }, []);
+
+  // Determine if public mode is active (hides the admin button from spectators)
+  const isPublicDisplayMode = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("mode") === "public" || params.get("public") === "true") return true;
+    return !!data.config.hideAdminButtonFromPublic;
+  }, [data.config.hideAdminButtonFromPublic]);
 
   const processedTeams = useMemo(() => {
     return meetingStore.getProcessedTeams();
@@ -183,7 +234,7 @@ export const Top10Scoreboard: React.FC = () => {
     const nextChanges: Record<string, { delta: number; type: "up" | "down"; timestamp: number }> = { ...rankChanges };
     const nextPointDeltas: Record<string, { delta: number; timestamp: number }> = {};
     let hasClimbed = false;
-    let newLeaderFound: { teamName: string; icon: string } | null = null;
+    let newLeaderFound: { teamName: string; icon: string; avatarUrl?: string } | null = null;
 
     processedTeams.forEach((team) => {
       const oldRank = currentRanks[team.id];
@@ -207,12 +258,13 @@ export const Top10Scoreboard: React.FC = () => {
         if (delta > 0) {
           hasClimbed = true;
           if (team.rank === 1 && oldRank > 1) {
-            newLeaderFound = { teamName: team.name, icon: team.icon };
+            newLeaderFound = { teamName: team.name, icon: team.icon, avatarUrl: team.avatarUrl };
             addToast({
               type: "leader_change",
               title: "👑 متصدر جديد للائحة الشرف!",
               message: `صعد فريق «${team.name}» إلى المركز الأول بمجموع ${team.points.toLocaleString("en-US")} XP! 🏆`,
               teamIcon: team.icon,
+              teamAvatarUrl: team.avatarUrl,
             });
           } else {
             addToast({
@@ -220,6 +272,7 @@ export const Top10Scoreboard: React.FC = () => {
               title: `🚀 تقدم في الترتيب: ${team.name}`,
               message: `قفز فريق «${team.name}» إلى المركز #${team.rank} (تقدم ${delta} ${delta === 1 ? "مركز" : "مراكز"})!`,
               teamIcon: team.icon,
+              teamAvatarUrl: team.avatarUrl,
             });
           }
         } else if (delta < 0) {
@@ -228,6 +281,7 @@ export const Top10Scoreboard: React.FC = () => {
             title: `📉 تغيير الترتيب: ${team.name}`,
             message: `تراجع فريق «${team.name}» إلى المركز #${team.rank}.`,
             teamIcon: team.icon,
+            teamAvatarUrl: team.avatarUrl,
           });
         }
       }
@@ -312,10 +366,23 @@ export const Top10Scoreboard: React.FC = () => {
 
   const toggleFullscreen = () => {
     sounds.playTap();
-    if (document.fullscreenElement) {
-      document.exitFullscreen?.().catch(() => {});
+    if (document.fullscreenElement || isFullscreen) {
+      if (document.fullscreenElement) {
+        document.exitFullscreen?.().catch(() => {});
+      }
+      setIsFullscreen(false);
     } else {
-      document.documentElement.requestFullscreen?.().catch(() => {});
+      setIsTvMode(true);
+      if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen()
+          .then(() => setIsFullscreen(true))
+          .catch(() => {
+            // Fallback for iframe restrictions: activate presentation fullscreen mode internally
+            setIsFullscreen(true);
+          });
+      } else {
+        setIsFullscreen(true);
+      }
     }
   };
 
@@ -392,7 +459,11 @@ export const Top10Scoreboard: React.FC = () => {
       {/* Confetti Canvas */}
       <ConfettiCanvas ref={confettiRef} />
 
-      <div className="relative z-10 max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-16 flex flex-col min-h-screen">
+      <div className={`relative z-10 mx-auto flex flex-col min-h-screen transition-all duration-300 ${
+        isTvMode || isFullscreen
+          ? "w-full max-w-[1800px] px-3 sm:px-6 lg:px-10 2xl:px-14 pt-3 pb-16"
+          : "max-w-6xl px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-16"
+      }`}>
         {/* Top Header Card */}
         <header className="rounded-3xl border border-slate-700/60 bg-slate-900/85 backdrop-blur-2xl p-4 sm:p-5 shadow-[0_20px_50px_rgba(0,0,0,0.5)] mb-5">
           <div className="flex items-center justify-between gap-3 flex-wrap md:flex-nowrap">
@@ -503,18 +574,34 @@ export const Top10Scoreboard: React.FC = () => {
                   <span>مسح QR للحضور 📱</span>
                 </button>
 
-                {/* Admin Panel Button */}
+                {/* Admin Panel Button - Hidden in Public Mode unless admin user is active */}
+                {(!isPublicDisplayMode || currentUser.role === "admin") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playTap();
+                      setViewMode("admin");
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 text-xs font-black shadow-sm active:scale-95 transition-all cursor-pointer"
+                    title="فتح لوحة تحكم الخادم لرصد النقاط وتعديل الفرق"
+                  >
+                    <Settings className="h-3.5 w-3.5" />
+                    <span>لوحة تحكم الخادم ⚙️</span>
+                  </button>
+                )}
+
+                {/* Share & Separate Links Button */}
                 <button
                   type="button"
                   onClick={() => {
                     sounds.playTap();
-                    setViewMode("admin");
+                    setShowShareModal(true);
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 text-xs font-black shadow-sm active:scale-95 transition-all cursor-pointer"
-                  title="فتح لوحة تحكم الخادم لرصد النقاط وتعديل الفرق"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800 hover:bg-indigo-600/80 text-indigo-300 hover:text-white border border-indigo-500/40 text-xs font-black shadow-sm active:scale-95 transition-all cursor-pointer"
+                  title="مشاركة وفصل الروابط: رابط الجمهور والبروجيكتور ورابط الخدام"
                 >
-                  <Settings className="h-3.5 w-3.5" />
-                  <span>لوحة تحكم الخادم ⚙️</span>
+                  <Share2 className="h-3.5 w-3.5" />
+                  <span>فصل الروابط 🔗</span>
                 </button>
 
                 {/* Celebrate winner button */}
@@ -542,17 +629,45 @@ export const Top10Scoreboard: React.FC = () => {
                   )}
                 </button>
 
-                {/* Fullscreen toggle */}
+                {/* TV / Projector Mode Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    setIsTvMode((prev) => !prev);
+                  }}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black shadow-md active:scale-95 transition-all cursor-pointer border ${
+                    isTvMode
+                      ? "bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 border-white ring-2 ring-amber-400 shadow-amber-500/30"
+                      : "bg-slate-800 hover:bg-slate-700 text-amber-300 border-amber-500/40"
+                  }`}
+                  title="تفعيل وضع العرض المكبر لقاعات الاجتماعات والشاشات الكبيرة والبروجكتور (TV Mode)"
+                >
+                  <Tv className="h-3.5 w-3.5" />
+                  <span>{isTvMode ? "نمط البروجكتور نشط 📽️" : "نمط البروجكتور 📽️"}</span>
+                </button>
+
+                {/* Fullscreen / Conference Room Presentation Button */}
                 <button
                   type="button"
                   onClick={toggleFullscreen}
-                  className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white shadow-xs active:scale-95 transition-all cursor-pointer"
-                  title={isFullscreen ? "إنهاء ملء الشاشة" : "ملء الشاشة للشاشات التفاعلية"}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black shadow-md active:scale-95 transition-all cursor-pointer border ${
+                    isFullscreen
+                      ? "bg-gradient-to-r from-rose-500 to-amber-500 text-slate-950 border-amber-300 shadow-rose-500/25 ring-2 ring-amber-400"
+                      : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white border-purple-400/40 shadow-purple-500/20"
+                  }`}
+                  title="عرض لوحة الشرف بنظام ملء الشاشة لقاعات المؤتمرات والشاشات الكبيرة"
                 >
                   {isFullscreen ? (
-                    <Minimize2 className="h-4 w-4 text-sky-400" />
+                    <>
+                      <Minimize2 className="h-3.5 w-3.5" />
+                      <span>إنهاء ملء الشاشة</span>
+                    </>
                   ) : (
-                    <Maximize2 className="h-4 w-4 text-sky-400" />
+                    <>
+                      <Maximize2 className="h-3.5 w-3.5 animate-pulse" />
+                      <span>ملء الشاشة للقاعات 📺</span>
+                    </>
                   )}
                 </button>
               </div>
@@ -624,6 +739,136 @@ export const Top10Scoreboard: React.FC = () => {
           </div>
         </header>
 
+        {/* TV & Projector Mode Active Controller Banner */}
+        <AnimatePresence>
+          {isTvMode && (
+            <motion.div
+              initial={{ opacity: 0, y: -10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.98 }}
+              className="mb-5 p-3.5 sm:p-4 rounded-3xl bg-gradient-to-r from-amber-950/90 via-slate-900/95 to-amber-950/90 border-2 border-amber-400/80 shadow-[0_15px_40px_rgba(245,158,11,0.25)] backdrop-blur-2xl flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-100"
+            >
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 font-black shadow-lg shadow-amber-500/30 shrink-0">
+                  <Tv className="h-5 w-5 sm:h-6 sm:w-6" />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
+                    <h3 className="text-sm sm:text-base lg:text-lg font-black text-amber-300">
+                      نمط الشاشات الكبيرة والبروجكتور نشط 📽️ (TV / Projector Mode)
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-black">
+                      قاعات المؤتمرات والاجتماعات
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 hidden sm:block mt-0.5 font-medium">
+                    تم تكبير أحجام الخطوط والأرقام والشعارات لضمان أعلى درجات الوضوح والتباين لجمهور القاعة عن بُعد
+                  </p>
+                </div>
+              </div>
+
+              {/* Controls: Scale & Layout Grid */}
+              <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap justify-end w-full sm:w-auto">
+                {/* Scale buttons */}
+                <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-2xl border border-slate-700/80">
+                  <span className="text-[11px] text-slate-400 font-bold px-1.5 hidden md:inline">
+                    حجم الخط:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playTap();
+                      setTvScale("normal");
+                    }}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      tvScale === "normal"
+                        ? "bg-amber-500 text-slate-950 font-black shadow-xs"
+                        : "text-slate-300 hover:text-white"
+                    }`}
+                  >
+                    100% عادي
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playTap();
+                      setTvScale("large");
+                    }}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      tvScale === "large"
+                        ? "bg-amber-500 text-slate-950 font-black shadow-xs"
+                        : "text-slate-300 hover:text-white"
+                    }`}
+                  >
+                    125% كبير 🔍
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playTap();
+                      setTvScale("xl");
+                    }}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      tvScale === "xl"
+                        ? "bg-amber-500 text-slate-950 font-black shadow-xs"
+                        : "text-slate-300 hover:text-white"
+                    }`}
+                  >
+                    150% عملاق 🚀
+                  </button>
+                </div>
+
+                {/* Column layout toggle on wide screens */}
+                <div className="hidden lg:flex items-center gap-1 bg-slate-950/80 p-1 rounded-2xl border border-slate-700/80">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playTap();
+                      setTvColumns("single");
+                    }}
+                    className={`p-1.5 rounded-xl transition-all cursor-pointer ${
+                      tvColumns === "single"
+                        ? "bg-amber-500 text-slate-950"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                    title="عرض رأسي فردي"
+                  >
+                    <List className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playTap();
+                      setTvColumns("grid");
+                    }}
+                    className={`p-1.5 rounded-xl transition-all cursor-pointer ${
+                      tvColumns === "grid"
+                        ? "bg-amber-500 text-slate-950"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                    title="عرض شبكي مزدوج (عمودين متجاورين للشاشات العريضة)"
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* Close TV Mode */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    setIsTvMode(false);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-colors cursor-pointer"
+                >
+                  إلغاء ✕
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Daily Challenge Banner */}
         {data.config.dailyChallenge && (
           <DailyChallengeBanner
@@ -655,9 +900,17 @@ export const Top10Scoreboard: React.FC = () => {
               className="mb-4 p-4 rounded-3xl bg-gradient-to-r from-amber-500 via-yellow-400 to-orange-500 text-slate-950 font-black flex items-center justify-between shadow-2xl shadow-amber-500/30 border-2 border-white ring-4 ring-amber-400/40"
             >
               <div className="flex items-center gap-3">
-                <span className="text-3xl p-1 bg-white/25 rounded-2xl shadow-inner">
-                  {newLeaderNotice.icon}
-                </span>
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl overflow-hidden border border-white/40 shadow-inner bg-white/25">
+                  {newLeaderNotice.avatarUrl ? (
+                    <img
+                      src={newLeaderNotice.avatarUrl}
+                      alt={newLeaderNotice.teamName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-3xl">{newLeaderNotice.icon}</span>
+                  )}
+                </div>
                 <div>
                   <div className="text-xs uppercase tracking-wider font-extrabold text-slate-900 flex items-center gap-1">
                     <Crown className="h-4 w-4" />
@@ -816,15 +1069,41 @@ export const Top10Scoreboard: React.FC = () => {
                         )}
                       </div>
 
-                      {/* Team Icon */}
+                      {/* Team Avatar / Profile Photo with Upload Trigger */}
                       <div
-                        className="flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-2xl text-xl sm:text-2xl border shadow-inner"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          sounds.playTap();
+                          setPhotoUploadTeam(team);
+                        }}
+                        className="relative group/photo flex h-11 w-11 sm:h-13 sm:w-13 shrink-0 items-center justify-center rounded-2xl overflow-hidden border-2 shadow-md transition-all duration-300 hover:scale-105 cursor-pointer ring-1 ring-white/10"
                         style={{
                           backgroundColor: `${team.color}22`,
-                          borderColor: `${team.color}55`,
+                          borderColor: team.color || "#F59E0B",
+                          boxShadow: `0 0 16px ${team.color}35`,
                         }}
+                        title="انقر لتغيير أو تحميل صورة تعريفية للفريق 📸"
                       >
-                        {team.icon}
+                        {team.avatarUrl ? (
+                          <img
+                            src={team.avatarUrl}
+                            alt={team.name}
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover/photo:scale-110"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLElement).style.display = "none";
+                            }}
+                          />
+                        ) : (
+                          <span className="text-xl sm:text-2xl select-none transition-transform duration-300 group-hover/photo:scale-110">
+                            {team.icon}
+                          </span>
+                        )}
+
+                        {/* Camera Hover Overlay */}
+                        <div className="absolute inset-0 bg-slate-950/75 opacity-0 group-hover/photo:opacity-100 flex flex-col items-center justify-center text-amber-300 transition-opacity duration-200">
+                          <Camera className="h-4 w-4 drop-shadow" />
+                          <span className="text-[8px] font-black mt-0.5">صورة</span>
+                        </div>
                       </div>
 
                       {/* Team Names and Metadata */}
@@ -843,6 +1122,20 @@ export const Top10Scoreboard: React.FC = () => {
                           >
                             {team.name}
                           </h3>
+
+                          {/* Quick Photo Upload Trigger Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              sounds.playTap();
+                              setPhotoUploadTeam(team);
+                            }}
+                            className="opacity-60 hover:opacity-100 p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-amber-300 transition-all text-xs flex items-center gap-1 cursor-pointer"
+                            title="تحميل أو تعديل صورة الفريق 📸"
+                          >
+                            <Camera className="h-3.5 w-3.5" />
+                          </button>
 
                           {/* Rank Shift Pill */}
                           {change && (
@@ -908,17 +1201,36 @@ export const Top10Scoreboard: React.FC = () => {
                               <span className="text-slate-500">•</span>
                             </>
                           )}
-                          <span className="text-slate-300 font-medium whitespace-nowrap">
-                            {team.membersCount} مشاركاً
-                          </span>
-                          {team.leaderName && (
+                          {/* Hierarchy Order: Leader -> Servant -> Makhdoumeen */}
+                          {team.leaderName ? (
+                            <span className="text-amber-300 font-bold flex items-center gap-1">
+                              <span>👑 القائد:</span>
+                              <span className="text-white font-semibold">{team.leaderName}</span>
+                            </span>
+                          ) : team.leadersCount > 0 ? (
+                            <span className="text-amber-300 font-bold flex items-center gap-1">
+                              <span>👑 القادة:</span>
+                              <span className="text-white font-semibold">{team.leadersCount}</span>
+                            </span>
+                          ) : null}
+
+                          {(team.servantsCount || 0) > 0 && (
                             <>
                               <span className="text-slate-500">•</span>
-                              <span className="text-slate-400 font-normal">
-                                القائد: {team.leaderName}
+                              <span className="text-purple-300 font-medium flex items-center gap-1">
+                                <span>✝️ الخدام:</span>
+                                <span className="text-slate-100 font-semibold">{team.servantsCount}</span>
                               </span>
                             </>
                           )}
+
+                          <span className="text-slate-500">•</span>
+                          <span className="text-teal-300 font-medium flex items-center gap-1">
+                            <span>👥 المخدومين:</span>
+                            <span className="text-slate-100 font-semibold">
+                              {team.makhdoumeenCount !== undefined ? team.makhdoumeenCount : team.membersCount}
+                            </span>
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -989,14 +1301,44 @@ export const Top10Scoreboard: React.FC = () => {
         <UserSwitcherModal onClose={() => setShowUserSwitcher(false)} />
       )}
 
-      {/* Auto-shown Member Card on Login */}
-      {showMemberCardOnLogin && (
-        <MemberCard
-          member={showMemberCardOnLogin}
-          team={data.teams.find((t) => t.id === showMemberCardOnLogin.teamId)}
-          onClose={() => setShowMemberCardOnLogin(null)}
+      {/* Team Photo Upload Modal */}
+      {photoUploadTeam && (
+        <TeamPhotoModal
+          team={photoUploadTeam}
+          onClose={() => setPhotoUploadTeam(null)}
+          onSuccess={(msg) => {
+            addToast({
+              type: "success",
+              title: "تحديث صورة الفريق 📸",
+              message: msg,
+              teamIcon: photoUploadTeam.icon,
+            });
+          }}
         />
       )}
+
+      {/* Share & Separate Links Modal */}
+      {showShareModal && (
+        <ShareLinksModal onClose={() => setShowShareModal(false)} />
+      )}
+
+      {/* Floating Exit Fullscreen Button for Conference Hall Mode */}
+      <AnimatePresence>
+        {isFullscreen && (
+          <motion.button
+            initial={{ opacity: 0, y: -20, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            type="button"
+            onClick={toggleFullscreen}
+            className="fixed top-4 left-4 z-[220] flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-900/90 hover:bg-rose-600 text-white text-xs font-black shadow-2xl border border-white/20 backdrop-blur-xl active:scale-95 transition-all cursor-pointer ring-2 ring-rose-500/30"
+            title="إنهاء وضع ملء الشاشة (Esc)"
+          >
+            <Minimize2 className="h-4 w-4 text-rose-400" />
+            <span>إنهاء ملء الشاشة (Esc) ✕</span>
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       {/* Floating Toast Notifications Stack */}
       <div
@@ -1024,8 +1366,10 @@ export const Top10Scoreboard: React.FC = () => {
               }`}
             >
               {/* Icon badge */}
-              <div className="shrink-0 p-2 rounded-xl bg-white/10 border border-white/10 text-lg flex items-center justify-center">
-                {toast.teamIcon ? (
+              <div className="shrink-0 h-10 w-10 rounded-xl bg-white/10 border border-white/10 text-lg flex items-center justify-center overflow-hidden">
+                {toast.teamAvatarUrl ? (
+                  <img src={toast.teamAvatarUrl} alt="" className="w-full h-full object-cover" />
+                ) : toast.teamIcon ? (
                   <span>{toast.teamIcon}</span>
                 ) : toast.type === "leader_change" ? (
                   <Crown className="h-5 w-5 text-amber-400" />
