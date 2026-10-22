@@ -47,9 +47,12 @@ import { AdminDashboard } from "./AdminDashboard";
 import { QRScannerModal } from "./QRScannerModal";
 import { UserSwitcherModal } from "./UserSwitcherModal";
 import { DailyChallengeBanner } from "./DailyChallengeBanner";
-import { ShareLinksModal } from "./ShareLinksModal";
 
-export const Top10Scoreboard: React.FC = () => {
+interface Top10ScoreboardProps {
+  onReturnToWelcome?: () => void;
+}
+
+export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelcome }) => {
   const { preference: themePreference, isDaytime, isLight, setPreference: setThemePreference } = useTheme();
   const [data, setData] = useState(meetingStore.getData());
   const [isLoading, setIsLoading] = useState(meetingStore.getIsLoading());
@@ -67,7 +70,6 @@ export const Top10Scoreboard: React.FC = () => {
   const [adminInitialTab, setAdminInitialTab] = useState<any>(undefined);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showUserSwitcher, setShowUserSwitcher] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [toasts, setToasts] = useState<
     Array<{
@@ -209,12 +211,21 @@ export const Top10Scoreboard: React.FC = () => {
     return () => window.removeEventListener("keydown", handleAdminHotkey);
   }, []);
 
-  // Determine if public mode is active (hides the admin button from spectators)
+  // Determine if public / makhdoum mode is active (hides all admin controls, edit buttons, QR scanner, user switcher, and share links from public/makhdoum view)
   const isPublicDisplayMode = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("mode") === "public" || params.get("public") === "true") return true;
-    return !!data.config.hideAdminButtonFromPublic;
-  }, [data.config.hideAdminButtonFromPublic]);
+    const mode = params.get("mode");
+    const view = params.get("view");
+    if (mode === "public" || mode === "makhdoum" || view === "public" || params.get("public") === "true") return true;
+    
+    // If logged in as admin, priest, leader, or servant: unlock all admin/servant controls!
+    if (currentUser.role === "admin" || currentUser.role === "priest" || currentUser.role === "leader" || currentUser.role === "servant") {
+      return false;
+    }
+    
+    // Default for guest / makhdoum members: read-only public mode
+    return true;
+  }, [currentUser.role]);
 
   const processedTeams = useMemo(() => {
     return meetingStore.getProcessedTeams();
@@ -474,9 +485,13 @@ export const Top10Scoreboard: React.FC = () => {
           <div className="flex items-center justify-between gap-3 flex-wrap md:flex-nowrap">
             {/* Title & Brand */}
             <div className="flex items-center gap-3">
-              <span className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 text-slate-950 font-black shadow-lg shadow-amber-500/25 shrink-0">
-                <Trophy className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
-              </span>
+              <div className="relative flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-white/95 border-2 border-amber-400/80 shadow-lg shadow-amber-500/20 shrink-0 overflow-hidden p-0.5">
+                <img
+                  src={data.config.meetingLogoUrl || "/assets/aistudio/_______________________55ad5e73.png"}
+                  alt="لوجو أسرة الشهيد العظيم أبي سيفين وتماف إيريني"
+                  className="w-full h-full object-contain rounded-xl"
+                />
+              </div>
 
               <div className="space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -493,7 +508,7 @@ export const Top10Scoreboard: React.FC = () => {
                   <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight leading-tight">
                     {data.config.meetingName}
                   </h1>
-                  {currentUser.role === "admin" && (
+                  {!isPublicDisplayMode && currentUser.role === "admin" && (
                     <button
                       onClick={() => {
                         sounds.playTap();
@@ -551,63 +566,87 @@ export const Top10Scoreboard: React.FC = () => {
 
               {/* Action buttons row - Unified Design System */}
               <div className="flex items-center gap-2 flex-wrap justify-end">
-                {/* Active User Switcher Pill */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    sounds.playTap();
-                    setShowUserSwitcher(true);
-                  }}
-                  className="h-9 px-3.5 rounded-xl bg-slate-900 border border-amber-500/40 text-amber-300 text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
-                  title="تبديل الحساب أو تسجيل الدخول بكود العضو"
-                >
-                  <KeyRound className="h-4 w-4 text-amber-400 shrink-0" />
-                  <span>{currentUser.name.split(" ")[0]} ({currentUser.roleLabel}) 🔑</span>
-                </button>
+                {/* Administrative Controls - Hidden in Public / Makhdoum View */}
+                {!isPublicDisplayMode ? (
+                  <>
+                    {/* Active User Switcher Pill */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playTap();
+                        setShowUserSwitcher(true);
+                      }}
+                      className="h-9 px-3.5 rounded-xl bg-slate-900 border border-amber-500/40 text-amber-300 text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                      title="تبديل الحساب أو تسجيل الدخول بكود العضو"
+                    >
+                      <KeyRound className="h-4 w-4 text-amber-400 shrink-0" />
+                      <span>{currentUser.name.split(" ")[0]} ({currentUser.roleLabel}) 🔑</span>
+                    </button>
 
-                {/* Direct Scan QR Button for leaders/all */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    sounds.playTap();
-                    setShowQRScanner(true);
-                  }}
-                  className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-black shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
-                  title="مسح رمز QR الفعالية لتسجيل الحضور واحتساب النقاط تلقائياً"
-                >
-                  <Camera className="h-4 w-4 shrink-0" />
-                  <span>مسح QR للحضور 📱</span>
-                </button>
+                    {/* Direct Scan QR Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playTap();
+                        setShowQRScanner(true);
+                      }}
+                      className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-black shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                      title="مسح رمز QR الفعالية لتسجيل الحضور واحتساب النقاط تلقائياً"
+                    >
+                      <Camera className="h-4 w-4 shrink-0" />
+                      <span>مسح QR للحضور 📱</span>
+                    </button>
 
-                {/* Admin Panel Button - Hidden in Public Mode unless admin user is active */}
-                {(!isPublicDisplayMode || currentUser.role === "admin") && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      sounds.playTap();
-                      setViewMode("admin");
-                    }}
-                    className="h-9 px-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 text-xs font-black shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
-                    title="فتح لوحة تحكم الخادم لرصد النقاط وتعديل الفرق"
-                  >
-                    <Settings className="h-4 w-4 shrink-0" />
-                    <span>لوحة تحكم الخادم ⚙️</span>
-                  </button>
+                    {/* Admin Panel Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playTap();
+                        setViewMode("admin");
+                      }}
+                      className="h-9 px-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 text-xs font-black shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                      title="فتح لوحة تحكم الخادم لرصد النقاط وتعديل الفرق"
+                    >
+                      <Settings className="h-4 w-4 shrink-0" />
+                      <span>لوحة تحكم الخادم ⚙️</span>
+                    </button>
+
+                    {/* Exit to Public View Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playClose();
+                        authStore.logout();
+                        addToast({
+                          type: "info",
+                          title: "الشاشة العامة (المخدومين)",
+                          message: "تم تسجيل الخروج والعودة للشاشة العامة المقروءة فقط.",
+                        });
+                      }}
+                      className="h-9 px-3.5 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-300 hover:text-white text-xs font-black shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                      title="تسجيل الخروج والرجوع إلى شاشة العرض العامة المقروءة للمخدومين فقط"
+                    >
+                      <span>🚪 خروج للشاشة العامة</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {onReturnToWelcome && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          sounds.playTap();
+                          onReturnToWelcome();
+                        }}
+                        className="h-9 px-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 border border-amber-300/40 text-xs font-black shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                        title="العودة لصفحة الدخول والشعار الرئيسية لإدخال الكود أو مسح الباركود"
+                      >
+                        <KeyRound className="h-4 w-4 shrink-0" />
+                        <span>🔑 صفحة الدخول والكود</span>
+                      </button>
+                    )}
+                  </>
                 )}
-
-                {/* Share & Separate Links Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    sounds.playTap();
-                    setShowShareModal(true);
-                  }}
-                  className="h-9 px-3.5 rounded-xl bg-slate-800 hover:bg-indigo-600/80 text-indigo-300 hover:text-white border border-indigo-500/40 text-xs font-black shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
-                  title="مشاركة وفصل الروابط: رابط الجمهور والبروجيكتور ورابط الخدام"
-                >
-                  <Share2 className="h-4 w-4 shrink-0" />
-                  <span>فصل الروابط 🔗</span>
-                </button>
 
                 {/* Celebrate winner button */}
                 <button
@@ -915,7 +954,7 @@ export const Top10Scoreboard: React.FC = () => {
         {data.config.dailyChallenge && (
           <DailyChallengeBanner
             challenge={data.config.dailyChallenge}
-            canAwardPoints={currentUser.permissions.canAwardPoints}
+            canAwardPoints={!isPublicDisplayMode && currentUser.permissions.canAwardPoints}
             onAwardChallengePoints={() => {
               setAdminInitialTab("quick_score");
               setViewMode("admin");
@@ -1165,19 +1204,21 @@ export const Top10Scoreboard: React.FC = () => {
                             {team.name}
                           </h3>
 
-                          {/* Quick Photo Upload Trigger Button */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              sounds.playTap();
-                              setPhotoUploadTeam(team);
-                            }}
-                            className="opacity-60 hover:opacity-100 p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-amber-300 transition-all text-xs flex items-center gap-1 cursor-pointer"
-                            title="تحميل أو تعديل صورة الفريق 📸"
-                          >
-                            <Camera className="h-3.5 w-3.5" />
-                          </button>
+                          {/* Quick Photo Upload Trigger Button (Admin/Leader only) */}
+                          {!isPublicDisplayMode && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                sounds.playTap();
+                                setPhotoUploadTeam(team);
+                              }}
+                              className="opacity-60 hover:opacity-100 p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-amber-300 transition-all text-xs flex items-center gap-1 cursor-pointer"
+                              title="تحميل أو تعديل صورة الفريق 📸"
+                            >
+                              <Camera className="h-3.5 w-3.5" />
+                            </button>
+                          )}
 
                           {/* Rank Shift Indicator Pill (Live shift or Previous Round comparison) */}
                           {change ? (
@@ -1309,16 +1350,18 @@ export const Top10Scoreboard: React.FC = () => {
 
                     {/* Right: XP Score + Quick +50 XP trigger */}
                     <div className="flex items-center gap-2.5 sm:gap-4 shrink-0 mr-1 sm:mr-3">
-                      {/* Quick +50 button for fast in-game scoring */}
-                      <button
-                        type="button"
-                        onClick={(e) => handleQuickAdd(e, team, 50)}
-                        className="hidden sm:flex h-8 px-2.5 rounded-xl bg-slate-800/80 hover:bg-amber-500 hover:text-slate-950 text-amber-400 text-xs font-bold border border-slate-700 items-center gap-1 transition-all cursor-pointer shadow-xs active:scale-95"
-                        title="إضافة سريعة +50 نقطة للفريق"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        <span>50 XP</span>
-                      </button>
+                      {/* Quick +50 button for fast in-game scoring (Admin only) */}
+                      {!isPublicDisplayMode && currentUser.permissions.canAwardPoints && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleQuickAdd(e, team, 50)}
+                          className="hidden sm:flex h-8 px-2.5 rounded-xl bg-slate-800/80 hover:bg-amber-500 hover:text-slate-950 text-amber-400 text-xs font-bold border border-slate-700 items-center gap-1 transition-all cursor-pointer shadow-xs active:scale-95"
+                          title="إضافة سريعة +50 نقطة للفريق"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          <span>50 XP</span>
+                        </button>
+                      )}
 
                       <div className="flex flex-col items-start" dir="ltr">
                         <div className="flex items-baseline gap-1 text-amber-400 font-display">
@@ -1389,10 +1432,6 @@ export const Top10Scoreboard: React.FC = () => {
         />
       )}
 
-      {/* Share & Separate Links Modal */}
-      {showShareModal && (
-        <ShareLinksModal onClose={() => setShowShareModal(false)} />
-      )}
 
       {/* Floating Exit Fullscreen Button for Conference Hall Mode */}
       <AnimatePresence>

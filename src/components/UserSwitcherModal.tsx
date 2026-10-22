@@ -141,7 +141,7 @@ export const UserSwitcherModal: React.FC<UserSwitcherModalProps> = ({ onClose })
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-black">
                 {currentUser.roleLabel}
               </span>
@@ -149,6 +149,25 @@ export const UserSwitcherModal: React.FC<UserSwitcherModalProps> = ({ onClose })
                 <span className="px-2 py-1 rounded-lg bg-slate-950 font-mono text-[11px] text-slate-400 border border-slate-800">
                   كود: {currentUser.accessCode}
                 </span>
+              )}
+              {currentUser.role !== "member" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playClose();
+                    authStore.logout();
+                    setCurrentUser(authStore.getCurrentUser());
+                    setSuccessMsg("تم تسجيل الخروج والعودة للشاشة العامة للمخدومين.");
+                    setTimeout(() => {
+                      onClose();
+                    }, 800);
+                  }}
+                  className="px-3 py-1 rounded-xl bg-rose-950/90 hover:bg-rose-900 border border-rose-500/50 text-rose-300 text-xs font-black cursor-pointer transition-all flex items-center gap-1 shrink-0"
+                  title="تسجيل الخروج والرجوع للشاشة العامة"
+                >
+                  <LogOut className="h-3.5 w-3.5 text-rose-400" />
+                  <span>خروج للشاشة العامة</span>
+                </button>
               )}
             </div>
           </div>

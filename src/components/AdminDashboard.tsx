@@ -41,7 +41,7 @@ import { QRScannerModal } from "./QRScannerModal";
 import { UserSwitcherModal } from "./UserSwitcherModal";
 import { AdminPanel } from "./AdminPanel";
 import { googleSheets } from "../utils/googleSheets";
-import { ShareLinksModal } from "./ShareLinksModal";
+import { PDFReportModal } from "./PDFReportModal";
 
 interface AdminDashboardProps {
   onBackToScoreboard: () => void;
@@ -82,15 +82,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
     return localStorage.getItem(ADMIN_PIN_KEY) || "9999";
   });
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
-    // If current logged user is admin, allow automatic unlock or check session
-    if (authStore.getCurrentUser().role === "admin") return true;
+    // If current logged user is admin, priest, leader, or servant, unlock automatically
+    const r = authStore.getCurrentUser().role;
+    if (r === "admin" || r === "priest" || r === "leader" || r === "servant") return true;
     return sessionStorage.getItem(ADMIN_UNLOCKED_SESSION_KEY) === "true";
   });
   const [enteredPin, setEnteredPin] = useState<string>("");
   const [pinError, setPinError] = useState<string | null>(null);
   const [showChangePinModal, setShowChangePinModal] = useState<boolean>(false);
   const [newPinValue, setNewPinValue] = useState<string>("");
-  const [showShareLinks, setShowShareLinks] = useState<boolean>(false);
+  const [showPdfReportModal, setShowPdfReportModal] = useState<boolean>(false);
 
   // Navigation Tabs in Admin Dashboard
   const [activeTab, setActiveTab] = useState<"teams" | "quick_points" | "security" | "history">("teams");
@@ -145,7 +146,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
     const unsubAuth = authStore.subscribe(() => {
       const user = authStore.getCurrentUser();
       setCurrentUser(user);
-      if (user.role === "admin") {
+      if (user.role === "admin" || user.role === "priest" || user.role === "leader" || user.role === "servant") {
         setIsUnlocked(true);
       }
     });
@@ -462,8 +463,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
         {/* ========================================================= */}
         <header className="rounded-3xl border border-slate-800 bg-[#0B132B]/90 backdrop-blur-xl p-5 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-slate-950 shadow-lg shadow-amber-500/20 font-black">
-              <Shield className="h-6 w-6" />
+            <div className="h-12 w-12 rounded-2xl bg-white/95 border-2 border-amber-400/80 p-0.5 flex items-center justify-center text-slate-950 shadow-lg shadow-amber-500/20 font-black overflow-hidden shrink-0">
+              <img
+                src={data.config.meetingLogoUrl || "/assets/aistudio/_______________________55ad5e73.png"}
+                alt="لوجو الاجتماع"
+                className="w-full h-full object-contain rounded-xl"
+              />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -561,18 +566,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
               <span>إعدادات شاملة ⚙️</span>
             </button>
 
-            {/* Share & Separate Links Button */}
+            {/* PDF Report Export Button */}
             <button
               type="button"
               onClick={() => {
                 sounds.playTap();
-                setShowShareLinks(true);
+                setShowPdfReportModal(true);
               }}
-              className="px-3.5 py-1.5 rounded-2xl bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95"
-              title="فصل ومشاركة الروابط: رابط الجمهور ورابط الخدام"
+              className="px-3.5 py-1.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-95"
+              title="تصدير تقرير نهائي لنتائج وترتيب الفرق بتنسيق PDF أو صورة للتليجرام والواتساب"
             >
-              <Share2 className="h-3.5 w-3.5" />
-              <span>فصل الروابط 🔗</span>
+              <Download className="h-3.5 w-3.5" />
+              <span>تقرير النتائج PDF 📄</span>
             </button>
 
             {/* Theme Switcher Toggle (Auto Time / Day / Night) */}
@@ -2182,9 +2187,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
         <UserSwitcherModal onClose={() => setShowUserSwitcher(false)} />
       )}
 
-      {/* Share Links Modal */}
-      {showShareLinks && (
-        <ShareLinksModal onClose={() => setShowShareLinks(false)} />
+      {/* PDF Report Export Modal */}
+      {showPdfReportModal && (
+        <PDFReportModal onClose={() => setShowPdfReportModal(false)} />
       )}
     </div>
   );

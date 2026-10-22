@@ -36,6 +36,17 @@ interface TeamModalProps {
 
 export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
   const [currentUser, setCurrentUser] = useState<SystemUser>(authStore.getCurrentUser());
+
+  const isPublicDisplayMode = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get("mode");
+    const view = params.get("view");
+    if (mode === "public" || mode === "makhdoum" || view === "public" || params.get("public") === "true") return true;
+    if (currentUser.role === "admin" || currentUser.role === "priest" || currentUser.role === "leader" || currentUser.role === "servant") {
+      return false;
+    }
+    return true;
+  }, [currentUser.role]);
   const [teamTab, setTeamTab] = useState<"members" | "history">("members");
   const [memberSearch, setMemberSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | "leaders" | "servants" | "members">("all");
@@ -182,8 +193,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
       list = list.filter(
         (m) =>
           m.name.toLowerCase().includes(q) ||
-          (m.nameEn && m.nameEn.toLowerCase().includes(q)) ||
-          (m.phone && m.phone.includes(q))
+          (m.nameEn && m.nameEn.toLowerCase().includes(q))
       );
     }
 
@@ -340,31 +350,35 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      sounds.playTap();
-                      setShowTeamScanner(true);
-                    }}
-                    className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95"
-                    title="مسح رمز QR الفعالية لحضور أعضاء هذا الفريق"
-                  >
-                    <Camera className="h-3.5 w-3.5" />
-                    <span>مسح QR للحضور 📱</span>
-                  </button>
+                {!isPublicDisplayMode && (
+                  <div className="flex items-center gap-2">
+                    {currentUser.permissions.canScanAttendance && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          sounds.playTap();
+                          setShowTeamScanner(true);
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95"
+                        title="مسح رمز QR الفعالية لحضور أعضاء هذا الفريق"
+                      >
+                        <Camera className="h-3.5 w-3.5" />
+                        <span>مسح QR للحضور 📱</span>
+                      </button>
+                    )}
 
-                  {currentUser.permissions.canAwardPoints && (
-                    <button
-                      type="button"
-                      onClick={() => setShowQuickForm(!showQuickForm)}
-                      className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      <span>رصد نقاط للفريق ⚡</span>
-                    </button>
-                  )}
-                </div>
+                    {currentUser.permissions.canAwardPoints && (
+                      <button
+                        type="button"
+                        onClick={() => setShowQuickForm(!showQuickForm)}
+                        className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>رصد نقاط للفريق ⚡</span>
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -508,7 +522,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                   </div>
                 {/* Filter and Sort Controls */}
                 <div className="flex items-center gap-2 overflow-x-auto pb-1 flex-wrap sm:flex-nowrap">
-                  {currentUser.permissions.canEditMembers && (
+                  {!isPublicDisplayMode && currentUser.permissions.canEditMembers && (
                     <button
                       type="button"
                       onClick={() => {
@@ -671,7 +685,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                     type="text"
                     value={memberSearch}
                     onChange={(e) => setMemberSearch(e.target.value)}
-                    placeholder="ابحث باسم المشارك أو رقم الهاتف..."
+                    placeholder="ابحث باسم الشخص..."
                     className="w-full h-11 pr-11 pl-4 rounded-2xl bg-slate-900/90 border border-slate-700/80 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-sky-400 shadow-inner"
                   />
                   {memberSearch && (
@@ -758,7 +772,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                                     <span>قائد</span>
                                   </span>
                                 </div>
-                                {member.phone && (
+                                {!isPublicDisplayMode && member.phone && (
                                   <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
                                     <Phone className="h-2.5 w-2.5 text-slate-500" />
                                     <span>{member.phone}</span>
@@ -777,25 +791,30 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                                   <div className="text-[8px] text-slate-500 font-bold text-right" dir="rtl">نقاط القائد</div>
                                 </div>
 
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    await meetingStore.awardPoints({
-                                      targetType: "member",
-                                      targetId: member.id,
-                                      points: 25,
-                                      reason: `نقطة تميز للقائد: ${member.name}`,
-                                      category: "تحدي قيادي",
-                                    });
-                                    sounds.playTap();
-                                    setToastMsg(`تم إضافة +25 XP للقائد ${member.name}!`);
-                                    setTimeout(() => setToastMsg(null), 2500);
-                                  }}
-                                  className="h-8 w-8 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-400 text-xs font-bold border border-slate-700 flex items-center justify-center transition-all cursor-pointer"
-                                  title="إضافة +25 نقطة للقائد فوراً"
-                                >
-                                  +25
-                                </button>
+                                {!isPublicDisplayMode && currentUser.permissions.canAwardPoints && (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      await meetingStore.awardPoints(
+                                        {
+                                          targetType: "member",
+                                          targetId: member.id,
+                                          points: 25,
+                                          reason: `نقطة تميز للقائد: ${member.name}`,
+                                          category: "تحدي قيادي",
+                                        },
+                                        currentUser
+                                      );
+                                      sounds.playTap();
+                                      setToastMsg(`تم إضافة +25 XP للقائد ${member.name}!`);
+                                      setTimeout(() => setToastMsg(null), 2500);
+                                    }}
+                                    className="h-8 w-8 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-400 text-xs font-bold border border-slate-700 flex items-center justify-center transition-all cursor-pointer"
+                                    title="إضافة +25 نقطة للقائد فوراً"
+                                  >
+                                    +25
+                                  </button>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -803,7 +822,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                       )}
                     </div>
 
-                    {/* SECTION 2: خدام ورعاة المجموعة (Servant) */}
+                    {/* SECTION 2: خدام المجموعة (Servant) */}
                     <div className="space-y-3 pt-2">
                       <div className="flex items-center justify-between pb-2 border-b border-purple-500/20">
                         <div className="flex items-center gap-2">
@@ -812,12 +831,12 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                           </span>
                           <div>
                             <h4 className="text-sm font-black text-purple-300 flex items-center gap-2">
-                              <span>خدام ورعاة المجموعة</span>
+                              <span>خدام المجموعة</span>
                               <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-mono border border-purple-500/30">
                                 {servantsList.length}
                               </span>
                             </h4>
-                            <p className="text-[10px] text-slate-400">المرتبة الثانية: الخدمة والرعاية الروحية</p>
+                            <p className="text-[10px] text-slate-400">المرتبة الثانية: الخدام والمساعدون</p>
                           </div>
                         </div>
                         {currentUser.permissions.canEditMembers && (
@@ -869,7 +888,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                                     <span>خادم</span>
                                   </span>
                                 </div>
-                                {member.phone && (
+                                {!isPublicDisplayMode && member.phone && (
                                   <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
                                     <Phone className="h-2.5 w-2.5 text-slate-500" />
                                     <span>{member.phone}</span>
@@ -888,25 +907,30 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                                   <div className="text-[8px] text-slate-500 font-bold text-right" dir="rtl">نقاط الخادم</div>
                                 </div>
 
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    await meetingStore.awardPoints({
-                                      targetType: "member",
-                                      targetId: member.id,
-                                      points: 25,
-                                      reason: `نقطة تميز للخادم: ${member.name}`,
-                                      category: "خدمة ومحبة",
-                                    });
-                                    sounds.playTap();
-                                    setToastMsg(`تم إضافة +25 XP للخادم ${member.name}!`);
-                                    setTimeout(() => setToastMsg(null), 2500);
-                                  }}
-                                  className="h-8 w-8 rounded-xl bg-slate-800 hover:bg-purple-600 hover:text-white text-purple-300 text-xs font-bold border border-slate-700 flex items-center justify-center transition-all cursor-pointer"
-                                  title="إضافة +25 نقطة للخادم فوراً"
-                                >
-                                  +25
-                                </button>
+                                {!isPublicDisplayMode && currentUser.permissions.canAwardPoints && (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      await meetingStore.awardPoints(
+                                        {
+                                          targetType: "member",
+                                          targetId: member.id,
+                                          points: 25,
+                                          reason: `نقطة تميز للخادم: ${member.name}`,
+                                          category: "خدمة ومحبة",
+                                        },
+                                        currentUser
+                                      );
+                                      sounds.playTap();
+                                      setToastMsg(`تم إضافة +25 XP للخادم ${member.name}!`);
+                                      setTimeout(() => setToastMsg(null), 2500);
+                                    }}
+                                    className="h-8 w-8 rounded-xl bg-slate-800 hover:bg-purple-600 hover:text-white text-purple-300 text-xs font-bold border border-slate-700 flex items-center justify-center transition-all cursor-pointer"
+                                    title="إضافة +25 نقطة للخادم فوراً"
+                                  >
+                                    +25
+                                  </button>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -977,7 +1001,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                                     <span>مخدوم</span>
                                   </span>
                                 </div>
-                                {member.phone && (
+                                {!isPublicDisplayMode && member.phone && (
                                   <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
                                     <Phone className="h-2.5 w-2.5 text-slate-500" />
                                     <span>{member.phone}</span>
@@ -996,25 +1020,30 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                                   <div className="text-[8px] text-slate-500 font-bold text-right" dir="rtl">نقاط العضو</div>
                                 </div>
 
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    await meetingStore.awardPoints({
-                                      targetType: "member",
-                                      targetId: member.id,
-                                      points: 25,
-                                      reason: `نقطة تميز للمشارك: ${member.name}`,
-                                      category: "تحدي فردي",
-                                    });
-                                    sounds.playTap();
-                                    setToastMsg(`تم إضافة +25 XP للمشارك ${member.name}!`);
-                                    setTimeout(() => setToastMsg(null), 2500);
-                                  }}
-                                  className="h-8 w-8 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-400 text-xs font-bold border border-slate-700 flex items-center justify-center transition-all cursor-pointer"
-                                  title="إضافة +25 نقطة للمشارك فوراً"
-                                >
-                                  +25
-                                </button>
+                                {!isPublicDisplayMode && currentUser.permissions.canAwardPoints && (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      await meetingStore.awardPoints(
+                                        {
+                                          targetType: "member",
+                                          targetId: member.id,
+                                          points: 25,
+                                          reason: `نقطة تميز للمشارك: ${member.name}`,
+                                          category: "تحدي فردي",
+                                        },
+                                        currentUser
+                                      );
+                                      sounds.playTap();
+                                      setToastMsg(`تم إضافة +25 XP للمشارك ${member.name}!`);
+                                      setTimeout(() => setToastMsg(null), 2500);
+                                    }}
+                                    className="h-8 w-8 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-400 text-xs font-bold border border-slate-700 flex items-center justify-center transition-all cursor-pointer"
+                                    title="إضافة +25 نقطة للمشارك فوراً"
+                                  >
+                                    +25
+                                  </button>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -1085,7 +1114,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                               )}
                             </div>
 
-                            {member.phone && (
+                            {!isPublicDisplayMode && member.phone && (
                               <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
                                 <Phone className="h-2.5 w-2.5 text-slate-500" />
                                 <span>{member.phone}</span>
@@ -1104,25 +1133,30 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                               <div className="text-[8px] text-slate-500 font-bold text-right" dir="rtl">نقاط العضو</div>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                await meetingStore.awardPoints({
-                                  targetType: "member",
-                                  targetId: member.id,
-                                  points: 25,
-                                  reason: `نقطة تميز: ${member.name}`,
-                                  category: "تحدي فردي",
-                                });
-                                sounds.playTap();
-                                setToastMsg(`تم إضافة +25 XP للمشارك ${member.name}!`);
-                                setTimeout(() => setToastMsg(null), 2500);
-                              }}
-                              className="h-8 w-8 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-400 text-xs font-bold border border-slate-700 flex items-center justify-center transition-all cursor-pointer"
-                              title="إضافة +25 نقطة فوراً"
-                            >
-                              +25
-                            </button>
+                            {!isPublicDisplayMode && currentUser.permissions.canAwardPoints && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  await meetingStore.awardPoints(
+                                    {
+                                      targetType: "member",
+                                      targetId: member.id,
+                                      points: 25,
+                                      reason: `نقطة تميز: ${member.name}`,
+                                      category: "تحدي فردي",
+                                    },
+                                    currentUser
+                                  );
+                                  sounds.playTap();
+                                  setToastMsg(`تم إضافة +25 XP للمشارك ${member.name}!`);
+                                  setTimeout(() => setToastMsg(null), 2500);
+                                }}
+                                className="h-8 w-8 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-400 text-xs font-bold border border-slate-700 flex items-center justify-center transition-all cursor-pointer"
+                                title="إضافة +25 نقطة فوراً"
+                              >
+                                +25
+                              </button>
+                            )}
                           </div>
                         </div>
                       );

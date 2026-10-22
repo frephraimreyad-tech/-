@@ -46,13 +46,14 @@ export const DEFAULT_ACTIVITY_REASONS: ActivityReason[] = [
 ];
 
 const DEFAULT_CONFIG: MeetingConfig = {
-  meetingName: "أسرة أبي سيفين وتماف إيريني",
+  meetingName: "أسرة الشهيد العظيم أبي سيفين وتماف إيريني",
   subTitle: "اجتماع شباب جامعة • لوحة الشرف الكبرى والتنافس الروحي",
-  churchName: "أسرة الشهيد العظيم أبي سيفين وتماف إيريني",
+  churchName: "كنيسة الشهيد العظيم أبي سيفين وتماف إيريني",
   seasonName: "موسم النهضة الروحية ٢٠٢٦",
   enableSounds: true,
   autoIdleSeconds: 50,
   hideAdminButtonFromPublic: false,
+  meetingLogoUrl: "/assets/aistudio/_______________________55ad5e73.png",
   dailyChallenge: {
     id: "dc-today-01",
     title: "تحدي حفظ آية اللقاء والاشتراك الجماعي",
@@ -849,17 +850,22 @@ class MeetingStore {
     const { targetType, targetId, points, reason, category, timestamp, notes } = params;
     if (points === 0) return null;
 
-    // Backend Security Verification
-    if (executor && !executor.permissions.canAwardPoints && executor.role !== "admin") {
+    // Backend Security Verification: Members / Makhdoumeen / Anonymous users cannot award points under any circumstances
+    const activeExecutor = executor || authStore.getCurrentUser();
+    if (
+      !activeExecutor ||
+      activeExecutor.role === "member" ||
+      (!activeExecutor.permissions.canAwardPoints && activeExecutor.role !== "admin")
+    ) {
       this.logAudit({
-        userId: executor.id,
-        userName: executor.name,
-        userRole: executor.role,
+        userId: activeExecutor?.id || "guest",
+        userName: activeExecutor?.name || "مستخدم عام",
+        userRole: activeExecutor?.role || "guest",
         action: "security_block",
         targetType,
         targetId,
         targetName: targetId,
-        details: `محاولة غير مصرح بها لرصد نقاط (${points > 0 ? "+" : ""}${points} XP) لـ ${targetId}. تم الرفض أمنياً.`,
+        details: `محاولة محظورة من مخدوم/عضو لرصد نقاط (${points > 0 ? "+" : ""}${points} XP). تم الرفض أمنياً.`,
         status: "denied",
       });
       return null;

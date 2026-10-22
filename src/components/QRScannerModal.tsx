@@ -38,7 +38,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   const [currentUser, setCurrentUser] = useState<SystemUser>(authStore.getCurrentUser());
   const data = meetingStore.getData();
 
-  const [scanMode, setScanMode] = useState<"camera" | "code_select">("code_select");
+  const [scanMode, setScanMode] = useState<"camera" | "code_select">("camera");
   const [selectedEventId, setSelectedEventId] = useState<string>(defaultEventId || "");
   const [selectedMemberId, setSelectedMemberId] = useState<string>(defaultMemberId || "");
   const [manualCode, setManualCode] = useState<string>("");
@@ -153,6 +153,17 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       stopLiveScanner();
     };
   }, []);
+
+  useEffect(() => {
+    if (scanMode === "camera") {
+      const timer = setTimeout(() => {
+        startLiveScanner();
+      }, 300);
+      return () => clearTimeout(timer);
+    } else {
+      stopLiveScanner();
+    }
+  }, [scanMode]);
 
   // Start Live Camera QR Stream
   const startLiveScanner = async () => {
@@ -682,19 +693,61 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
 
         {/* ---------------- SECTION 2: CAMERA TAB ---------------- */}
         {scanMode === "camera" && (
-          <div className="space-y-3.5">
-            {cameraError && (
-              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs leading-relaxed space-y-1">
-                <div className="font-bold flex items-center gap-1 text-amber-300">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>تنبيه أمان المتصفح:</span>
-                </div>
-                <p>{cameraError}</p>
-              </div>
-            )}
-
-            {/* Guaranteed 1-Tap Camera Capture Button */}
+          <div className="space-y-4">
+            {/* Live Camera Stream Container */}
             <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold text-amber-300">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                  <span>البث المباشر لكاميرا الهاتف:</span>
+                </span>
+                {isScanningLive && (
+                  <span className="text-[10px] text-emerald-400 font-mono">
+                    جاري المسح الفوري ⚡
+                  </span>
+                )}
+              </div>
+
+              <div className="relative rounded-2xl overflow-hidden border-2 border-amber-400/60 bg-black min-h-[220px] flex items-center justify-center shadow-xl">
+                <div id="qr-camera-stream" className="w-full max-w-[320px]" />
+                
+                {/* Laser Scanning Finder Line when scanning live */}
+                {isScanningLive && (
+                  <div className="pointer-events-none absolute inset-x-8 top-1/2 -translate-y-1/2 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent shadow-[0_0_15px_#f59e0b] animate-pulse" />
+                )}
+
+                {!isScanningLive && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center text-xs text-slate-300 bg-slate-950/90 space-y-3">
+                    <Camera className="h-8 w-8 text-amber-400 animate-bounce" />
+                    <p className="font-bold">البث المباشر للكاميرا جاهز للمسح</p>
+                    <button
+                      type="button"
+                      onClick={startLiveScanner}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs active:scale-95 transition-all cursor-pointer shadow-md"
+                    >
+                      تشغيل البث المباشر للكاميرا 🎥
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {isScanningLive && (
+                <button
+                  type="button"
+                  onClick={stopLiveScanner}
+                  className="w-full py-1.5 text-xs text-rose-400 hover:text-rose-300 font-bold bg-rose-950/40 rounded-xl cursor-pointer border border-rose-500/30"
+                >
+                  إيقاف البث المباشر ⏹️
+                </button>
+              )}
+            </div>
+
+            {/* Guaranteed 1-Tap Camera Capture & Gallery Upload Buttons */}
+            <div className="space-y-2 pt-2 border-t border-slate-800">
+              <span className="text-[11px] font-bold text-slate-400 block">
+                أو التقط صورة للرمز مباشرة من الكاميرا / المعرض:
+              </span>
+
               <button
                 type="button"
                 onClick={() => {
@@ -702,13 +755,13 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
                   fileInputCameraRef.current?.click();
                 }}
                 disabled={isProcessingFile}
-                className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-sm shadow-xl shadow-amber-500/25 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
+                className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-sm shadow-xl shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
               >
                 <Camera className="h-5 w-5" />
                 <span>
                   {isProcessingFile
-                    ? "جاري قراءة الرمز..."
-                    : "📸 التقاط صورة للكود بكاميرا الهاتف (مضمون 100%)"}
+                    ? "جاري قراءة الصورة..."
+                    : "📸 التقاط صورة للكود بالكاميرا (Camera Snapshot)"}
                 </span>
               </button>
 
@@ -722,42 +775,19 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
                 className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2"
               >
                 <Upload className="h-4 w-4 text-sky-400" />
-                <span>اختيار صورة كود من المعرض أو ألبوم الصور 🖼️</span>
+                <span>اختيار صورة كود من ألبوم الصور 🖼️</span>
               </button>
             </div>
 
-            {/* Optional Live Camera Video Stream Area */}
-            <div className="pt-2 border-t border-slate-800/80 space-y-2">
-              <span className="text-[11px] font-bold text-slate-400 block">
-                أو جرب البث المباشر المستمر للكاميرا:
-              </span>
-
-              <div className="relative rounded-2xl overflow-hidden border-2 border-dashed border-slate-700 bg-black min-h-[190px] flex items-center justify-center">
-                <div id="qr-camera-stream" className="w-full max-w-[300px]" />
-                {!isScanningLive && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center text-xs text-slate-400 bg-black/75 space-y-2">
-                    <p>اضغط لبدء البث المباشر عبر الكاميرا</p>
-                    <button
-                      type="button"
-                      onClick={startLiveScanner}
-                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-black text-xs active:scale-95 transition-all cursor-pointer"
-                    >
-                      تشغيل البث المباشر للكاميرا 🎥
-                    </button>
-                  </div>
-                )}
+            {cameraError && (
+              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs leading-relaxed space-y-1">
+                <div className="font-bold flex items-center gap-1 text-amber-300">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>تنبيه أمان المتصفح:</span>
+                </div>
+                <p>{cameraError}</p>
               </div>
-
-              {isScanningLive && (
-                <button
-                  type="button"
-                  onClick={stopLiveScanner}
-                  className="w-full py-1.5 text-xs text-rose-400 hover:text-rose-300 font-bold bg-rose-950/30 rounded-lg cursor-pointer"
-                >
-                  إيقاف البث المباشر ⏹️
-                </button>
-              )}
-            </div>
+            )}
           </div>
         )}
 

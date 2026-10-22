@@ -25,6 +25,8 @@ export interface SystemUser {
   accessCode: string;
   permissions: MemberPermissions;
   email?: string;
+  avatarUrl?: string;
+  points?: number;
 }
 
 export const SUPER_ADMIN_USER: SystemUser = {
@@ -42,6 +44,24 @@ export const SUPER_ADMIN_USER: SystemUser = {
     canScanAttendance: true,
     canExportData: true,
     canClearLogs: true,
+  },
+};
+
+export const PUBLIC_MAKHDOUUM_USER: SystemUser = {
+  id: "guest-public",
+  name: "زائر (مخدوم)",
+  role: "member",
+  roleLabel: "عرض عام للمخدومين",
+  accessCode: "",
+  permissions: {
+    canAwardPoints: false,
+    canEditTeams: false,
+    canEditMembers: false,
+    canManagePermissions: false,
+    canCreateEvents: false,
+    canScanAttendance: false,
+    canExportData: false,
+    canClearLogs: false,
   },
 };
 
@@ -109,7 +129,7 @@ export function getRoleDefaultPermissions(role: RoleType): MemberPermissions {
 const AUTH_STORAGE_KEY = "meeting_active_auth_user_v2";
 
 class AuthStore {
-  private currentUser: SystemUser = SUPER_ADMIN_USER;
+  private currentUser: SystemUser = PUBLIC_MAKHDOUUM_USER;
   private googleUser: User | null = null;
   private accessToken: string | null = null;
   private listeners: Array<() => void> = [];
@@ -139,11 +159,11 @@ class AuthStore {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.id && parsed.role) {
           this.currentUser = parsed;
+          return;
         }
       }
-    } catch {
-      this.currentUser = SUPER_ADMIN_USER;
-    }
+    } catch {}
+    this.currentUser = PUBLIC_MAKHDOUUM_USER;
   }
 
   getCurrentUser(): SystemUser {
@@ -242,6 +262,8 @@ class AuthStore {
         teamName: team?.name || "",
         accessCode: member.accessCode,
         permissions: userPermissions,
+        avatarUrl: member.avatarUrl,
+        points: member.points,
       };
 
       this.setCurrentUser(systemUser);
@@ -263,7 +285,7 @@ class AuthStore {
     await auth.signOut();
     this.accessToken = null;
     sessionStorage.removeItem(this.TOKEN_KEY);
-    this.setCurrentUser(SUPER_ADMIN_USER);
+    this.setCurrentUser(PUBLIC_MAKHDOUUM_USER);
   }
 }
 
