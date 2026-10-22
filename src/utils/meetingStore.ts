@@ -733,6 +733,35 @@ class MeetingStore {
     return { success: false, error: "العضو غير موجود" };
   }
 
+  async updateAdminAvatar(avatarUrl: string, executor?: SystemUser): Promise<{ success: boolean; error?: string }> {
+    const adminMember = this.data.members.find((m) => m.id === "mem-1" || m.role === "admin");
+    if (adminMember) {
+      adminMember.avatarUrl = avatarUrl;
+      try {
+        await updateDoc(doc(db, "members", adminMember.id), { avatarUrl });
+      } catch (e) {
+        console.warn("Could not update doc in Firestore:", e);
+      }
+    }
+    SUPER_ADMIN_USER.avatarUrl = avatarUrl;
+    authStore.updateCurrentUserAvatar(avatarUrl);
+    this.triggerAutoSync();
+
+    this.logAudit({
+      userId: executor?.id || "mem-1",
+      userName: executor?.name || "مدير النظام",
+      userRole: "admin",
+      action: "edit_member",
+      targetType: "member",
+      targetId: adminMember?.id || "mem-1",
+      targetName: adminMember?.name || "مدير النظام",
+      details: "تحديث وتعيين الصورة الشخصية لمدير النظام",
+      status: "success",
+    });
+
+    return { success: true };
+  }
+
   async deleteMember(memberId: string, executor?: SystemUser): Promise<{ success: boolean; error?: string }> {
     if (executor && !executor.permissions.canEditMembers && executor.role !== "admin") {
       this.logAudit({

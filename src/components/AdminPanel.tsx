@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Zap,
   Users,
@@ -32,6 +32,7 @@ import {
   Check,
   X,
   CreditCard,
+  Link as LinkIcon,
 } from "lucide-react";
 import type {
   ActivityReason,
@@ -387,6 +388,45 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
   const [memberSearchTerm, setMemberSearchTerm] = useState("");
   const [memberSubTab, setMemberSubTab] = useState<RoleType>("leader");
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  const memberPhotoFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleMemberPhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    sounds.playTap();
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const maxDim = 400;
+        let w = img.width;
+        let h = img.height;
+        if (w > h) {
+          if (w > maxDim) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          }
+        } else {
+          if (h > maxDim) {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, w, h);
+          const compressed = canvas.toDataURL("image/jpeg", 0.85);
+          setNewMemberAvatarUrl(compressed);
+        }
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSaveMember = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1905,17 +1945,51 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-300 block">رابط صورة العضو (اختياري):</label>
-                    <div className="relative">
-                      <input
-                        type="url"
-                        value={newMemberAvatarUrl}
-                        onChange={(e) => setNewMemberAvatarUrl(e.target.value)}
-                        placeholder="https://example.com/photo.jpg"
-                        className="w-full h-11 pl-10 pr-4 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-sky-400"
-                      />
-                      <Camera className="absolute left-3 top-3 h-5 w-5 text-slate-500" />
+                  <div className="space-y-1.5">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      ref={memberPhotoFileInputRef}
+                      onChange={handleMemberPhotoFileChange}
+                      className="hidden"
+                    />
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-300 block">صورة العضو (اختياري):</label>
+                      <button
+                        type="button"
+                        onClick={() => memberPhotoFileInputRef.current?.click()}
+                        className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 cursor-pointer flex items-center gap-1 text-[11px] font-bold"
+                      >
+                        <Upload className="h-3 w-3" />
+                        <span>تحميل من الجهاز 📁</span>
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {newMemberAvatarUrl && (
+                        <div className="h-11 w-11 rounded-xl border border-amber-400/80 overflow-hidden shrink-0 bg-slate-900">
+                          <img src={newMemberAvatarUrl} alt="" className="h-full w-full object-cover" />
+                        </div>
+                      )}
+                      <div className="relative flex-1">
+                        <input
+                          type="url"
+                          value={newMemberAvatarUrl}
+                          onChange={(e) => setNewMemberAvatarUrl(e.target.value)}
+                          placeholder="أو الصق رابط صورة (لينك URL)..."
+                          className="w-full h-11 pl-10 pr-4 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white focus:outline-none focus:border-sky-400"
+                        />
+                        <LinkIcon className="absolute left-3 top-3 h-5 w-5 text-slate-500" />
+                      </div>
+                      {newMemberAvatarUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setNewMemberAvatarUrl("")}
+                          className="p-3 rounded-xl bg-slate-900 hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 border border-slate-700 cursor-pointer"
+                          title="حذف الصورة"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
 

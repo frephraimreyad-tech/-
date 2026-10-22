@@ -42,6 +42,7 @@ import { UserSwitcherModal } from "./UserSwitcherModal";
 import { AdminPanel } from "./AdminPanel";
 import { googleSheets } from "../utils/googleSheets";
 import { PDFReportModal } from "./PDFReportModal";
+import { AdminPhotoUploadModal } from "./AdminPhotoUploadModal";
 
 interface AdminDashboardProps {
   onBackToScoreboard: () => void;
@@ -92,6 +93,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
   const [showChangePinModal, setShowChangePinModal] = useState<boolean>(false);
   const [newPinValue, setNewPinValue] = useState<string>("");
   const [showPdfReportModal, setShowPdfReportModal] = useState<boolean>(false);
+  const [showAdminPhotoModal, setShowAdminPhotoModal] = useState<boolean>(false);
 
   // Navigation Tabs in Admin Dashboard
   const [activeTab, setActiveTab] = useState<"teams" | "quick_points" | "security" | "history">("teams");
@@ -523,6 +525,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                 </button>
               )}
             </div>
+
+            {/* Admin Profile Photo Button */}
+            <button
+              type="button"
+              onClick={() => {
+                sounds.playTap();
+                setShowAdminPhotoModal(true);
+              }}
+              className="px-2.5 py-1.5 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-amber-500/50 text-amber-300 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95 group"
+              title="تحديث صورة مدير النظام (أبونا افرايم رياض)"
+            >
+              <div className="relative h-6 w-6 rounded-full bg-slate-900 border border-amber-400 overflow-hidden flex items-center justify-center shrink-0">
+                {currentUser.avatarUrl ? (
+                  <img src={currentUser.avatarUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-[10px] font-black text-amber-400">{currentUser.name.charAt(0)}</span>
+                )}
+              </div>
+              <span>صورة مدير النظام 📷</span>
+            </button>
 
             {/* User Switcher / Current User Badge */}
             <button
@@ -2190,6 +2212,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
       {/* PDF Report Export Modal */}
       {showPdfReportModal && (
         <PDFReportModal onClose={() => setShowPdfReportModal(false)} />
+      )}
+
+      {/* Admin Photo Upload Modal */}
+      {showAdminPhotoModal && (
+        <AdminPhotoUploadModal onClose={() => setShowAdminPhotoModal(false)} />
       )}
     </div>
   );

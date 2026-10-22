@@ -258,10 +258,25 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
 
       // Check points change
       if (team.points !== oldPoints) {
+        const delta = team.points - oldPoints;
         nextPointDeltas[team.id] = {
-          delta: team.points - oldPoints,
+          delta,
           timestamp: Date.now(),
         };
+
+        // Live notification toast alerting viewers that points were updated by admin
+        if (oldRank === team.rank) {
+          addToast({
+            type: delta > 0 ? "success" : "info",
+            title: delta > 0 ? `⚡ تحديث نقاط: ${team.name}` : `تعديل نقاط: ${team.name}`,
+            message: delta > 0
+              ? `تم تحديث نقاط فريق «${team.name}» بإضافة +${delta.toLocaleString("en-US")} XP (الرصيد الحالي: ${team.points.toLocaleString("en-US")} XP)`
+              : `تم تعديل نقاط فريق «${team.name}» بخصم ${Math.abs(delta).toLocaleString("en-US")} XP (الرصيد الحالي: ${team.points.toLocaleString("en-US")} XP)`,
+            teamIcon: team.icon,
+            teamAvatarUrl: team.avatarUrl,
+          });
+          sounds.playPointUp();
+        }
       }
 
       // Check rank change

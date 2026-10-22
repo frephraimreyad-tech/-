@@ -2,13 +2,10 @@ import React, { useState } from "react";
 import {
   X,
   KeyRound,
-  Shield,
   UserCheck,
   Lock,
   CheckCircle,
   AlertCircle,
-  Crown,
-  Users,
   LogOut,
   QrCode,
   Zap,
@@ -57,46 +54,6 @@ export const UserSwitcherModal: React.FC<UserSwitcherModalProps> = ({ onClose })
     if (!inputCode.trim()) return;
     handleLoginWithCode(inputCode.trim());
   };
-
-  // Quick preset accounts for demonstration
-  const quickProfiles = [
-    {
-      title: "الخادم المسؤول (مدير النظام)",
-      code: "9999",
-      roleLabel: "مدير النظام العام",
-      role: "admin",
-      desc: "صلاحية كاملة: إدارة الفرق، رصد وتعديل النقاط، إدارة الأمان والفعاليات",
-      badgeColor: "from-amber-500 to-amber-700",
-      icon: Crown,
-    },
-    {
-      title: "مينا عادل فخري (قائد فريق مارمرقس)",
-      code: "1010",
-      roleLabel: "قائد المجموعة",
-      role: "leader",
-      desc: "مسح QR للحضور لمجموعته فقط • محظور تماماً من تعديل النقاط أو الفرق",
-      badgeColor: "from-sky-500 to-blue-700",
-      icon: Shield,
-    },
-    {
-      title: "بيتر سمير جرجس (قائد فريق مارجرجس)",
-      code: "2010",
-      roleLabel: "قائد المجموعة",
-      role: "leader",
-      desc: "مسح QR للحضور لمجموعته فقط • محظور تماماً من تعديل النقاط أو الفرق",
-      badgeColor: "from-rose-500 to-red-700",
-      icon: Shield,
-    },
-    {
-      title: "فادي سامي نبيل (عضو مشارك)",
-      code: "1020",
-      roleLabel: "عضو مشارك",
-      role: "member",
-      desc: "استعراض لوحة الشرف وملفه فقط • لا يملك أي صلاحيات تعديل",
-      badgeColor: "from-slate-600 to-slate-800",
-      icon: Users,
-    },
-  ];
 
   return (
     <div
@@ -304,47 +261,6 @@ export const UserSwitcherModal: React.FC<UserSwitcherModalProps> = ({ onClose })
             <span>{successMsg}</span>
           </div>
         )}
-
-        {/* Quick Switch Profiles for Demonstration */}
-        <div className="space-y-2 pt-2">
-          <span className="text-xs font-bold text-slate-400 block">
-            تبديل فوري لتجربة الصلاحيات المختلفة (اضغط للتفعيل المباشر):
-          </span>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {quickProfiles.map((p) => {
-              const Icon = p.icon;
-              const isSelected = currentUser.accessCode === p.code;
-              return (
-                <button
-                  key={p.code}
-                  type="button"
-                  onClick={() => handleLoginWithCode(p.code)}
-                  className={`p-3 rounded-2xl border text-right transition-all flex flex-col justify-between gap-2 active:scale-98 cursor-pointer ${
-                    isSelected
-                      ? "bg-amber-500/10 border-amber-500 shadow-md ring-1 ring-amber-500"
-                      : "bg-slate-900/80 hover:bg-slate-800 border-slate-800"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className={`p-1.5 rounded-xl bg-gradient-to-br ${p.badgeColor} text-white`}>
-                        <Icon className="h-4 w-4" />
-                      </span>
-                      <div>
-                        <div className="text-xs font-black text-white">{p.title}</div>
-                        <div className="text-[10px] text-slate-400">{p.roleLabel}</div>
-                      </div>
-                    </div>
-                    <span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-950 text-amber-300 border border-slate-800">
-                      كود: {p.code}
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 leading-normal">{p.desc}</p>
-                </button>
-              );
-            })}
-          </div>
-        </div>
       </div>
     </div>
   );

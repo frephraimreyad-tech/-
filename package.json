@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
+    "gcp-build": "vite build",
     "start": "node server.js",
-    "preview": "vite preview",
+    "preview": "vite preview --port 8080 --host 0.0.0.0",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
   },

@@ -125,6 +125,31 @@ class SoundManager {
   playSuccess(): void {
     this.playVictory();
   }
+
+  playPointUp(): void {
+    if (this.isMuted) return;
+    const ctx = this.initContext();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      const pitches = [523.25, 783.99];
+      pitches.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        const start = now + 0.05 * i;
+        osc.frequency.setValueAtTime(freq, start);
+        gain.gain.setValueAtTime(0.12, start);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.25);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + 0.28);
+      });
+    } catch {
+      // Audio error ignored
+    }
+  }
 }
 
 export const sounds = new SoundManager();

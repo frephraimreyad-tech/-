@@ -170,6 +170,22 @@ class AuthStore {
     return this.currentUser;
   }
 
+  updateCurrentUserAvatar(avatarUrl: string) {
+    if (this.currentUser) {
+      this.currentUser = {
+        ...this.currentUser,
+        avatarUrl,
+      };
+      if (this.currentUser.role === "admin" || this.currentUser.id === "mem-1") {
+        SUPER_ADMIN_USER.avatarUrl = avatarUrl;
+      }
+      try {
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(this.currentUser));
+      } catch {}
+      this.notify();
+    }
+  }
+
   getGoogleUser(): User | null {
     return this.googleUser;
   }
