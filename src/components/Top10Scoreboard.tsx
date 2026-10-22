@@ -30,11 +30,15 @@ import {
   List,
   Share2,
   Link2,
+  Sun,
+  Moon,
+  Clock,
 } from "lucide-react";
 import type { CustomMember, ProcessedMeetingTeam } from "../types";
 import { meetingStore } from "../utils/meetingStore";
 import { sounds } from "../utils/soundEffects";
 import { authStore, type SystemUser } from "../utils/authStore";
+import { useTheme } from "../utils/themeStore";
 import { ConfettiCanvas, type ConfettiCanvasRef } from "./ConfettiCanvas";
 import { TeamModal } from "./TeamModal";
 import { TeamPhotoModal } from "./TeamPhotoModal";
@@ -46,6 +50,7 @@ import { DailyChallengeBanner } from "./DailyChallengeBanner";
 import { ShareLinksModal } from "./ShareLinksModal";
 
 export const Top10Scoreboard: React.FC = () => {
+  const { preference: themePreference, isDaytime, isLight, setPreference: setThemePreference } = useTheme();
   const [data, setData] = useState(meetingStore.getData());
   const [isLoading, setIsLoading] = useState(meetingStore.getIsLoading());
   const [currentUser, setCurrentUser] = useState<SystemUser>(authStore.getCurrentUser());
@@ -544,8 +549,8 @@ export const Top10Scoreboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action buttons row */}
-              <div className="flex items-center gap-1.5 flex-wrap justify-end">
+              {/* Action buttons row - Unified Design System */}
+              <div className="flex items-center gap-2 flex-wrap justify-end">
                 {/* Active User Switcher Pill */}
                 <button
                   type="button"
@@ -553,10 +558,10 @@ export const Top10Scoreboard: React.FC = () => {
                     sounds.playTap();
                     setShowUserSwitcher(true);
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 border border-amber-500/40 text-amber-300 text-xs font-bold shadow-sm active:scale-95 transition-all cursor-pointer"
+                  className="h-9 px-3.5 rounded-xl bg-slate-900 border border-amber-500/40 text-amber-300 text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
                   title="تبديل الحساب أو تسجيل الدخول بكود العضو"
                 >
-                  <KeyRound className="h-3.5 w-3.5 text-amber-400" />
+                  <KeyRound className="h-4 w-4 text-amber-400 shrink-0" />
                   <span>{currentUser.name.split(" ")[0]} ({currentUser.roleLabel}) 🔑</span>
                 </button>
 
@@ -567,10 +572,10 @@ export const Top10Scoreboard: React.FC = () => {
                     sounds.playTap();
                     setShowQRScanner(true);
                   }}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-black shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer"
+                  className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-black shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
                   title="مسح رمز QR الفعالية لتسجيل الحضور واحتساب النقاط تلقائياً"
                 >
-                  <Camera className="h-3.5 w-3.5" />
+                  <Camera className="h-4 w-4 shrink-0" />
                   <span>مسح QR للحضور 📱</span>
                 </button>
 
@@ -582,10 +587,10 @@ export const Top10Scoreboard: React.FC = () => {
                       sounds.playTap();
                       setViewMode("admin");
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 text-xs font-black shadow-sm active:scale-95 transition-all cursor-pointer"
+                    className="h-9 px-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 text-xs font-black shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
                     title="فتح لوحة تحكم الخادم لرصد النقاط وتعديل الفرق"
                   >
-                    <Settings className="h-3.5 w-3.5" />
+                    <Settings className="h-4 w-4 shrink-0" />
                     <span>لوحة تحكم الخادم ⚙️</span>
                   </button>
                 )}
@@ -597,10 +602,10 @@ export const Top10Scoreboard: React.FC = () => {
                     sounds.playTap();
                     setShowShareModal(true);
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800 hover:bg-indigo-600/80 text-indigo-300 hover:text-white border border-indigo-500/40 text-xs font-black shadow-sm active:scale-95 transition-all cursor-pointer"
+                  className="h-9 px-3.5 rounded-xl bg-slate-800 hover:bg-indigo-600/80 text-indigo-300 hover:text-white border border-indigo-500/40 text-xs font-black shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
                   title="مشاركة وفصل الروابط: رابط الجمهور والبروجيكتور ورابط الخدام"
                 >
-                  <Share2 className="h-3.5 w-3.5" />
+                  <Share2 className="h-4 w-4 shrink-0" />
                   <span>فصل الروابط 🔗</span>
                 </button>
 
@@ -608,50 +613,18 @@ export const Top10Scoreboard: React.FC = () => {
                 <button
                   type="button"
                   onClick={triggerCelebrate}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-xs font-black shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
+                  className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-xs font-black shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
                   title="احتفال بالمتصدر"
                 >
-                  <PartyPopper className="h-3.5 w-3.5" />
+                  <PartyPopper className="h-4 w-4 shrink-0" />
                   <span>احتفال بالبطل</span>
                 </button>
 
-                {/* Sound toggle */}
-                <button
-                  type="button"
-                  onClick={toggleMute}
-                  className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white shadow-xs active:scale-95 transition-all cursor-pointer"
-                  title={isMuted ? "تشغيل المؤثرات الصوتية" : "كتم الصوت"}
-                >
-                  {isMuted ? (
-                    <VolumeX className="h-4 w-4 text-rose-400" />
-                  ) : (
-                    <Volume2 className="h-4 w-4 text-emerald-400" />
-                  )}
-                </button>
-
-                {/* TV / Projector Mode Toggle Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    sounds.playTap();
-                    setIsTvMode((prev) => !prev);
-                  }}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black shadow-md active:scale-95 transition-all cursor-pointer border ${
-                    isTvMode
-                      ? "bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 border-white ring-2 ring-amber-400 shadow-amber-500/30"
-                      : "bg-slate-800 hover:bg-slate-700 text-amber-300 border-amber-500/40"
-                  }`}
-                  title="تفعيل وضع العرض المكبر لقاعات الاجتماعات والشاشات الكبيرة والبروجكتور (TV Mode)"
-                >
-                  <Tv className="h-3.5 w-3.5" />
-                  <span>{isTvMode ? "نمط البروجكتور نشط 📽️" : "نمط البروجكتور 📽️"}</span>
-                </button>
-
-                {/* Fullscreen / Conference Room Presentation Button */}
+                {/* Fullscreen / Conference Hall Presentation Button */}
                 <button
                   type="button"
                   onClick={toggleFullscreen}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black shadow-md active:scale-95 transition-all cursor-pointer border ${
+                  className={`h-9 px-3.5 rounded-xl text-xs font-black shadow-md active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 border shrink-0 ${
                     isFullscreen
                       ? "bg-gradient-to-r from-rose-500 to-amber-500 text-slate-950 border-amber-300 shadow-rose-500/25 ring-2 ring-amber-400"
                       : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white border-purple-400/40 shadow-purple-500/20"
@@ -660,16 +633,85 @@ export const Top10Scoreboard: React.FC = () => {
                 >
                   {isFullscreen ? (
                     <>
-                      <Minimize2 className="h-3.5 w-3.5" />
-                      <span>إنهاء ملء الشاشة</span>
+                      <Minimize2 className="h-4 w-4 shrink-0" />
+                      <span>إلغاء ملء الشاشة</span>
                     </>
                   ) : (
                     <>
-                      <Maximize2 className="h-3.5 w-3.5 animate-pulse" />
+                      <Maximize2 className="h-4 w-4 shrink-0 animate-pulse" />
                       <span>ملء الشاشة للقاعات 📺</span>
                     </>
                   )}
                 </button>
+
+                {/* Sound toggle button */}
+                <button
+                  type="button"
+                  onClick={toggleMute}
+                  className="h-9 w-9 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white shadow-xs active:scale-95 transition-all cursor-pointer flex items-center justify-center shrink-0"
+                  title={isMuted ? "تشغيل المؤثرات الصوتية" : "كتم الصوت"}
+                >
+                  {isMuted ? (
+                    <VolumeX className="h-4 w-4 text-rose-400 shrink-0" />
+                  ) : (
+                    <Volume2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                  )}
+                </button>
+
+                {/* Theme Switcher Toggle (Auto Time / Day / Night) */}
+                <div className="flex items-center gap-1 bg-slate-900/90 border border-amber-500/30 p-1 rounded-xl shrink-0 shadow-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playTap();
+                      setThemePreference("auto");
+                    }}
+                    className={`h-7 px-2 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                      themePreference === "auto"
+                        ? "bg-amber-500 text-slate-950 font-black shadow-xs"
+                        : "text-slate-300 hover:text-white"
+                    }`}
+                    title={`تلقائي حسب الوقت (${isDaytime ? "نهار ☀️ 06:00-18:00" : "ليل 🌙 18:00-06:00"})`}
+                  >
+                    <Clock className="h-3 w-3" />
+                    <span>تلقائي</span>
+                    <span className="text-[10px] opacity-90">({isDaytime ? "☀️" : "🌙"})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playTap();
+                      setThemePreference("light");
+                    }}
+                    className={`h-7 px-2 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                      themePreference === "light"
+                        ? "bg-amber-400 text-slate-950 font-black shadow-xs"
+                        : "text-slate-300 hover:text-white"
+                    }`}
+                    title="الوضع النهاري (فاتح ومشرق)"
+                  >
+                    <Sun className="h-3 w-3 text-amber-600" />
+                    <span>نهاري</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playTap();
+                      setThemePreference("dark");
+                    }}
+                    className={`h-7 px-2 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                      themePreference === "dark"
+                        ? "bg-indigo-600 text-white font-black shadow-xs"
+                        : "text-slate-300 hover:text-white"
+                    }`}
+                    title="الوضع الليلي (داكن وجميل)"
+                  >
+                    <Moon className="h-3 w-3 text-indigo-300" />
+                    <span>ليلي</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1137,31 +1179,61 @@ export const Top10Scoreboard: React.FC = () => {
                             <Camera className="h-3.5 w-3.5" />
                           </button>
 
-                          {/* Rank Shift Pill */}
-                          {change && (
+                          {/* Rank Shift Indicator Pill (Live shift or Previous Round comparison) */}
+                          {change ? (
                             <motion.span
                               initial={{ scale: 0, opacity: 0, x: -10 }}
                               animate={{ scale: 1, opacity: 1, x: 0 }}
                               exit={{ scale: 0, opacity: 0 }}
                               transition={{ type: "spring", stiffness: 500, damping: 20 }}
-                              className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black flex items-center gap-1 shadow-sm ${
+                              className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black flex items-center gap-1 shadow-sm shrink-0 ${
                                 hasShiftedUp
                                   ? "bg-emerald-500/25 text-emerald-300 border border-emerald-400/50 shadow-emerald-500/20"
                                   : "bg-rose-500/20 text-rose-300 border border-rose-400/40"
                               }`}
+                              title={hasShiftedUp ? `صعد +${change.delta} مراكز في الجولة الحالية` : `تراجع ${change.delta} مراكز`}
                             >
                               {hasShiftedUp ? (
                                 <>
-                                  <TrendingUp className="h-3 w-3 text-emerald-400" />
+                                  <ArrowUp className="h-3 w-3 stroke-[3] text-emerald-400" />
                                   <span>+{change.delta} صعود</span>
                                 </>
                               ) : (
                                 <>
-                                  <TrendingDown className="h-3 w-3 text-rose-400" />
+                                  <ArrowDown className="h-3 w-3 stroke-[3] text-rose-400" />
                                   <span>{change.delta} تراجع</span>
                                 </>
                               )}
                             </motion.span>
+                          ) : team.previousRank && team.previousRank !== team.rank ? (
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black flex items-center gap-1 shadow-xs shrink-0 ${
+                                team.previousRank > team.rank
+                                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
+                                  : "bg-rose-500/20 text-rose-400 border border-rose-500/40"
+                              }`}
+                              title={`الترتيب السابق #${team.previousRank} ➔ الحالي #${team.rank}`}
+                            >
+                              {team.previousRank > team.rank ? (
+                                <>
+                                  <ArrowUp className="h-3 w-3 stroke-[3] text-emerald-400" />
+                                  <span>+{team.previousRank - team.rank} صعود</span>
+                                </>
+                              ) : (
+                                <>
+                                  <ArrowDown className="h-3 w-3 stroke-[3] text-rose-400" />
+                                  <span>-{team.rank - team.previousRank} تراجع</span>
+                                </>
+                              )}
+                            </span>
+                          ) : (
+                            <span
+                              className="px-2 py-0.5 rounded-full bg-slate-800/80 text-slate-400 border border-slate-700/60 text-[10px] font-bold flex items-center gap-1 shrink-0"
+                              title="مستقر في الترتيب مقارنة بالجولة السابقة"
+                            >
+                              <span className="text-[9px]">➖</span>
+                              <span>مستقر</span>
+                            </span>
                           )}
 
                           {team.isTied ? (

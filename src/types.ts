@@ -34,6 +34,7 @@ export interface CustomTeam {
   slogan?: string;
   description?: string;
   points: number;
+  previousRank?: number; // الترتيب في الجولة أو اللقاء السابق
   leaderName?: string;
   avatarUrl?: string;
   logoUrl?: string;
@@ -136,6 +137,7 @@ export interface MeetingConfig {
   autoIdleSeconds: number;
   dailyChallenge?: DailyChallenge;
   hideAdminButtonFromPublic?: boolean;
+  meetingLogoUrl?: string;
 }
 
 export interface MeetingData {

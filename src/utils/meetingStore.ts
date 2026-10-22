@@ -46,9 +46,9 @@ export const DEFAULT_ACTIVITY_REASONS: ActivityReason[] = [
 ];
 
 const DEFAULT_CONFIG: MeetingConfig = {
-  meetingName: "اجتماع الشباب والخدمة",
-  subTitle: "لوحة الشرف الكبرى والتنافس الروحي",
-  churchName: "الكنيسة القبطية الأرثوذكسية",
+  meetingName: "أسرة أبي سيفين وتماف إيريني",
+  subTitle: "اجتماع شباب جامعة • لوحة الشرف الكبرى والتنافس الروحي",
+  churchName: "أسرة الشهيد العظيم أبي سيفين وتماف إيريني",
   seasonName: "موسم النهضة الروحية ٢٠٢٦",
   enableSounds: true,
   autoIdleSeconds: 50,
@@ -66,9 +66,9 @@ const DEFAULT_CONFIG: MeetingConfig = {
 };
 
 const DEFAULT_TEAMS: CustomTeam[] = [
-  { id: "team-1", name: "فريق مارمرقس", icon: "🦁", color: "#EAB308", slogan: "كاروز الديار المصرية", leaderName: "أنطونيوس إدوار", points: 1250, avatarUrl: "https://images.unsplash.com/photo-1546182990-dffeafbe841d?w=400&auto=format&fit=crop&q=80" },
-  { id: "team-2", name: "فريق أثناسيوس", icon: "⚔️", color: "#3B82F6", slogan: "حامي الإيمان المستقيم", leaderName: "مينا شهيد", points: 1120, avatarUrl: "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=400&auto=format&fit=crop&q=80" },
-  { id: "team-3", name: "فريق الأنبا شنودة", icon: "📜", color: "#10B981", slogan: "رئيس المتوحدين", leaderName: "د. مينا ماهر", points: 980, avatarUrl: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&auto=format&fit=crop&q=80" },
+  { id: "team-1", name: "فريق مارمرقس", icon: "🦁", color: "#EAB308", slogan: "كاروز الديار المصرية", leaderName: "أنطونيوس إدوار", points: 1250, previousRank: 2, avatarUrl: "https://images.unsplash.com/photo-1546182990-dffeafbe841d?w=400&auto=format&fit=crop&q=80" },
+  { id: "team-2", name: "فريق أثناسيوس", icon: "⚔️", color: "#3B82F6", slogan: "حامي الإيمان المستقيم", leaderName: "مينا شهيد", points: 1120, previousRank: 1, avatarUrl: "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=400&auto=format&fit=crop&q=80" },
+  { id: "team-3", name: "فريق الأنبا شنودة", icon: "📜", color: "#10B981", slogan: "رئيس المتوحدين", leaderName: "د. مينا ماهر", points: 980, previousRank: 3, avatarUrl: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&auto=format&fit=crop&q=80" },
 ];
 
 export const DEFAULT_MEMBERS: CustomMember[] = [

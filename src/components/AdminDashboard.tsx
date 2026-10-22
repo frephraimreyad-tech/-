@@ -29,11 +29,14 @@ import {
   Camera,
   Download,
   Share2,
+  Sun,
+  Moon,
 } from "lucide-react";
 import type { CustomTeam, ProcessedMeetingTeam, ScoreTransaction } from "../types";
 import { meetingStore } from "../utils/meetingStore";
 import { authStore, SUPER_ADMIN_USER, type SystemUser } from "../utils/authStore";
 import { sounds } from "../utils/soundEffects";
+import { useTheme } from "../utils/themeStore";
 import { QRScannerModal } from "./QRScannerModal";
 import { UserSwitcherModal } from "./UserSwitcherModal";
 import { AdminPanel } from "./AdminPanel";
@@ -69,6 +72,7 @@ const ADMIN_PIN_KEY = "admin_dashboard_simple_pin_v1";
 const ADMIN_UNLOCKED_SESSION_KEY = "admin_dashboard_unlocked_session_v1";
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboard, initialPanelTab }) => {
+  const { preference: themePreference, isDaytime, setPreference: setThemePreference } = useTheme();
   // Store Data & User State
   const [data, setData] = useState(meetingStore.getData());
   const [currentUser, setCurrentUser] = useState<SystemUser>(authStore.getCurrentUser());
@@ -570,6 +574,60 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
               <Share2 className="h-3.5 w-3.5" />
               <span>فصل الروابط 🔗</span>
             </button>
+
+            {/* Theme Switcher Toggle (Auto Time / Day / Night) */}
+            <div className="flex items-center gap-1 bg-slate-900/90 border border-amber-500/30 p-1 rounded-2xl shadow-sm">
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  setThemePreference("auto");
+                }}
+                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                  themePreference === "auto"
+                    ? "bg-amber-500 text-slate-950 font-black shadow-xs"
+                    : "text-slate-300 hover:text-white"
+                }`}
+                title={`تلقائي حسب الوقت (${isDaytime ? "نهار ☀️ 06:00-18:00" : "ليل 🌙 18:00-06:00"})`}
+              >
+                <Clock className="h-3.5 w-3.5" />
+                <span>تلقائي ({isDaytime ? "☀️" : "🌙"})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  setThemePreference("light");
+                }}
+                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                  themePreference === "light"
+                    ? "bg-amber-400 text-slate-950 font-black shadow-xs"
+                    : "text-slate-300 hover:text-white"
+                }`}
+                title="الوضع النهاري"
+              >
+                <Sun className="h-3.5 w-3.5 text-amber-600" />
+                <span>نهاري</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  setThemePreference("dark");
+                }}
+                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                  themePreference === "dark"
+                    ? "bg-indigo-600 text-white font-black shadow-xs"
+                    : "text-slate-300 hover:text-white"
+                }`}
+                title="الوضع الليلي"
+              >
+                <Moon className="h-3.5 w-3.5 text-indigo-300" />
+                <span>ليلي</span>
+              </button>
+            </div>
 
             {/* Back to Public Scoreboard */}
             <button
