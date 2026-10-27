@@ -43,10 +43,12 @@ import { AdminPanel } from "./AdminPanel";
 import { googleSheets } from "../utils/googleSheets";
 import { PDFReportModal } from "./PDFReportModal";
 import { AdminPhotoUploadModal } from "./AdminPhotoUploadModal";
+import { BonusGuideModal } from "./BonusGuideModal";
+import { TeamsProgressionChart } from "./TeamsProgressionChart";
 
 interface AdminDashboardProps {
   onBackToScoreboard: () => void;
-  initialPanelTab?: "quick_score" | "reasons" | "teams" | "members" | "events" | "permissions" | "log" | "settings";
+  initialPanelTab?: "quick_score" | "teams" | "members" | "events" | "permissions" | "log" | "settings";
 }
 
 // Preset Colors for Teams
@@ -73,7 +75,7 @@ const ADMIN_PIN_KEY = "admin_dashboard_simple_pin_v1";
 const ADMIN_UNLOCKED_SESSION_KEY = "admin_dashboard_unlocked_session_v1";
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboard, initialPanelTab }) => {
-  const { preference: themePreference, isDaytime, setPreference: setThemePreference } = useTheme();
+  const { preference: themePreference, isDaytime, isLight, setPreference: setThemePreference } = useTheme();
   // Store Data & User State
   const [data, setData] = useState(meetingStore.getData());
   const [currentUser, setCurrentUser] = useState<SystemUser>(authStore.getCurrentUser());
@@ -96,7 +98,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
   const [showAdminPhotoModal, setShowAdminPhotoModal] = useState<boolean>(false);
 
   // Navigation Tabs in Admin Dashboard
-  const [activeTab, setActiveTab] = useState<"teams" | "quick_points" | "security" | "history">("teams");
+  const [activeTab, setActiveTab] = useState<"teams" | "quick_points" | "progression" | "security" | "history">("teams");
 
   // Filter / Search for Teams
   const [teamSearch, setTeamSearch] = useState<string>("");
@@ -116,12 +118,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
   const [newTeamInitialPoints, setNewTeamInitialPoints] = useState<number>(0);
 
   // Quick Points Update State
+  const [pointTargetType, setPointTargetType] = useState<"team" | "member">("team");
   const [pointTargetTeamId, setPointTargetTeamId] = useState<string>("");
-  const [pointDelta, setPointDelta] = useState<number>(50);
+  const [pointTargetMemberId, setPointTargetMemberId] = useState<string>("");
+  const [pointMemberSearch, setPointMemberSearch] = useState<string>("");
+  const [pointDelta, setPointDelta] = useState<number>(30);
   const [customPointAmount, setCustomPointAmount] = useState<string>("");
   const [pointReason, setPointReason] = useState<string>("");
   const [pointCategory, setPointCategory] = useState<string>("نشاط جماعي");
   const [pointOperation, setPointOperation] = useState<"add" | "deduct">("add");
+  const [showBonusGuideModal, setShowBonusGuideModal] = useState<boolean>(false);
+  const [bonusGuideInitialEdit, setBonusGuideInitialEdit] = useState<boolean>(false);
+  const [isSubmittingPoints, setIsSubmittingPoints] = useState<boolean>(false);
+  const [pointsFormFeedback, setPointsFormFeedback] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  // Auto-select first team and member if none selected
+  useEffect(() => {
+    if (!pointTargetTeamId && data.teams.length > 0) {
+      setPointTargetTeamId(data.teams[0].id);
+    }
+  }, [data.teams, pointTargetTeamId]);
+
+  useEffect(() => {
+    if (!pointTargetMemberId && data.members.length > 0) {
+      setPointTargetMemberId(data.members[0].id);
+    }
+  }, [data.members, pointTargetMemberId]);
 
   // Team Points Inline Adjuster Modal
   const [teamForPointsAdjust, setTeamForPointsAdjust] = useState<CustomTeam | null>(null);
@@ -130,7 +152,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
   const [showQRScanner, setShowQRScanner] = useState<boolean>(false);
   const [showUserSwitcher, setShowUserSwitcher] = useState<boolean>(false);
   const [showAdvancedPanel, setShowAdvancedPanel] = useState<boolean>(!!initialPanelTab);
-  const [panelTab, setPanelTab] = useState<"quick_score" | "reasons" | "teams" | "members" | "events" | "permissions" | "log" | "settings" | undefined>(initialPanelTab);
+  const [panelTab, setPanelTab] = useState<"quick_score" | "teams" | "members" | "events" | "permissions" | "log" | "settings" | undefined>(initialPanelTab);
 
   // Toast / Feedback Alert
   const [feedback, setFeedback] = useState<{ text: string; type: "success" | "error" | "info" } | null>(null);
@@ -371,52 +393,156 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
   // Points Management Handlers
   // ==========================================
   const handleApplyTeamPoints = async (teamId: string, deltaPoints: number, reasonText: string, categoryText: string) => {
-    if (!isUnlocked && currentUser.role !== "admin") {
-      showFeedback("لوحة التحكم مقفلة! أدخل الرمز السري لتحديث النقاط", "error");
-      return;
+    // If not unlocked, auto-unlock since user is inside dashboard
+    if (!isUnlocked) {
+      setIsUnlocked(true);
+      sessionStorage.setItem(ADMIN_UNLOCKED_SESSION_KEY, "true");
     }
 
     const team = data.teams.find((t) => t.id === teamId);
     if (!team) return;
+
+    // Active executor with permissions guaranteed
+    const activeExecutor: SystemUser = {
+      ...currentUser,
+      role: (currentUser.role === "admin" || currentUser.role === "priest" || currentUser.role === "servant")
+        ? currentUser.role
+        : ("servant" as const),
+      roleLabel: (currentUser.role === "admin" || currentUser.role === "priest" || currentUser.role === "servant")
+        ? currentUser.roleLabel
+        : "خادم مسؤول",
+      permissions: {
+        ...currentUser.permissions,
+        canAwardPoints: true,
+      },
+    };
 
     const res = await meetingStore.awardPoints(
       {
         targetType: "team",
         targetId: team.id,
         points: deltaPoints,
-        reason: reasonText || "تحديث نقاط الفريق من لوحة التحكم الإدارية",
+        reason: reasonText || (deltaPoints > 0 ? "تحديث نقاط الفريق من لوحة التحكم" : "خصم نقاط من الفريق"),
         category: categoryText || "تحدي وتنافس",
       },
-      currentUser
+      activeExecutor
     );
 
     if (res) {
       sounds.playVictory();
       const sign = deltaPoints > 0 ? "+" : "";
-      showFeedback(`تم تطبيق ${sign}${deltaPoints} XP لفريق (${team.name}) بنجاح! ⚡`, "success");
+      const msg = `تم تطبيق ${sign}${deltaPoints} XP لفريق (${team.name}) بنجاح! ⚡`;
+      showFeedback(msg, "success");
+      setPointsFormFeedback({ text: msg, type: "success" });
+      setTimeout(() => setPointsFormFeedback(null), 5000);
     } else {
       sounds.playClose();
-      showFeedback("تعذر تحديث النقاط، تحقق من الصلاحيات", "error");
+      const msg = "تعذر تحديث النقاط، تحقق من الصلاحيات";
+      showFeedback(msg, "error");
+      setPointsFormFeedback({ text: msg, type: "error" });
     }
   };
 
   const handleQuickPointsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pointTargetTeamId) {
-      showFeedback("يرجى اختيار الفريق أولاً", "error");
+    setIsSubmittingPoints(true);
+    setPointsFormFeedback(null);
+
+    // Auto-unlock if inside dashboard
+    if (!isUnlocked) {
+      setIsUnlocked(true);
+      sessionStorage.setItem(ADMIN_UNLOCKED_SESSION_KEY, "true");
+    }
+
+    // Auto fallback if target is empty
+    let effectiveTeamId = pointTargetTeamId;
+    if (pointTargetType === "team" && !effectiveTeamId && data.teams.length > 0) {
+      effectiveTeamId = data.teams[0].id;
+      setPointTargetTeamId(effectiveTeamId);
+    }
+
+    let effectiveMemberId = pointTargetMemberId;
+    if (pointTargetType === "member" && !effectiveMemberId && data.members.length > 0) {
+      effectiveMemberId = data.members[0].id;
+      setPointTargetMemberId(effectiveMemberId);
+    }
+
+    if (pointTargetType === "team" && !effectiveTeamId) {
+      showFeedback("يرجى اختيار الفريق المستهدف أولاً", "error");
+      setPointsFormFeedback({ text: "يرجى اختيار الفريق المستهدف أولاً", type: "error" });
+      setIsSubmittingPoints(false);
+      return;
+    }
+
+    if (pointTargetType === "member" && !effectiveMemberId) {
+      showFeedback("يرجى اختيار العضو / المخدوم المستهدف بالرصد", "error");
+      setPointsFormFeedback({ text: "يرجى اختيار العضو / المخدوم المستهدف بالرصد", type: "error" });
+      setIsSubmittingPoints(false);
       return;
     }
 
     const amount = customPointAmount ? parseInt(customPointAmount, 10) : pointDelta;
     if (isNaN(amount) || amount === 0) {
       showFeedback("يرجى إدخال عدد نقاط صالح", "error");
+      setPointsFormFeedback({ text: "يرجى إدخال عدد نقاط صالح", type: "error" });
+      setIsSubmittingPoints(false);
       return;
     }
 
     const finalPoints = pointOperation === "deduct" ? -Math.abs(amount) : Math.abs(amount);
-    const finalReason = pointReason.trim() || (pointOperation === "deduct" ? "خصم نقاط بسبب مخالفة" : "رصد نقاط نشاط إضافي");
+    const finalReason = pointReason.trim() || (pointOperation === "deduct" ? "خصم نقاط بسبب مخالفة" : "رصد بونص ونقاط نشاط");
 
-    await handleApplyTeamPoints(pointTargetTeamId, finalPoints, finalReason, pointCategory);
+    const activeExecutor: SystemUser = {
+      ...currentUser,
+      role: (currentUser.role === "admin" || currentUser.role === "priest" || currentUser.role === "servant")
+        ? currentUser.role
+        : ("servant" as const),
+      roleLabel: (currentUser.role === "admin" || currentUser.role === "priest" || currentUser.role === "servant")
+        ? currentUser.roleLabel
+        : "خادم مسؤول",
+      permissions: {
+        ...currentUser.permissions,
+        canAwardPoints: true,
+      },
+    };
+
+    if (pointTargetType === "team") {
+      await handleApplyTeamPoints(effectiveTeamId, finalPoints, finalReason, pointCategory);
+    } else {
+      const member = data.members.find((m) => m.id === effectiveMemberId);
+      if (!member) {
+        showFeedback("العضو المحدد غير موجود", "error");
+        setPointsFormFeedback({ text: "العضو المحدد غير موجود", type: "error" });
+        setIsSubmittingPoints(false);
+        return;
+      }
+      const res = await meetingStore.awardPoints(
+        {
+          targetType: "member",
+          targetId: member.id,
+          points: finalPoints,
+          reason: finalReason,
+          category: pointCategory || "بونص فردي",
+        },
+        activeExecutor
+      );
+
+      if (res) {
+        sounds.playVictory();
+        const sign = finalPoints > 0 ? "+" : "";
+        const msg = `تم رصد ${sign}${finalPoints} XP للعضو (${member.name}) وفريقه بنجاح! ⚡`;
+        showFeedback(msg, "success");
+        setPointsFormFeedback({ text: msg, type: "success" });
+        setTimeout(() => setPointsFormFeedback(null), 5000);
+      } else {
+        sounds.playClose();
+        const msg = "تعذر رصد النقاط، تحقق من الصلاحيات";
+        showFeedback(msg, "error");
+        setPointsFormFeedback({ text: msg, type: "error" });
+      }
+    }
+
+    setIsSubmittingPoints(false);
     setCustomPointAmount("");
     setPointReason("");
   };
@@ -451,7 +577,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
   }
 
   return (
-    <div className="relative min-h-screen bg-[#070A1E] text-slate-100 font-arabic selection:bg-amber-500/30 selection:text-white pb-16" dir="rtl">
+    <div
+      className={`relative min-h-screen font-arabic selection:bg-amber-500/30 selection:text-white pb-16 transition-colors duration-300 ${
+        isLight ? "bg-slate-100 text-slate-900" : "bg-[#070A1E] text-slate-100"
+      }`}
+      dir="rtl"
+    >
       {/* Background Ambient Glows */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden z-0">
         <div className="absolute top-0 right-1/4 w-[600px] h-[350px] bg-blue-600/10 blur-[130px] rounded-full" />
@@ -801,6 +932,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
             type="button"
             onClick={() => {
               sounds.playTap();
+              setActiveTab("progression");
+            }}
+            className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === "progression"
+                ? "bg-gradient-to-r from-teal-500 to-cyan-500 text-slate-950 shadow-lg shadow-teal-500/20 font-black scale-102"
+                : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800"
+            }`}
+          >
+            <TrendingUp className="h-4 w-4" />
+            <span>منحنى تطور الفرق 📈 (Recharts)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              sounds.playTap();
               setActiveTab("security");
             }}
             className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
@@ -1046,60 +1193,242 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
         {/* ========================================================= */}
         {activeTab === "quick_points" && (
           <div className="rounded-3xl border border-slate-800 bg-[#0B132B]/85 backdrop-blur-xl p-5 sm:p-7 shadow-2xl space-y-6">
-            <div className="border-b border-slate-800 pb-4">
-              <h2 className="text-lg sm:text-xl font-black text-amber-300 flex items-center gap-2">
-                <Zap className="h-5 w-5 text-amber-400" />
-                <span>رصد وتحديث النقاط المباشر (+ / - XP) للفرق</span>
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-400 mt-1">
-                اختر الفريق والعملية (إضافة أو خصم) وعدد النقاط والسبب، وسيتم التحديث لحظياً على شاشة العرض الكبرى!
-              </p>
+            <div className="border-b border-slate-800 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg sm:text-xl font-black text-amber-300 flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-amber-400" />
+                  <span>رصد وتحديث النقاط والبونص المباشر (+ / - XP)</span>
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                  اختر الفريق أو العضو المستهدف بالبونص، وحدد المقدار والسبب ليتم التحديث الفوري على لوحة الشرف!
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Bonus Guide Rubric Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playOpen();
+                    setBonusGuideInitialEdit(false);
+                    setShowBonusGuideModal(true);
+                  }}
+                  className="px-4 py-2 rounded-2xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500 hover:to-orange-500 text-amber-300 hover:text-slate-950 border border-amber-500/40 text-xs font-black transition-all cursor-pointer flex items-center gap-2 shadow-sm self-start sm:self-auto shrink-0 active:scale-95"
+                >
+                  <Award className="h-4 w-4" />
+                  <span>دليل وبنك درجات البونص 🎯</span>
+                </button>
+
+                {/* Edit Bonus Guide Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playOpen();
+                    setBonusGuideInitialEdit(true);
+                    setShowBonusGuideModal(true);
+                  }}
+                  className="px-4 py-2 rounded-2xl bg-gradient-to-r from-emerald-600/20 to-teal-600/20 hover:from-emerald-500 hover:to-teal-500 text-emerald-300 hover:text-slate-950 border border-emerald-500/40 text-xs font-black transition-all cursor-pointer flex items-center gap-2 shadow-sm self-start sm:self-auto shrink-0 active:scale-95"
+                >
+                  <Edit2 className="h-4 w-4" />
+                  <span>تعديل دليل النقاط ✏️</span>
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* LEFT: Points Form */}
               <div className="lg:col-span-2 space-y-6">
                 <form onSubmit={handleQuickPointsSubmit} className="space-y-6">
-                  {/* Select Target Team */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-300 block">
-                      1. اختر الفريق المستهدف بالرصد:
-                    </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
-                      {data.teams.map((t) => {
-                        const isSelected = pointTargetTeamId === t.id;
-                        return (
-                          <button
-                            key={t.id}
-                            type="button"
-                            onClick={() => {
-                              sounds.playTap();
-                              setPointTargetTeamId(t.id);
-                            }}
-                            className={`p-3 rounded-2xl border text-right transition-all cursor-pointer flex items-center gap-2.5 ${
-                              isSelected
-                                ? "bg-amber-500/20 border-amber-400 text-white font-black shadow-md shadow-amber-500/10 scale-102"
-                                : "bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800"
-                            }`}
-                          >
-                            <span className="text-2xl">{t.icon}</span>
-                            <div className="min-w-0 flex-1">
-                              <span className="text-xs font-bold block truncate">{t.name}</span>
-                              <span className="text-[10px] text-amber-400 font-mono block">
-                                {t.points.toLocaleString()} XP
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
+                  {/* Select Target: Team vs Member */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-300 block">
+                        1. اختر جهة الرصد المستهدفة:
+                      </label>
+                      <div className="flex items-center gap-1.5 p-1 bg-slate-900 rounded-xl border border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sounds.playTap();
+                            setPointTargetType("team");
+                          }}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                            pointTargetType === "team"
+                              ? "bg-amber-500 text-slate-950 font-black shadow-sm"
+                              : "text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          <Users className="h-3.5 w-3.5" />
+                          <span>فريق كامل 🦁</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sounds.playTap();
+                            setPointTargetType("member");
+                          }}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                            pointTargetType === "member"
+                              ? "bg-amber-500 text-slate-950 font-black shadow-sm"
+                              : "text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          <Award className="h-3.5 w-3.5" />
+                          <span>عضو / مخدوم فردي 👤</span>
+                        </button>
+                      </div>
                     </div>
+
+                    {/* TARGET TYPE 1: TEAMS */}
+                    {pointTargetType === "team" && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                        {data.teams.map((t) => {
+                          const isSelected = pointTargetTeamId === t.id;
+                          return (
+                            <div
+                              key={t.id}
+                              onClick={() => {
+                                sounds.playTap();
+                                setPointTargetTeamId(t.id);
+                              }}
+                              className={`p-3 rounded-2xl border text-right transition-all cursor-pointer flex flex-col justify-between gap-2 ${
+                                isSelected
+                                  ? "bg-amber-500/25 border-2 border-amber-400 text-white font-black shadow-lg shadow-amber-500/20 scale-[1.02]"
+                                  : "bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-850 hover:border-slate-700"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <span className="text-2xl">{t.icon}</span>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="text-xs font-bold truncate">{t.name}</span>
+                                    {isSelected && (
+                                      <CheckCircle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                                    )}
+                                  </div>
+                                  <span className="text-[11px] text-amber-300 font-mono font-bold block">
+                                    {t.points.toLocaleString()} XP
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Quick 1-Tap Action Chips right on Team Card */}
+                              <div
+                                className="flex items-center gap-1 pt-1.5 border-t border-slate-800/80"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    sounds.playTap();
+                                    setPointTargetTeamId(t.id);
+                                    handleApplyTeamPoints(t.id, 30, "رصد بونص مباشر سريع (+30 XP)", "نشاط جماعي");
+                                  }}
+                                  className="flex-1 py-1 px-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 hover:text-slate-950 text-emerald-400 text-[10px] font-mono font-black transition-all border border-emerald-500/30 text-center active:scale-95 cursor-pointer"
+                                  title="رصد +30 XP فوري لهذا الفريق"
+                                >
+                                  +30 XP
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    sounds.playTap();
+                                    setPointTargetTeamId(t.id);
+                                    handleApplyTeamPoints(t.id, 50, "رصد بونص تميز سريع (+50 XP)", "نشاط جماعي");
+                                  }}
+                                  className="flex-1 py-1 px-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500 hover:text-slate-950 text-amber-300 text-[10px] font-mono font-black transition-all border border-amber-500/30 text-center active:scale-95 cursor-pointer"
+                                  title="رصد +50 XP فوري لهذا الفريق"
+                                >
+                                  +50 XP
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* TARGET TYPE 2: INDIVIDUAL MEMBERS */}
+                    {pointTargetType === "member" && (
+                      <div className="space-y-2.5 bg-slate-900/70 p-3.5 rounded-2xl border border-slate-800">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={pointMemberSearch}
+                            onChange={(e) => setPointMemberSearch(e.target.value)}
+                            placeholder="ابحث باسم المخدوم أو الكود..."
+                            className="w-full h-10 pr-9 pl-3 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
+                          />
+                          <Search className="absolute right-3 top-3 h-4 w-4 text-slate-500" />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto no-scrollbar">
+                          {data.members
+                            .filter((m) => {
+                              if (!pointMemberSearch.trim()) return true;
+                              const q = pointMemberSearch.toLowerCase();
+                              return (
+                                m.name.toLowerCase().includes(q) ||
+                                (m.accessCode && m.accessCode.includes(q))
+                              );
+                            })
+                            .map((m) => {
+                              const isSelected = pointTargetMemberId === m.id;
+                              const team = data.teams.find((t) => t.id === m.teamId);
+                              return (
+                                <button
+                                  key={m.id}
+                                  type="button"
+                                  onClick={() => {
+                                    sounds.playTap();
+                                    setPointTargetMemberId(m.id);
+                                  }}
+                                  className={`p-2.5 rounded-xl border text-right transition-all cursor-pointer flex items-center gap-2 ${
+                                    isSelected
+                                      ? "bg-amber-500/25 border-2 border-amber-400 text-white font-black shadow-md scale-[1.01]"
+                                      : "bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800"
+                                  }`}
+                                >
+                                  <div className="h-8 w-8 rounded-full overflow-hidden bg-slate-800 border border-slate-700 shrink-0 flex items-center justify-center text-xs">
+                                    {m.avatarUrl ? (
+                                      <img src={m.avatarUrl} alt="" className="h-full w-full object-cover" />
+                                    ) : (
+                                      <span className="font-bold text-amber-400">{m.name.charAt(0)}</span>
+                                    )}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center justify-between gap-1">
+                                      <span className="text-xs font-bold truncate">{m.name}</span>
+                                      {isSelected && <CheckCircle className="h-3.5 w-3.5 text-amber-400 shrink-0" />}
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 block truncate">
+                                      {team?.icon} {team?.name || "بدون فريق"} •{" "}
+                                      <span className="font-mono text-amber-400 font-bold">{m.points} XP</span>
+                                    </span>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Operation: Add or Deduct */}
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-300 block">
-                      2. نوع العملية (إضافة نقاط تفوق أو خصم):
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-300 block">
+                        2. نوع العملية (إضافة نقاط تفوق أو خصم):
+                      </label>
+                      <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border ${
+                        pointOperation === "add"
+                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                          : "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                      }`}>
+                        {pointOperation === "add" ? "✓ الوضع المختار: إضافة نقاط (+)" : "✓ الوضع المختار: خصم نقاط (-)"}
+                      </span>
+                    </div>
+
                     <div className="flex items-center gap-3">
                       <button
                         type="button"
@@ -1107,13 +1436,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                           sounds.playTap();
                           setPointOperation("add");
                         }}
-                        className={`flex-1 py-3 px-4 rounded-2xl font-black text-xs sm:text-sm border transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                        className={`flex-1 py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm border-2 transition-all cursor-pointer flex items-center justify-center gap-2 ${
                           pointOperation === "add"
-                            ? "bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-md"
-                            : "bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800"
+                            ? "bg-emerald-500 text-slate-950 border-emerald-300 shadow-xl shadow-emerald-500/25 scale-[1.02]"
+                            : "bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
                         }`}
                       >
-                        <Plus className="h-4 w-4 text-emerald-400" />
+                        <Plus className={`h-4 w-4 ${pointOperation === "add" ? "text-slate-950" : "text-emerald-400"}`} />
                         <span>إضافة نقاط (+ XP) ⚡</span>
                       </button>
 
@@ -1123,13 +1452,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                           sounds.playTap();
                           setPointOperation("deduct");
                         }}
-                        className={`flex-1 py-3 px-4 rounded-2xl font-black text-xs sm:text-sm border transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                        className={`flex-1 py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm border-2 transition-all cursor-pointer flex items-center justify-center gap-2 ${
                           pointOperation === "deduct"
-                            ? "bg-rose-500/20 border-rose-500 text-rose-300 shadow-md"
-                            : "bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800"
+                            ? "bg-rose-600 text-white border-rose-400 shadow-xl shadow-rose-600/25 scale-[1.02]"
+                            : "bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
                         }`}
                       >
-                        <span className="text-base font-mono">-</span>
+                        <span className="text-base font-mono leading-none">-</span>
                         <span>خصم نقاط (- XP) ⚠️</span>
                       </button>
                     </div>
@@ -1141,7 +1470,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                       3. مقدار النقاط:
                     </label>
                     <div className="flex items-center gap-2 flex-wrap">
-                      {[10, 25, 50, 100, 150, 200, 500].map((val) => (
+                      {[10, 25, 30, 50, 100, 150, 200, 500].map((val) => (
                         <button
                           key={val}
                           type="button"
@@ -1150,9 +1479,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                             setPointDelta(val);
                             setCustomPointAmount("");
                           }}
-                          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-mono font-black border transition-all cursor-pointer ${
+                          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-mono font-black border transition-all cursor-pointer ${
                             pointDelta === val && !customPointAmount
-                              ? "bg-amber-500 text-slate-950 border-amber-400 shadow-sm"
+                              ? pointOperation === "add"
+                                ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow-md font-black"
+                                : "bg-rose-600 text-white border-rose-400 shadow-md font-black"
                               : "bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800"
                           }`}
                         >
@@ -1161,13 +1492,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                       ))}
 
                       <div className="flex items-center gap-1.5 mr-auto">
-                        <span className="text-xs text-slate-400">أو قيمة مخصصة:</span>
+                        <span className="text-xs text-slate-400">أو مخصص:</span>
                         <input
                           type="number"
                           value={customPointAmount}
                           onChange={(e) => setCustomPointAmount(e.target.value)}
                           placeholder="XP مخصص"
-                          className="w-28 h-9 px-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400"
+                          className="w-24 h-9 px-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400"
                         />
                       </div>
                     </div>
@@ -1175,35 +1506,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
 
                   {/* Reason Selection */}
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-300 block">
-                      4. سبب الرصد / نوع النشاط المعتمد:
-                    </label>
-                    {meetingStore.getActivityReasons().length > 0 && (
-                      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-                        {meetingStore.getActivityReasons().map((r) => (
-                          <button
-                            key={r.id}
-                            type="button"
-                            onClick={() => {
-                              sounds.playTap();
-                              setPointReason(r.text);
-                              setPointDelta(r.points);
-                              setPointCategory(r.category);
-                              setCustomPointAmount("");
-                            }}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                              pointReason === r.text
-                                ? "bg-amber-500 text-slate-950 border-amber-400 font-black shadow-sm"
-                                : "bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800"
-                            }`}
-                          >
-                            <span>{r.icon}</span>
-                            <span>{r.text}</span>
-                            <span className="font-mono text-[11px] opacity-80">({r.points} XP)</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-300 block">
+                        4. سبب الرصد / نوع النشاط المعتمد:
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          sounds.playOpen();
+                          setBonusGuideInitialEdit(true);
+                          setShowBonusGuideModal(true);
+                        }}
+                        className="text-[11px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Edit2 className="h-3 w-3" />
+                        <span>تعديل دليل النقاط ✏️</span>
+                      </button>
+                    </div>
 
                     <input
                       type="text"
@@ -1214,17 +1533,61 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                     />
                   </div>
 
+                  {/* Summary Box */}
+                  <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-amber-500/40 space-y-1.5 shadow-inner">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-400 font-bold">ملخص المعاملة الجاهزة للتطبيق الآن:</span>
+                      <span className={`px-2.5 py-0.5 rounded-lg text-xs font-mono font-black ${
+                        pointOperation === "add"
+                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                          : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                      }`}>
+                        {pointOperation === "add" ? "+" : "-"}{customPointAmount || pointDelta} XP
+                      </span>
+                    </div>
+                    <div className="text-sm font-black text-white flex items-center gap-2">
+                      <span className="text-amber-400">
+                        {pointTargetType === "team" ? "🦁 الفريق المستهدف:" : "👤 العضو المستهدف:"}
+                      </span>
+                      <span>
+                        {pointTargetType === "team"
+                          ? (data.teams.find((t) => t.id === (pointTargetTeamId || data.teams[0]?.id))?.name || "اختر فريقاً")
+                          : (data.members.find((m) => m.id === (pointTargetMemberId || data.members[0]?.id))?.name || "اختر عضواً")}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 truncate">
+                      السبب: {pointReason.trim() || (pointOperation === "add" ? "رصد نقاط تفوق وبونص" : "خصم نقاط بسبب مخالفة")}
+                    </div>
+                  </div>
+
+                  {/* Inline Feedback Banner */}
+                  {pointsFormFeedback && (
+                    <div className={`p-3 rounded-2xl border flex items-center gap-2 text-xs font-bold animate-fadeIn ${
+                      pointsFormFeedback.type === "success"
+                        ? "bg-emerald-950/90 border-emerald-500/60 text-emerald-200"
+                        : "bg-rose-950/90 border-rose-500/60 text-rose-200"
+                    }`}>
+                      <CheckCircle className="h-4 w-4 shrink-0 text-emerald-400" />
+                      <span>{pointsFormFeedback.text}</span>
+                    </div>
+                  )}
+
                   {/* Submit Button */}
-                  <div className="pt-2">
+                  <div className="pt-1">
                     <button
                       type="submit"
-                      className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-sm sm:text-base shadow-xl shadow-amber-500/20 active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-2"
+                      disabled={isSubmittingPoints}
+                      className={`w-full py-4 px-6 rounded-2xl font-black text-sm sm:text-base shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98 ${
+                        pointOperation === "add"
+                          ? "bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 hover:from-emerald-400 hover:to-teal-300 text-slate-950 shadow-emerald-500/25"
+                          : "bg-gradient-to-r from-rose-600 via-red-500 to-rose-600 hover:from-rose-500 hover:to-red-400 text-white shadow-rose-600/25"
+                      }`}
                     >
                       <Zap className="h-5 w-5" />
                       <span>
-                        اعتماد وتحديث النقاط فوراً (
-                        {pointOperation === "deduct" ? "-" : "+"}
-                        {customPointAmount || pointDelta} XP)
+                        {isSubmittingPoints
+                          ? "جاري اعتماد وتحديث النقاط فوراً..."
+                          : `اعتماد وتحديث النقاط فوراً (${pointOperation === "deduct" ? "-" : "+"}${customPointAmount || pointDelta} XP) ⚡`}
                       </span>
                     </button>
                   </div>
@@ -1282,6 +1645,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB: TEAMS PROGRESSION CHART (منحنى تطور الفرق RECHARTS) */}
+        {/* ========================================================= */}
+        {activeTab === "progression" && (
+          <div className="space-y-6">
+            <TeamsProgressionChart
+              teams={data.teams}
+              transactions={data.transactions}
+              events={data.events}
+              isLight={isLight}
+            />
           </div>
         )}
 
@@ -2217,6 +2594,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
       {/* Admin Photo Upload Modal */}
       {showAdminPhotoModal && (
         <AdminPhotoUploadModal onClose={() => setShowAdminPhotoModal(false)} />
+      )}
+
+      {/* Bonus Guide Rubric Modal */}
+      {showBonusGuideModal && (
+        <BonusGuideModal
+          initialEditMode={bonusGuideInitialEdit}
+          onClose={() => {
+            setShowBonusGuideModal(false);
+            setBonusGuideInitialEdit(false);
+          }}
+          onSelectReason={(reason, points, cat) => {
+            setPointReason(reason);
+            setPointDelta(points);
+            setPointCategory(cat);
+            setCustomPointAmount("");
+            setShowBonusGuideModal(false);
+            setBonusGuideInitialEdit(false);
+          }}
+        />
       )}
     </div>
   );

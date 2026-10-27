@@ -98,10 +98,13 @@ export const AdminPhotoUploadModal: React.FC<AdminPhotoUploadModalProps> = ({
     sounds.playTap();
 
     try {
-      if (userToEdit.id === "mem-1" || currentUser.role === "admin") {
+      if (userToEdit.id === "mem-1") {
         await meetingStore.updateAdminAvatar(previewUrl, currentUser);
       } else {
         await meetingStore.updateMember(userToEdit.id, { avatarUrl: previewUrl }, currentUser);
+        if (currentUser.id === userToEdit.id) {
+          authStore.updateCurrentUserAvatar(previewUrl);
+        }
       }
 
       if (onSaved) {

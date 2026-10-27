@@ -47,6 +47,23 @@ import { AdminDashboard } from "./AdminDashboard";
 import { QRScannerModal } from "./QRScannerModal";
 import { UserSwitcherModal } from "./UserSwitcherModal";
 import { DailyChallengeBanner } from "./DailyChallengeBanner";
+import { TeamsProgressionChart } from "./TeamsProgressionChart";
+import { MeetingCountdownTimer } from "./MeetingCountdownTimer";
+
+export interface TopRankChangeToast {
+  id: string;
+  teamId: string;
+  teamName: string;
+  teamIcon: string;
+  teamAvatarUrl?: string;
+  teamColor?: string;
+  oldRank: number;
+  newRank: number;
+  points: number;
+  deltaPoints: number;
+  badgeTitle: string;
+  type: "first_place" | "second_place" | "third_place" | "top_shift";
+}
 
 interface Top10ScoreboardProps {
   onReturnToWelcome?: () => void;
@@ -70,6 +87,8 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
   const [adminInitialTab, setAdminInitialTab] = useState<any>(undefined);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showUserSwitcher, setShowUserSwitcher] = useState(false);
+  const [showProgressionModal, setShowProgressionModal] = useState<boolean>(false);
+  const [topRankToast, setTopRankToast] = useState<TopRankChangeToast | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [toasts, setToasts] = useState<
     Array<{
@@ -112,6 +131,15 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
     }, 5000);
     return () => clearTimeout(timer);
   }, [toasts]);
+
+  // Auto-dismiss top rank visual toast after 7s
+  useEffect(() => {
+    if (!topRankToast) return;
+    const timer = setTimeout(() => {
+      setTopRankToast(null);
+    }, 7000);
+    return () => clearTimeout(timer);
+  }, [topRankToast]);
 
   // Subscribe to meetingStore and authStore changes
   useEffect(() => {
@@ -285,6 +313,47 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
         const delta = oldRank - team.rank;
         const type = delta > 0 ? "up" : "down";
         nextChanges[team.id] = { delta, type, timestamp: Date.now() };
+
+        // Visual Notification Toast for Top Ranks (المراكز الأولى)
+        const isTopRankShift = team.rank <= 3 || oldRank <= 3;
+        if (isTopRankShift) {
+          let badgeTitle = "";
+          let toastType: "first_place" | "second_place" | "third_place" | "top_shift" = "top_shift";
+
+          if (team.rank === 1) {
+            badgeTitle = "👑 صعود للمركز الأول وانتزاع الصدارة!";
+            toastType = "first_place";
+            newLeaderFound = { teamName: team.name, icon: team.icon, avatarUrl: team.avatarUrl };
+            sounds.playFanfare();
+          } else if (team.rank === 2) {
+            badgeTitle = delta > 0 ? "🥈 قفزة تاريخية للمركز الثاني والوصافة!" : "🥈 تراجع إلى المركز الثاني";
+            toastType = "second_place";
+            sounds.playVictory();
+          } else if (team.rank === 3) {
+            badgeTitle = delta > 0 ? "🥉 اقتحام منصة التتويج والمركز الثالث!" : "🥉 تراجع إلى المركز الثالث";
+            toastType = "third_place";
+            sounds.playVictory();
+          } else {
+            badgeTitle = "⚡ تبدل في المراكز الأولى ولائحة الشرف!";
+            toastType = "top_shift";
+            sounds.playPointUp();
+          }
+
+          setTopRankToast({
+            id: `top-rank-${Date.now()}-${team.id}`,
+            teamId: team.id,
+            teamName: team.name,
+            teamIcon: team.icon,
+            teamAvatarUrl: team.avatarUrl,
+            teamColor: team.color,
+            oldRank,
+            newRank: team.rank,
+            points: team.points,
+            deltaPoints: team.points - oldPoints,
+            badgeTitle,
+            type: toastType,
+          });
+        }
 
         if (delta > 0) {
           hasClimbed = true;
@@ -475,7 +544,9 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
 
   return (
     <div
-      className="relative min-h-[100dvh] w-full bg-[#0B0F2A] text-slate-100 overflow-x-hidden select-none font-arabic"
+      className={`relative min-h-[100dvh] w-full overflow-x-hidden select-none font-arabic transition-colors duration-300 ${
+        isLight ? "bg-slate-100 text-slate-900" : "bg-[#0B0F2A] text-slate-100"
+      }`}
       dir="rtl"
     >
       {/* Background ambient lighting - Cheerful Vibrant Orbs */}
@@ -674,6 +745,20 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                   <span>احتفال بالبطل</span>
                 </button>
 
+                {/* Progression Chart Modal Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    setShowProgressionModal(true);
+                  }}
+                  className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 text-slate-950 text-xs font-black shadow-md shadow-cyan-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                  title="عرض منحنى تطور وصعود وهبوط الفرق الـ 10 التفاعلي عبر أيام الاجتماع"
+                >
+                  <TrendingUp className="h-4 w-4 shrink-0" />
+                  <span>منحنى الفرق 📈</span>
+                </button>
+
                 {/* Fullscreen / Conference Hall Presentation Button */}
                 <button
                   type="button"
@@ -834,6 +919,26 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
             </div>
           </div>
         </header>
+
+        {/* Meeting Countdown Timer (الوقت المتبقي على انتهاء اجتماع الشباب 2026) ⏳ */}
+        <div className="mb-5">
+          <MeetingCountdownTimer
+            endTime={data.config.meetingEndTime}
+            startTime={data.config.meetingStartTime}
+            currentUser={currentUser}
+            isLight={isLight}
+            onExpire={() => {
+              sounds.playFanfare();
+              confettiRef.current?.celebrateWinner();
+              addToast({
+                type: "leader_change",
+                title: "انتهى وقت اجتماع الشباب 2026 🏆",
+                message: "اكتمل وقت المسابقات والأنشطة! حان موعد تتويج الفريق البطل وإعلان النتائج النهائية.",
+              });
+            }}
+            onCelebrateWinner={triggerCelebrate}
+          />
+        </div>
 
         {/* TV & Projector Mode Active Controller Banner */}
         <AnimatePresence>
@@ -1447,6 +1552,32 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
         />
       )}
 
+      {/* Teams Progression Curve Modal (Recharts) */}
+      {showProgressionModal && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-xl animate-fadeIn overflow-y-auto" dir="rtl">
+          <div className="relative w-full max-w-5xl my-auto">
+            <button
+              type="button"
+              onClick={() => {
+                sounds.playClose();
+                setShowProgressionModal(false);
+              }}
+              className="absolute -top-3 -left-3 z-30 h-10 w-10 rounded-full bg-slate-900 border-2 border-slate-700 text-white hover:bg-rose-600 transition-all flex items-center justify-center shadow-2xl cursor-pointer"
+              title="إغلاق المنحنى"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <TeamsProgressionChart
+              teams={data.teams}
+              transactions={data.transactions}
+              events={data.events}
+              isLight={isLight}
+            />
+          </div>
+        </div>
+      )}
+
 
       {/* Floating Exit Fullscreen Button for Conference Hall Mode */}
       <AnimatePresence>
@@ -1463,6 +1594,144 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
             <Minimize2 className="h-4 w-4 text-rose-400" />
             <span>إنهاء ملء الشاشة (Esc) ✕</span>
           </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* Visual Notification Toast for Top Ranks Shift (إشعار بصري لتغير مراكز الصدارة) 🏆 */}
+      <AnimatePresence>
+        {topRankToast && (
+          <motion.div
+            key={topRankToast.id}
+            initial={{ opacity: 0, y: -70, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -40, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 350, damping: 24 }}
+            className="fixed top-5 left-1/2 -translate-x-1/2 z-[250] w-[95vw] max-w-xl pointer-events-auto"
+            dir="rtl"
+          >
+            <div
+              className={`relative overflow-hidden rounded-3xl p-4 sm:p-5 border-2 shadow-[0_25px_60px_rgba(0,0,0,0.65)] backdrop-blur-2xl transition-all ${
+                topRankToast.type === "first_place"
+                  ? "bg-gradient-to-r from-amber-950/95 via-yellow-900/90 to-amber-950/95 border-amber-400 text-amber-100 shadow-amber-500/30 ring-4 ring-amber-400/30"
+                  : topRankToast.type === "second_place"
+                  ? "bg-gradient-to-r from-slate-900/95 via-slate-800/95 to-slate-900/95 border-slate-300 text-slate-100 shadow-slate-400/25 ring-2 ring-slate-300/30"
+                  : topRankToast.type === "third_place"
+                  ? "bg-gradient-to-r from-amber-950/95 via-orange-950/95 to-stone-900/95 border-amber-600 text-amber-200 shadow-amber-700/25 ring-2 ring-amber-600/30"
+                  : "bg-gradient-to-r from-indigo-950/95 via-slate-900/95 to-purple-950/95 border-indigo-400 text-indigo-100 shadow-indigo-500/25 ring-2 ring-indigo-400/30"
+              }`}
+            >
+              {/* Background ambient beam */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+
+              <div className="relative flex items-start gap-3.5">
+                {/* Team avatar / icon */}
+                <div className="relative shrink-0">
+                  <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-black/40 border-2 border-white/30 overflow-hidden flex items-center justify-center shadow-lg">
+                    {topRankToast.teamAvatarUrl ? (
+                      <img
+                        src={topRankToast.teamAvatarUrl}
+                        alt={topRankToast.teamName}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-3xl">{topRankToast.teamIcon}</span>
+                    )}
+                  </div>
+                  {topRankToast.newRank === 1 && (
+                    <span className="absolute -top-2 -right-2 text-xl drop-shadow-md animate-bounce">
+                      👑
+                    </span>
+                  )}
+                </div>
+
+                {/* Body info */}
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping shrink-0" />
+                      <span className="text-xs sm:text-sm font-black tracking-wide text-amber-300">
+                        {topRankToast.badgeTitle}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setTopRankToast(null)}
+                      className="p-1 rounded-xl bg-black/30 hover:bg-black/50 text-white/70 hover:text-white transition-colors cursor-pointer shrink-0"
+                      title="إغلاق الإشعار"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base sm:text-lg font-black text-white truncate">
+                      فريق «{topRankToast.teamName}»
+                    </h3>
+                  </div>
+
+                  {/* Rank shift comparison pill */}
+                  <div className="flex items-center gap-2 flex-wrap text-xs font-bold pt-1">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-black/40 border border-white/15">
+                      <span className="text-slate-400 text-[11px]">المركز السابق:</span>
+                      <span className="line-through text-slate-400 font-mono">#{topRankToast.oldRank}</span>
+                      <span className="text-white">➔</span>
+                      <span className="text-amber-300 font-black font-mono text-sm">
+                        #{topRankToast.newRank}
+                      </span>
+                      {topRankToast.oldRank > topRankToast.newRank ? (
+                        <span className="flex items-center text-emerald-400 text-[11px] font-black mr-1">
+                          <ArrowUp className="h-3.5 w-3.5" />
+                          <span>+{topRankToast.oldRank - topRankToast.newRank}</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center text-rose-400 text-[11px] font-black mr-1">
+                          <ArrowDown className="h-3.5 w-3.5" />
+                          <span>-{topRankToast.newRank - topRankToast.oldRank}</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Points total */}
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 font-mono text-xs font-black">
+                      <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                      <span>{topRankToast.points.toLocaleString("en-US")} XP</span>
+                      {topRankToast.deltaPoints !== 0 && (
+                        <span className="text-emerald-400 text-[11px]">
+                          ({topRankToast.deltaPoints > 0 ? `+${topRankToast.deltaPoints.toLocaleString("en-US")}` : topRankToast.deltaPoints.toLocaleString("en-US")})
+                        </span>
+                      )}
+                    </div>
+
+                    {/* View details button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const team = processedTeams.find((t) => t.id === topRankToast.teamId);
+                        if (team) {
+                          setSelectedTeam(team);
+                          sounds.playTap();
+                        }
+                      }}
+                      className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold transition-all cursor-pointer mr-auto"
+                    >
+                      عرض الفريق 🔍
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress timer bar */}
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/40 overflow-hidden">
+                <motion.div
+                  initial={{ width: "100%" }}
+                  animate={{ width: "0%" }}
+                  transition={{ duration: 7, ease: "linear" }}
+                  className="h-full bg-gradient-to-r from-amber-400 to-yellow-300"
+                />
+              </div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 

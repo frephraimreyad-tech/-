@@ -34,6 +34,7 @@ export interface CustomTeam {
   slogan?: string;
   description?: string;
   points: number;
+  initialPoints?: number;
   previousRank?: number; // الترتيب في الجولة أو اللقاء السابق
   leaderName?: string;
   avatarUrl?: string;
@@ -64,6 +65,8 @@ export interface ActivityReason {
   category: string;
   points: number;
   icon?: string;
+  description?: string;
+  howToAward?: string;
 }
 
 export interface EventSession {
@@ -138,6 +141,8 @@ export interface MeetingConfig {
   dailyChallenge?: DailyChallenge;
   hideAdminButtonFromPublic?: boolean;
   meetingLogoUrl?: string;
+  meetingEndTime?: string; // ISO string for meeting countdown
+  meetingStartTime?: string; // ISO string for meeting start
 }
 
 export interface MeetingData {

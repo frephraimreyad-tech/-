@@ -91,7 +91,7 @@ export function getRoleDefaultPermissions(role: RoleType): MemberPermissions {
       };
     case "servant":
       return {
-        canAwardPoints: false,
+        canAwardPoints: true, // الخادم مصرح له برصد النقاط والبونص التشجيعي
         canEditTeams: false,
         canEditMembers: false,
         canManagePermissions: false,
@@ -158,7 +158,18 @@ class AuthStore {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.id && parsed.role) {
-          this.currentUser = parsed;
+          const defaultPerms = getRoleDefaultPermissions(parsed.role);
+          this.currentUser = {
+            ...parsed,
+            permissions: {
+              ...defaultPerms,
+              ...(parsed.permissions || {}),
+              canAwardPoints:
+                parsed.role === "admin" || parsed.role === "servant" || parsed.role === "priest"
+                  ? true
+                  : !!parsed.permissions?.canAwardPoints,
+            },
+          };
           return;
         }
       }

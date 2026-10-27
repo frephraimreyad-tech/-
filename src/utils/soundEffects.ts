@@ -126,6 +126,32 @@ class SoundManager {
     this.playVictory();
   }
 
+  playFanfare(): void {
+    if (this.isMuted) return;
+    const ctx = this.initContext();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      // Grand celebratory fanfare chord progression (C5 -> E5 -> G5 -> C6 -> E6)
+      const notes = [523.25, 659.25, 783.99, 1046.5, 1318.51];
+      notes.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "triangle";
+        const start = now + 0.08 * i;
+        osc.frequency.setValueAtTime(freq, start);
+        gain.gain.setValueAtTime(0.18, start);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.8);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + 0.85);
+      });
+    } catch {
+      // Audio error ignored
+    }
+  }
+
   playPointUp(): void {
     if (this.isMuted) return;
     const ctx = this.initContext();

@@ -26,7 +26,8 @@
             "slogan": "string",
             "description": "string",
             "points": "number",
-            "leaderName": "string"
+            "leaderName": "string",
+            "avatarUrl": "string?"
           }
         }
       }
@@ -44,7 +45,8 @@
             "points": "number",
             "phone": "string?",
             "accessCode": "string",
-            "permissions": "map"
+            "permissions": "map",
+            "avatarUrl": "string?"
           }
         }
       }

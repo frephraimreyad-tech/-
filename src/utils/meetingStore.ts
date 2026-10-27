@@ -64,6 +64,8 @@ const DEFAULT_CONFIG: MeetingConfig = {
     endsAt: new Date(Date.now() + 4 * 60 * 60 * 1000 + 30 * 60 * 1000).toISOString(),
     isActive: true,
   },
+  meetingStartTime: new Date().toISOString(),
+  meetingEndTime: new Date(Date.now() + 2 * 60 * 60 * 1000 + 30 * 60 * 1000).toISOString(),
 };
 
 const DEFAULT_TEAMS: CustomTeam[] = [
@@ -166,11 +168,32 @@ class MeetingStore {
     this.initFirestore();
   }
 
+  private getCachedMembers(): CustomMember[] {
+    if (typeof window === "undefined") return DEFAULT_MEMBERS;
+    try {
+      const saved = localStorage.getItem("meeting_members_persistent_cache_v2");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return DEFAULT_MEMBERS;
+  }
+
+  public saveMembersToStorage(members: CustomMember[]): void {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem("meeting_members_persistent_cache_v2", JSON.stringify(members));
+    } catch {}
+  }
+
   private getFallbackData(): MeetingData {
     return {
       config: DEFAULT_CONFIG,
       teams: DEFAULT_TEAMS,
-      members: DEFAULT_MEMBERS,
+      members: this.getCachedMembers(),
       transactions: DEFAULT_TRANSACTIONS,
       activityReasons: DEFAULT_ACTIVITY_REASONS,
       events: DEFAULT_EVENTS,
@@ -225,10 +248,14 @@ class MeetingStore {
         members.push({
           ...m,
           id: doc.id,
+          avatarUrl: m.avatarUrl || "",
           permissions: { ...defaults, ...(m.permissions || {}) }
         } as CustomMember);
       });
-      this.data.members = members;
+      if (members.length > 0) {
+        this.data.members = members;
+        this.saveMembersToStorage(members);
+      }
       this.notify();
     });
 
@@ -271,6 +298,18 @@ class MeetingStore {
         logs.push({ ...doc.data(), id: doc.id } as AuditLogEntry);
       });
       this.data.auditLogs = logs;
+      this.notify();
+    });
+
+    // Listen to Activity Reasons / Bonus Guide Rubrics
+    onSnapshot(collection(db, "activityReasons"), (querySnap) => {
+      const reasons: ActivityReason[] = [];
+      querySnap.forEach((doc) => {
+        reasons.push({ ...doc.data(), id: doc.id } as ActivityReason);
+      });
+      if (reasons.length > 0) {
+        this.data.activityReasons = reasons;
+      }
       this.notify();
     });
 
@@ -656,7 +695,9 @@ class MeetingStore {
       },
     };
 
-    await setDoc(doc(db, "members", id), newMember);
+    await setDoc(doc(db, "members", id), newMember, { merge: true });
+    this.data.members.push(newMember);
+    this.saveMembersToStorage(this.data.members);
 
     if (memberData.initialPoints && memberData.initialPoints > 0) {
       const team = this.data.teams.find((t) => t.id === memberData.teamId);
@@ -726,7 +767,12 @@ class MeetingStore {
         });
       }
 
-      await updateDoc(doc(db, "members", memberId), updates);
+      try {
+        await setDoc(doc(db, "members", memberId), updates, { merge: true });
+      } catch (e) {
+        console.warn("Could not set member in Firestore:", e);
+      }
+      this.saveMembersToStorage(this.data.members);
       this.triggerAutoSync();
       return { success: true };
     }
@@ -738,11 +784,12 @@ class MeetingStore {
     if (adminMember) {
       adminMember.avatarUrl = avatarUrl;
       try {
-        await updateDoc(doc(db, "members", adminMember.id), { avatarUrl });
+        await setDoc(doc(db, "members", adminMember.id), { avatarUrl }, { merge: true });
       } catch (e) {
         console.warn("Could not update doc in Firestore:", e);
       }
     }
+    this.saveMembersToStorage(this.data.members);
     SUPER_ADMIN_USER.avatarUrl = avatarUrl;
     authStore.updateCurrentUserAvatar(avatarUrl);
     this.triggerAutoSync();
@@ -798,6 +845,7 @@ class MeetingStore {
     }
 
     await deleteDoc(doc(db, "members", memberId));
+    this.saveMembersToStorage(this.data.members);
     this.triggerAutoSync();
     return { success: true };
   }
@@ -884,7 +932,7 @@ class MeetingStore {
     if (
       !activeExecutor ||
       activeExecutor.role === "member" ||
-      (!activeExecutor.permissions.canAwardPoints && activeExecutor.role !== "admin")
+      (!activeExecutor.permissions?.canAwardPoints && activeExecutor.role !== "admin" && activeExecutor.role !== "servant")
     ) {
       this.logAudit({
         userId: activeExecutor?.id || "guest",
@@ -920,6 +968,7 @@ class MeetingStore {
 
       const team = this.data.teams.find((t) => t.id === teamId);
       if (team) {
+        team.points = Math.max(0, team.points + points);
         teamName = team.name;
       } else {
         teamName = "عام";
@@ -949,17 +998,18 @@ class MeetingStore {
     if (targetType === "team") {
       const team = this.data.teams.find((t) => t.id === targetId);
       if (team) {
-        batch.update(doc(db, "teams", team.id), { points: Math.max(0, team.points + points) });
+        batch.update(doc(db, "teams", team.id), { points: team.points });
       }
     } else {
       const member = this.data.members.find((m) => m.id === targetId);
       if (member) {
-        batch.update(doc(db, "members", member.id), { points: Math.max(0, member.points + points) });
+        batch.update(doc(db, "members", member.id), { points: member.points });
         const team = this.data.teams.find((t) => t.id === member.teamId);
         if (team) {
-          batch.update(doc(db, "teams", team.id), { points: Math.max(0, team.points + points) });
+          batch.update(doc(db, "teams", team.id), { points: team.points });
         }
       }
+      this.saveMembersToStorage(this.data.members);
     }
 
     this.logAudit({
@@ -1078,6 +1128,8 @@ class MeetingStore {
     memberId: string;
     isPunctual?: boolean;
     executor: SystemUser;
+    manualBonusPoints?: number;
+    manualBonusReason?: string;
   }): Promise<{
     success: boolean;
     record?: AttendanceRecord;
@@ -1086,7 +1138,7 @@ class MeetingStore {
     member?: CustomMember;
     event?: EventSession;
   }> {
-    const { eventIdOrCode, memberId, isPunctual, executor } = params;
+    const { eventIdOrCode, memberId, isPunctual, executor, manualBonusPoints, manualBonusReason } = params;
 
     // 1. Permission check
     if (executor.role !== "admin" && !executor.permissions.canScanAttendance) {
@@ -1186,6 +1238,13 @@ class MeetingStore {
     } else if (isPunctual && event.punctualityBonusPoints > 0) {
       pointsAwarded += event.punctualityBonusPoints;
       punctualityStatus = " (بونص الالتزام المبكر)";
+    }
+
+    // Optional Extra Manual Bonus from Servant / Admin
+    const extraBonus = Number(manualBonusPoints) || 0;
+    if (extraBonus > 0) {
+      pointsAwarded += extraBonus;
+      punctualityStatus += ` + بونص يدوي (+${extraBonus} XP: ${manualBonusReason?.trim() || "تشجيع وتفوق"})`;
     }
 
     // Update member points
@@ -1330,6 +1389,8 @@ class MeetingStore {
     category?: string;
     points?: number;
     icon?: string;
+    description?: string;
+    howToAward?: string;
   }): Promise<ActivityReason> {
     const id = "ar-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const newReason: ActivityReason = {
@@ -1338,11 +1399,16 @@ class MeetingStore {
       category: reasonData.category?.trim() || "نشاط وتحدي",
       points: typeof reasonData.points === "number" ? reasonData.points : 30,
       icon: reasonData.icon || "🎯",
+      description: reasonData.description?.trim() || "",
+      howToAward: reasonData.howToAward?.trim() || "",
     };
     if (!this.data.activityReasons) {
       this.data.activityReasons = [...DEFAULT_ACTIVITY_REASONS];
     }
+    this.data.activityReasons.unshift(newReason);
+    this.notify();
     await setDoc(doc(db, "activityReasons", id), newReason);
+    this.triggerAutoSync();
     return newReason;
   }
 
@@ -1356,7 +1422,9 @@ class MeetingStore {
         ...this.data.activityReasons[idx],
         ...updates,
       };
+      this.notify();
       await updateDoc(doc(db, "activityReasons", id), updates);
+      this.triggerAutoSync();
     }
   }
 
@@ -1364,16 +1432,22 @@ class MeetingStore {
     if (!this.data.activityReasons) {
       this.data.activityReasons = [...DEFAULT_ACTIVITY_REASONS];
     }
+    this.data.activityReasons = this.data.activityReasons.filter((r) => r.id !== id);
+    this.notify();
     await deleteDoc(doc(db, "activityReasons", id));
+    this.triggerAutoSync();
   }
 
   async resetActivityReasonsToDefault(): Promise<void> {
     const batch = writeBatch(db);
     // Delete existing
-    this.data.activityReasons.forEach(r => batch.delete(doc(db, "activityReasons", r.id)));
+    this.data.activityReasons.forEach((r) => batch.delete(doc(db, "activityReasons", r.id)));
     // Add default
-    DEFAULT_ACTIVITY_REASONS.forEach(r => batch.set(doc(db, "activityReasons", r.id), r));
+    DEFAULT_ACTIVITY_REASONS.forEach((r) => batch.set(doc(db, "activityReasons", r.id), r));
+    this.data.activityReasons = [...DEFAULT_ACTIVITY_REASONS];
+    this.notify();
     await batch.commit();
+    this.triggerAutoSync();
   }
 
   async resetScoresOnly(): Promise<void> {

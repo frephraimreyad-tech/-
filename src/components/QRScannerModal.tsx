@@ -16,11 +16,13 @@ import {
   UserCheck,
   Check,
   Zap,
+  Award,
 } from "lucide-react";
 import type { CustomMember, EventSession, ProcessedMeetingTeam } from "../types";
 import { meetingStore } from "../utils/meetingStore";
 import { authStore, type SystemUser } from "../utils/authStore";
 import { sounds } from "../utils/soundEffects";
+import { BonusGuideModal } from "./BonusGuideModal";
 
 interface QRScannerModalProps {
   onClose: () => void;
@@ -47,6 +49,9 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   const [isScanningLive, setIsScanningLive] = useState<boolean>(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isProcessingFile, setIsProcessingFile] = useState<boolean>(false);
+  const [manualBonusPoints, setManualBonusPoints] = useState<number | string>("");
+  const [manualBonusReason, setManualBonusReason] = useState<string>("");
+  const [showBonusGuide, setShowBonusGuide] = useState<boolean>(false);
 
   const [scanResult, setScanResult] = useState<{
     type: "success" | "error";
@@ -288,12 +293,15 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       return;
     }
 
-    // Call meetingStore
+    // Call meetingStore with optional manual bonus
+    const parsedBonus = Number(manualBonusPoints) || 0;
     const res = await meetingStore.recordQRAttendance({
       eventIdOrCode: targetEventId,
       memberId: processedCode,
       isPunctual,
       executor: currentUser,
+      manualBonusPoints: parsedBonus > 0 ? parsedBonus : undefined,
+      manualBonusReason: parsedBonus > 0 ? (manualBonusReason.trim() || undefined) : undefined,
     });
 
     if (res.success) {
@@ -332,11 +340,14 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       return;
     }
 
+    const parsedBonus = Number(manualBonusPoints) || 0;
     const res = await meetingStore.recordQRAttendance({
       eventIdOrCode: targetEventId,
       memberId: member.id,
       isPunctual,
       executor: currentUser,
+      manualBonusPoints: parsedBonus > 0 ? parsedBonus : undefined,
+      manualBonusReason: parsedBonus > 0 ? (manualBonusReason.trim() || undefined) : undefined,
     });
 
     if (res.success) {
@@ -472,6 +483,95 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
               <span className="text-[10px] text-emerald-400/90 font-medium">
                 ⚡ بونص الحضور المبكر يحتسب تلقائياً
               </span>
+            </div>
+          )}
+        </div>
+
+        {/* Optional Manual Bonus Card for Servants / Admins */}
+        <div className="rounded-2xl border border-amber-500/30 bg-slate-900/80 p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black text-amber-300 flex items-center gap-1.5">
+              <Zap className="h-3.5 w-3.5 text-amber-400" />
+              <span>إضافة بونص يدوي فوري مع الحضور (اختياري للخادم):</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                sounds.playOpen();
+                setShowBonusGuide(true);
+              }}
+              className="px-2.5 py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500 hover:text-slate-950 text-amber-300 text-[11px] font-bold border border-amber-500/40 transition-all cursor-pointer flex items-center gap-1"
+            >
+              <Award className="h-3 w-3" />
+              <span>دليل الدرجات 🎯</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {[
+              { label: "بدون بونص (0)", val: 0, reason: "" },
+              { label: "+15 (حفظ آية 📖)", val: 15, reason: "حفظ وتسميع آية الأسبوع" },
+              { label: "+20 (إحضار إنجيل ✝️)", val: 20, reason: "إحضار الكتاب المقدس" },
+              { label: "+30 (نشاط وتفاعل ⚡)", val: 30, reason: "مشاركة وتفاعل متميز" },
+              { label: "+50 (إنجاز فائق 🌟)", val: 50, reason: "إنجاز روحي وخدمي استثنائي" },
+            ].map((b) => {
+              const isSelected =
+                b.val === 0
+                  ? !manualBonusPoints || Number(manualBonusPoints) === 0
+                  : Number(manualBonusPoints) === b.val;
+              return (
+                <button
+                  key={b.val}
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    if (b.val === 0) {
+                      setManualBonusPoints("");
+                      setManualBonusReason("");
+                    } else {
+                      setManualBonusPoints(b.val);
+                      setManualBonusReason(b.reason);
+                    }
+                  }}
+                  className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${
+                    isSelected
+                      ? "bg-amber-500 text-slate-950 border-amber-400 font-black shadow-sm"
+                      : "bg-slate-950 text-slate-400 border-slate-800 hover:text-white"
+                  }`}
+                >
+                  {b.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {Number(manualBonusPoints) > 0 && (
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="number"
+                value={manualBonusPoints}
+                onChange={(e) => setManualBonusPoints(e.target.value)}
+                placeholder="XP"
+                className="w-16 h-8 px-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-mono font-bold text-amber-300 text-center"
+              />
+              <input
+                type="text"
+                value={manualBonusReason}
+                onChange={(e) => setManualBonusReason(e.target.value)}
+                placeholder="سبب البونص (مثال: حفظ الآية، إحضار الإنجيل...)"
+                className="flex-1 h-8 px-3 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  setManualBonusPoints("");
+                  setManualBonusReason("");
+                }}
+                className="px-2 py-1 rounded-lg text-[10px] text-slate-400 hover:text-rose-400 hover:bg-slate-800"
+              >
+                إلغاء
+              </button>
             </div>
           )}
         </div>
@@ -798,6 +898,18 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
             يتم التحقق تلقائياً من منع تكرار الحضور للعضو في نفس الفعالية، واحتساب النقاط فورياً.
           </span>
         </div>
+
+        {/* Bonus Guide Modal */}
+        {showBonusGuide && (
+          <BonusGuideModal
+            onClose={() => setShowBonusGuide(false)}
+            onSelectReason={(reason, points) => {
+              setManualBonusPoints(points);
+              setManualBonusReason(reason);
+              setShowBonusGuide(false);
+            }}
+          />
+        )}
       </div>
     </div>
   );

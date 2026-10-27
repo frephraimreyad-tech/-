@@ -54,10 +54,11 @@ import { QRCodeModal } from "./QRCodeModal";
 import { QRScannerModal } from "./QRScannerModal";
 import { UserSwitcherModal } from "./UserSwitcherModal";
 import { MemberCard } from "./MemberCard";
+import { AdminPhotoUploadModal } from "./AdminPhotoUploadModal";
 
 interface AdminPanelProps {
   onBackToScoreboard: () => void;
-  initialTab?: "quick_score" | "reasons" | "teams" | "members" | "events" | "permissions" | "log" | "settings";
+  initialTab?: "quick_score" | "teams" | "members" | "events" | "permissions" | "log" | "settings";
 }
 
 const EMOJI_OPTIONS = ["🦁", "⚔️", "📜", "🕊️", "⭐", "👑", "🛡️", "⚓", "🌿", "📖", "❤️", "🔥", "⛵", "🦅", "💡", "🎺"];
@@ -92,7 +93,7 @@ const REASON_EMOJI_OPTIONS = [
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, initialTab }) => {
   const [activeTab, setActiveTab] = useState<
-    "quick_score" | "reasons" | "teams" | "members" | "events" | "permissions" | "log" | "settings"
+    "quick_score" | "teams" | "members" | "events" | "permissions" | "log" | "settings"
   >(initialTab || "quick_score");
 
   // Auth User
@@ -101,6 +102,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
   const [showQRScanner, setShowQRScanner] = useState<boolean | string>(false);
   const [activeQRModalEvent, setActiveQRModalEvent] = useState<EventSession | null>(null);
   const [previewingCardMember, setPreviewingCardMember] = useState<CustomMember | null>(null);
+  const [photoTargetMember, setPhotoTargetMember] = useState<CustomMember | null>(null);
 
   // Store data
   const [data, setData] = useState(meetingStore.getData());
@@ -221,85 +223,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
         "error"
       );
     }
-  };
-
-  // --- Activity Reasons Form & Management State ---
-  const [newReasonText, setNewReasonText] = useState("");
-  const [newReasonCategory, setNewReasonCategory] = useState("نشاط وتحدي");
-  const [newReasonPoints, setNewReasonPoints] = useState(30);
-  const [newReasonIcon, setNewReasonIcon] = useState("🎯");
-  const [editingReasonId, setEditingReasonId] = useState<string | null>(null);
-
-  const handleSaveReason = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newReasonText.trim()) {
-      showFeedback("برجاء إدخال اسم النشاط أو سبب رصد النقاط", "error");
-      return;
-    }
-
-    if (editingReasonId) {
-      meetingStore.updateActivityReason(editingReasonId, {
-        text: newReasonText.trim(),
-        category: newReasonCategory.trim() || "نشاط وتحدي",
-        points: newReasonPoints,
-        icon: newReasonIcon,
-      });
-      sounds.playTap();
-      showFeedback("تم تحديث سبب الرصد / نوع النشاط بنجاح!");
-      setEditingReasonId(null);
-    } else {
-      meetingStore.addActivityReason({
-        text: newReasonText.trim(),
-        category: newReasonCategory.trim() || "نشاط وتحدي",
-        points: newReasonPoints,
-        icon: newReasonIcon,
-      });
-      sounds.playTap();
-      showFeedback(`تمت إضافة "${newReasonText}" إلى أسباب رصد النقاط!`);
-    }
-
-    setNewReasonText("");
-    setNewReasonPoints(30);
-  };
-
-  const handleStartEditReason = (reason: ActivityReason) => {
-    setEditingReasonId(reason.id);
-    setNewReasonText(reason.text);
-    setNewReasonCategory(reason.category);
-    setNewReasonPoints(reason.points);
-    setNewReasonIcon(reason.icon || "🎯");
-    setActiveTab("reasons");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const handleDeleteReason = (reasonId: string, text: string) => {
-    setConfirmDialog({
-      title: "تأكيد حذف سبب الرصد",
-      message: `هل أنت متأكد من رغبتك في حذف "${text}" من قائمة أسباب رصد النقاط؟`,
-      confirmLabel: "نعم، حذف السبب",
-      cancelLabel: "إلغاء",
-      onConfirm: () => {
-        meetingStore.deleteActivityReason(reasonId);
-        sounds.playTap();
-        showFeedback(`تم حذف سبب "${text}" بنجاح!`);
-        setConfirmDialog(null);
-      },
-    });
-  };
-
-  const handleResetReasonsToDefaults = () => {
-    setConfirmDialog({
-      title: "استعادة أسباب الرصد الافتراضية",
-      message: "هل تريد استعادة قائمة الأسباب والأنشطة النموذجية الافتراضية؟ سيتم إرجاع البنود الأساسية.",
-      confirmLabel: "استعادة الافتراضي",
-      cancelLabel: "إلغاء",
-      onConfirm: () => {
-        meetingStore.resetActivityReasonsToDefault();
-        sounds.playTap();
-        showFeedback("تمت استعادة أسباب الرصد والأنشطة الافتراضية بنجاح!");
-        setConfirmDialog(null);
-      },
-    });
   };
 
   // --- Team Management Form State ---
@@ -977,20 +900,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
             <span>الصلاحيات والأمان (RBAC) 🛡️</span>
           </button>
 
-          <button
-            onClick={() => {
-              sounds.playTap();
-              setActiveTab("reasons");
-            }}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === "reasons"
-                ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-md font-black"
-                : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800"
-            }`}
-          >
-            <Sparkles className="h-4 w-4" />
-            <span>أسباب الرصد والأنشطة ({data.activityReasons?.length || 0})</span>
-          </button>
 
           <button
             onClick={() => {
@@ -1227,86 +1136,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                 </div>
               </div>
 
-              {/* Preset Reasons & Custom Reason Input */}
+              {/* Reason & Category Input */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <label className="text-xs font-bold text-slate-300 block">
-                    سبب رصد النقاط / نوع النشاط:
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      sounds.playTap();
-                      setActiveTab("reasons");
-                    }}
-                    className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-95"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    <Edit2 className="h-3 w-3" />
-                    <span>إضافة وتعديل أسباب الرصد والأنشطة ({data.activityReasons?.length || 0}) ⚙️</span>
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {(data.activityReasons || []).map((preset) => {
-                    const isSelected = scoreReason === preset.text;
-                    return (
-                      <div
-                        key={preset.id}
-                        onClick={() => {
-                          setScoreReason(preset.text);
-                          setScoreCategory(preset.category);
-                          setScorePoints(preset.points);
-                        }}
-                        className={`text-right p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                          isSelected
-                            ? "bg-amber-500/20 border-amber-400 ring-1 ring-amber-400 shadow-md"
-                            : "bg-slate-900/90 border-slate-800 hover:border-amber-500/50 hover:bg-slate-800/80"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                          <span className="text-xl shrink-0 p-1.5 rounded-xl bg-slate-800 border border-slate-700/60">
-                            {preset.icon || "🎯"}
-                          </span>
-                          <div className="min-w-0">
-                            <div className="font-bold text-white text-xs sm:text-sm truncate">
-                              {preset.text}
-                            </div>
-                            <div className="text-[10px] text-amber-400/90 flex items-center gap-2 mt-1">
-                              <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 font-medium">
-                                {preset.category}
-                              </span>
-                              <span className="font-mono font-bold">
-                                +{preset.points} XP
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleStartEditReason(preset);
-                            }}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-400 transition-all cursor-pointer"
-                            title="تعديل هذا السبب"
-                          >
-                            <Edit2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <label className="text-xs font-bold text-slate-300 block">
+                  سبب رصد النقاط / نوع النشاط:
+                </label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {["نشاط وتحدي", "حضور والتزام", "مسابقة روحية", "خدمة ومحبة", "ألحان وترانيم", "نقاط عامة"].map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setScoreCategory(cat)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all ${
+                        scoreCategory === cat
+                          ? "bg-amber-500 text-slate-950 border-amber-400 font-black shadow-sm"
+                          : "bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
                 </div>
 
                 <input
                   type="text"
                   value={scoreReason}
                   onChange={(e) => setScoreReason(e.target.value)}
-                  placeholder="أو اكتب سبب أو مناسبة الرصد يدوياً هنا..."
-                  className="w-full h-11 px-4 mt-2 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
+                  placeholder="اكتب سبب أو مناسبة الرصد (مثال: الفوز في مسابقة الإنجيل أو حضور مبكر)..."
+                  className="w-full h-11 px-4 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
                 />
               </div>
 
@@ -1388,255 +1245,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
       </div>
     )}
 
-        {/* TAB: ACTIVITY REASONS & CRITERIA MANAGER */}
-        {activeTab === "reasons" && (
-          <div className="space-y-6">
-            {/* Add / Edit Activity Reason Form */}
-            <div className="rounded-3xl border border-slate-800 bg-[#0B132B]/80 p-5 sm:p-7 shadow-xl space-y-5">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <h2 className="text-lg font-black text-amber-300 flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-amber-400" />
-                  <span>
-                    {editingReasonId ? "تعديل سبب الرصد / نوع النشاط" : "إضافة سبب رصد أو نوع نشاط جديد"}
-                  </span>
-                </h2>
-                {editingReasonId && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingReasonId(null);
-                      setNewReasonText("");
-                      setNewReasonPoints(30);
-                    }}
-                    className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 cursor-pointer"
-                  >
-                    إلغاء التعديل
-                  </button>
-                )}
-              </div>
-
-              <p className="text-xs text-slate-400">
-                يمكنك تخصيص الأنشطة والمناسبات والمسابقات التي يتم احتساب النقاط عليها في الاجتماع (مثل الحضور المبكر، مسابقات الإنجيل، التحديات الرياضية، الألحان، والخدمة).
-              </p>
-
-              <form onSubmit={handleSaveReason} className="space-y-4">
-                {/* Reason Text */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-300 block">
-                    نص ومسمى سبب الرصد / النشاط:
-                  </label>
-                  <input
-                    type="text"
-                    value={newReasonText}
-                    onChange={(e) => setNewReasonText(e.target.value)}
-                    placeholder="مثال: الفوز في مسابقة دراسة الكتاب المقدس أو حضور مبكر..."
-                    className="w-full h-11 px-4 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-amber-400"
-                    required
-                  />
-                </div>
-
-                {/* Category Selection */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-300 block">
-                    نوع / تصنيف النشاط:
-                  </label>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {REASON_CATEGORIES.map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setNewReasonCategory(cat)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all ${
-                          newReasonCategory === cat
-                            ? "bg-amber-500 text-slate-950 border-amber-400 shadow-md font-black"
-                            : "bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800"
-                        }`}
-                      >
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-
-                  <input
-                    type="text"
-                    value={newReasonCategory}
-                    onChange={(e) => setNewReasonCategory(e.target.value)}
-                    placeholder="أو اكتب تصنيفاً مخصصاً هنا..."
-                    className="w-full h-10 px-4 mt-1 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400"
-                  />
-                </div>
-
-                {/* Points Selection */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-300 block">
-                    مقدار النقاط الافتراضية المقترحة (+XP):
-                  </label>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {[10, 20, 25, 30, 40, 50, 60, 100].map((pts) => (
-                      <button
-                        key={pts}
-                        type="button"
-                        onClick={() => setNewReasonPoints(pts)}
-                        className={`px-3 py-1.5 rounded-xl font-mono text-xs font-bold border cursor-pointer transition-all ${
-                          newReasonPoints === pts
-                            ? "bg-amber-500 text-slate-950 border-amber-400 shadow-md font-black"
-                            : "bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800"
-                        }`}
-                      >
-                        +{pts} XP
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="relative w-48">
-                    <input
-                      type="number"
-                      value={newReasonPoints}
-                      onChange={(e) => setNewReasonPoints(parseInt(e.target.value) || 0)}
-                      className="w-full h-10 px-4 rounded-xl bg-slate-900 border border-slate-700 text-sm font-mono text-amber-300 focus:outline-none focus:border-amber-400"
-                    />
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">
-                      XP
-                    </span>
-                  </div>
-                </div>
-
-                {/* Icon Picker */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300 block">
-                    رمز وأيقونة النشاط التعبيرية:
-                  </label>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {REASON_EMOJI_OPTIONS.map((emoji) => (
-                      <button
-                        key={emoji}
-                        type="button"
-                        onClick={() => setNewReasonIcon(emoji)}
-                        className={`h-10 w-10 text-xl rounded-xl border flex items-center justify-center cursor-pointer transition-all ${
-                          newReasonIcon === emoji
-                            ? "bg-amber-500/30 border-amber-400 scale-110 shadow-md"
-                            : "bg-slate-900 border-slate-800 hover:bg-slate-800"
-                        }`}
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Submit Action */}
-                <div className="pt-2 flex items-center gap-3">
-                  <button
-                    type="submit"
-                    className="px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm shadow-md transition-all cursor-pointer flex items-center gap-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span>{editingReasonId ? "حفظ وتحديث التعديلات" : "إضافة السبب لقائمة الأنشطة"}</span>
-                  </button>
-
-                  {editingReasonId && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingReasonId(null);
-                        setNewReasonText("");
-                        setNewReasonPoints(30);
-                      }}
-                      className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-sm cursor-pointer"
-                    >
-                      إلغاء
-                    </button>
-                  )}
-                </div>
-              </form>
-            </div>
-
-            {/* Configured Reasons List */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <span>أسباب الرصد والأنشطة المعتمدة في الاجتماع</span>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-amber-400 border border-slate-700 font-mono">
-                    {data.activityReasons?.length || 0} نشاط
-                  </span>
-                </h3>
-
-                <button
-                  type="button"
-                  onClick={handleResetReasonsToDefaults}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white text-xs font-bold transition-all cursor-pointer"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  <span>استعادة الأسباب الافتراضية</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {(data.activityReasons || []).map((reason) => (
-                  <div
-                    key={reason.id}
-                    className="p-4 rounded-2xl bg-[#0B132B]/80 border border-slate-800 hover:border-slate-700 flex items-center justify-between gap-3 shadow-md transition-all"
-                    style={{ borderRightWidth: "4px", borderRightColor: "#EAB308" }}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-12 w-12 rounded-xl flex items-center justify-center text-2xl border shrink-0 bg-amber-500/15 border-amber-500/40 shadow-xs">
-                        {reason.icon || "🎯"}
-                      </div>
-                      <div className="min-w-0 space-y-1">
-                        <h4 className="text-sm sm:text-base font-bold text-white leading-snug">
-                          {reason.text}
-                        </h4>
-                        <div className="flex items-center gap-2 flex-wrap text-xs">
-                          <span className="px-2 py-0.5 rounded-md bg-slate-800 text-amber-300/90 border border-slate-700/80 text-[11px] font-medium">
-                            بند: {reason.category}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-end gap-2 shrink-0">
-                      <span className="font-mono font-black text-amber-400 text-base">
-                        +{reason.points} XP
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setScoreReason(reason.text);
-                            setScoreCategory(reason.category);
-                            setScorePoints(reason.points);
-                            setActiveTab("quick_score");
-                            sounds.playTap();
-                          }}
-                          className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-xs font-bold cursor-pointer transition-all active:scale-95"
-                          title="استخدام في الرصد المباشر الآن"
-                        >
-                          رصد ⚡
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleStartEditReason(reason)}
-                          className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-all active:scale-95"
-                          title="تعديل هذا السبب"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteReason(reason.id, reason.text)}
-                          className="p-2 rounded-xl bg-slate-800/90 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 hover:border-rose-600 cursor-pointer transition-all shadow-sm active:scale-95"
-                          title="حذف هذا السبب"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* TAB 2: TEAMS MANAGER */}
         {activeTab === "teams" && (
@@ -2134,6 +1742,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                             {m.points} XP
                           </span>
                           <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                sounds.playTap();
+                                setPhotoTargetMember(m);
+                              }}
+                              className="p-1.5 rounded-lg bg-slate-800/90 hover:bg-amber-400 hover:text-slate-950 text-amber-300 border border-amber-400/30 transition-all cursor-pointer shadow-xs active:scale-90"
+                              title="تحديث أو إضافة صورة شخصية للعضو"
+                            >
+                              <Camera className="h-3.5 w-3.5" />
+                            </button>
                             <button
                               type="button"
                               onClick={() => handleStartEditMember(m)}
@@ -3617,6 +3236,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
           member={previewingCardMember}
           team={data.teams.find((t) => t.id === previewingCardMember.teamId)}
           onClose={() => setPreviewingCardMember(null)}
+        />
+      )}
+
+      {/* Member Photo Upload / Change Modal */}
+      {photoTargetMember && (
+        <AdminPhotoUploadModal
+          targetUser={photoTargetMember}
+          onClose={() => setPhotoTargetMember(null)}
+          onSaved={(newUrl) => {
+            setData((prev) => ({
+              ...prev,
+              members: prev.members.map((m) =>
+                m.id === photoTargetMember.id ? { ...m, avatarUrl: newUrl } : m
+              ),
+            }));
+            setPhotoTargetMember(null);
+          }}
         />
       )}
     </div>
