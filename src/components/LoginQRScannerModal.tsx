@@ -15,11 +15,13 @@ import { sounds } from "../utils/soundEffects";
 
 interface LoginQRScannerModalProps {
   onClose: () => void;
-  onLoginSuccess: (user: SystemUser) => void;
+  onCodeScanned?: (code: string) => void;
+  onLoginSuccess?: (user: SystemUser) => void;
 }
 
 export const LoginQRScannerModal: React.FC<LoginQRScannerModalProps> = ({
   onClose,
+  onCodeScanned,
   onLoginSuccess,
 }) => {
   const data = meetingStore.getData();
@@ -72,12 +74,20 @@ export const LoginQRScannerModal: React.FC<LoginQRScannerModalProps> = ({
       }
     }
 
+    // If onCodeScanned is provided, redirect to login page with code prefilled instead of immediately entering the system
+    if (onCodeScanned) {
+      stopLiveScanner();
+      sounds.playTap();
+      onCodeScanned(clean);
+      return;
+    }
+
     const res = authStore.loginWithCode(clean, data.members, data.teams);
 
     if (res.success && res.user) {
       stopLiveScanner();
       sounds.playVictory();
-      onLoginSuccess(res.user);
+      onLoginSuccess?.(res.user);
     } else {
       sounds.playClose();
       setErrorMsg(res.error || "رمز الباركود أو الكود غير صحيح، يرجى إعادة المحاولة.");

@@ -33,6 +33,7 @@ import {
   Sun,
   Moon,
   Clock,
+  Zap,
 } from "lucide-react";
 import type { CustomMember, ProcessedMeetingTeam } from "../types";
 import { meetingStore } from "../utils/meetingStore";
@@ -49,6 +50,7 @@ import { UserSwitcherModal } from "./UserSwitcherModal";
 import { DailyChallengeBanner } from "./DailyChallengeBanner";
 import { TeamsProgressionChart } from "./TeamsProgressionChart";
 import { MeetingCountdownTimer } from "./MeetingCountdownTimer";
+import { TeamsManagementModal } from "./TeamsManagementModal";
 
 export interface TopRankChangeToast {
   id: string;
@@ -88,6 +90,7 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showUserSwitcher, setShowUserSwitcher] = useState(false);
   const [showProgressionModal, setShowProgressionModal] = useState<boolean>(false);
+  const [showTeamsManagement, setShowTeamsManagement] = useState<boolean>(false);
   const [topRankToast, setTopRankToast] = useState<TopRankChangeToast | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [toasts, setToasts] = useState<
@@ -188,33 +191,6 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
   >({});
   const [pointDeltas, setPointDeltas] = useState<Record<string, { delta: number; timestamp: number }>>({});
   const [newLeaderNotice, setNewLeaderNotice] = useState<{ teamName: string; icon: string; avatarUrl?: string } | null>(null);
-
-  // Handle auto-login from URL QR Code
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
-    if (code && !isLoading && data.members.length > 0) {
-      const result = authStore.loginWithCode(code, data.members, data.teams);
-      if (result.success) {
-        // Clear the query param from URL without refreshing to keep it clean
-        const newUrl = window.location.pathname;
-        window.history.replaceState({}, document.title, newUrl);
-        
-        sounds.playVictory();
-        addToast({
-          type: "success",
-          title: "لوحة الشرف الكبرى 🏆",
-          message: `مرحباً بك يا ${result.user?.name}! تم تسجيل دخولك بنجاح والانتقال مباشرة إلى لوحة الشرف الكبرى.`,
-        });
-      } else {
-        addToast({
-          type: "warning",
-          title: "خطأ في تسجيل الدخول",
-          message: "كود الدخول من الـ QR غير صحيح أو منتهي الصلاحية.",
-        });
-      }
-    }
-  }, [isLoading, data.members, data.teams]);
 
   // Handle direct URL mode routing (?mode=admin or ?mode=public or ?admin=1)
   useEffect(() => {
@@ -695,6 +671,20 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                     >
                       <Settings className="h-4 w-4 shrink-0" />
                       <span>لوحة تحكم الخادم ⚙️</span>
+                    </button>
+
+                    {/* Dedicated Teams Management Interface Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playTap();
+                        setShowTeamsManagement(true);
+                      }}
+                      className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-black shadow-md shadow-blue-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                      title="واجهة إدارة الـ 10 فرق المتنافسة (تغيير الأسماء، الحذف، الإضافة)"
+                    >
+                      <Shield className="h-4 w-4 shrink-0" />
+                      <span>إدارة الـ 10 فرق 🛡️</span>
                     </button>
 
                     {/* Exit to Public View Button */}
@@ -1206,18 +1196,43 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                     {/* Floating Point Delta animation */}
                     {pointDelta && (
                       <motion.div
-                        initial={{ opacity: 0, y: 5, scale: 0.8 }}
-                        animate={{ opacity: 1, y: -22, scale: 1.05 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 1.2, ease: "easeOut" }}
-                        className={`absolute -top-1 left-24 sm:left-32 px-2.5 py-0.5 rounded-full font-mono text-xs font-black shadow-lg pointer-events-none z-20 ${
+                        key={`delta-${pointDelta.timestamp}`}
+                        initial={{ opacity: 0, y: 15, scale: 0.6, rotate: -6 }}
+                        animate={{
+                          opacity: [0, 1, 1, 0],
+                          y: [8, -26, -34],
+                          scale: [0.6, 1.25, 1],
+                          rotate: [-6, 3, 0],
+                        }}
+                        transition={{ duration: 2.5, times: [0, 0.15, 0.7, 1], ease: "easeOut" }}
+                        className={`absolute -top-3.5 left-20 sm:left-28 px-3.5 py-1 rounded-2xl font-mono text-xs sm:text-sm font-black shadow-2xl pointer-events-none z-30 flex items-center gap-1.5 border backdrop-blur-md ${
                           pointDelta.delta > 0
-                            ? "bg-emerald-500 text-slate-950 shadow-emerald-500/40"
-                            : "bg-rose-500 text-white shadow-rose-500/40"
+                            ? "bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 text-slate-950 border-emerald-200 shadow-emerald-500/60 ring-2 ring-emerald-300"
+                            : "bg-gradient-to-r from-rose-600 to-red-500 text-white border-rose-300 shadow-rose-500/60 ring-2 ring-rose-400"
                         }`}
                       >
-                        {pointDelta.delta > 0 ? `+${pointDelta.delta}` : pointDelta.delta} XP
+                        <Zap className="h-4 w-4 animate-bounce shrink-0" />
+                        <span>{pointDelta.delta > 0 ? `+${pointDelta.delta.toLocaleString("en-US")}` : pointDelta.delta.toLocaleString("en-US")} XP</span>
+                        {pointDelta.delta > 0 && <Sparkles className="h-3.5 w-3.5 text-yellow-200" />}
                       </motion.div>
+                    )}
+
+                    {/* Card Ripple Wave on Point Update */}
+                    {pointDelta && (
+                      <motion.div
+                        key={`ripple-${pointDelta.timestamp}`}
+                        initial={{ opacity: 0.9, scale: 0.98 }}
+                        animate={{
+                          opacity: [0.9, 0.4, 0],
+                          scale: [0.98, 1.025, 1],
+                        }}
+                        transition={{ duration: 1.8, ease: "easeOut" }}
+                        className={`absolute inset-0 rounded-2xl sm:rounded-3xl pointer-events-none ring-4 z-10 ${
+                          pointDelta.delta > 0
+                            ? "ring-emerald-400 bg-emerald-500/15 shadow-[0_0_35px_rgba(16,185,129,0.5)]"
+                            : "ring-rose-500 bg-rose-500/15 shadow-[0_0_35px_rgba(244,63,94,0.5)]"
+                        }`}
+                      />
                     )}
 
                     {/* Left Info: Rank, Icon, Name, Slogan, Leaders */}
@@ -1490,9 +1505,19 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                           </span>
                           <motion.span
                             key={team.points}
-                            initial={{ scale: 1.25, color: "#10B981" }}
-                            animate={{ scale: 1, color: "#FBBF24" }}
-                            transition={{ duration: 0.5, ease: "easeOut" }}
+                            initial={{
+                              scale: pointDelta ? 1.45 : 1.15,
+                              color: pointDelta ? (pointDelta.delta > 0 ? "#10B981" : "#F43F5E") : "#10B981",
+                              textShadow: pointDelta ? "0 0 20px rgba(245, 158, 11, 0.85)" : "none",
+                            }}
+                            animate={{
+                              scale: [pointDelta ? 1.4 : 1.1, 1],
+                              color: pointDelta
+                                ? [pointDelta.delta > 0 ? "#10B981" : "#F43F5E", "#F59E0B", "#FBBF24"]
+                                : ["#10B981", "#FBBF24"],
+                              textShadow: "none",
+                            }}
+                            transition={{ duration: 0.8, ease: "easeOut" }}
                             className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight font-display"
                           >
                             {team.points.toLocaleString("en-US")}
@@ -1576,6 +1601,17 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
             />
           </div>
         </div>
+      )}
+
+      {/* Dedicated Teams Management Modal (واجهة إدارة الـ 10 فرق المتنافسة) 🛡️ */}
+      {showTeamsManagement && (
+        <TeamsManagementModal
+          onClose={() => setShowTeamsManagement(false)}
+          onOpenPhotoModal={(team) => {
+            setShowTeamsManagement(false);
+            setPhotoUploadTeam(team as any);
+          }}
+        />
       )}
 
 

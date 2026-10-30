@@ -214,10 +214,14 @@ export const MemberCard: React.FC<MemberCardProps> = ({ member, team, onClose })
               </div>
               
               {/* Access Code Overlay */}
-              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-slate-900 text-white text-[10px] font-black font-mono shadow-md border border-slate-700">
-                {member.accessCode}
+              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-slate-900 text-white text-[10px] font-black font-mono shadow-md border border-slate-700 whitespace-nowrap">
+                كود: {member.accessCode}
               </div>
             </div>
+
+            <p className="text-[9px] text-slate-400 font-bold mb-1">
+              امسح الرمز لفتح صفحة الدخول بالرابط
+            </p>
 
             {/* Footer Slogan */}
             <div className="w-full pt-3 border-t border-slate-100">

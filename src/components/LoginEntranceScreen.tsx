@@ -43,6 +43,19 @@ export const LoginEntranceScreen: React.FC<LoginEntranceScreenProps> = ({
     return unsub;
   }, []);
 
+  // Detect code from URL query parameter (when redirected from QR code scanner)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlCode = params.get("code");
+    if (urlCode) {
+      const clean = urlCode.trim();
+      setInputCode(clean);
+      setErrorMsg(null);
+      setSuccessMsg(`تم استلام الكود من الماسح / الرابط: [${clean}] 🔑 اضغط «دخول النظام ⚡» للمتابعة`);
+      sounds.playOpen();
+    }
+  }, []);
+
   const handleCodeSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setErrorMsg(null);
@@ -58,6 +71,11 @@ export const LoginEntranceScreen: React.FC<LoginEntranceScreenProps> = ({
     const res = authStore.loginWithCode(clean, data.members, data.teams);
 
     if (res.success && res.user) {
+      // Clear code query parameter from URL so it doesn't persist after login
+      if (window.location.search.includes("code=")) {
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+      }
       setWelcomeUser(res.user);
     } else {
       sounds.playClose();
@@ -189,7 +207,7 @@ export const LoginEntranceScreen: React.FC<LoginEntranceScreenProps> = ({
               className="w-full h-12 rounded-2xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/40 text-xs sm:text-sm font-black shadow-md active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-2"
             >
               <Camera className="h-5 w-5 text-emerald-400" />
-              <span>📱 مسح رمز الباركود / QR للدخول المباشر</span>
+              <span>📱 مسح رمز الباركود / QR بالماسح</span>
             </button>
           </div>
         </div>
@@ -199,9 +217,12 @@ export const LoginEntranceScreen: React.FC<LoginEntranceScreenProps> = ({
       {showScanner && (
         <LoginQRScannerModal
           onClose={() => setShowScanner(false)}
-          onLoginSuccess={(user) => {
+          onCodeScanned={(scannedCode) => {
             setShowScanner(false);
-            setWelcomeUser(user);
+            setInputCode(scannedCode);
+            setErrorMsg(null);
+            setSuccessMsg(`تم قراءة الكود بنجاح من الماسح: [${scannedCode}] 🔑 اضغط «دخول النظام ⚡» للمتابعة`);
+            sounds.playSuccess();
           }}
         />
       )}

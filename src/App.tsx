@@ -7,10 +7,12 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<"welcome" | "app">(() => {
     const params = new URLSearchParams(window.location.search);
     const mode = params.get("mode");
-    const code = params.get("code");
     const view = params.get("view");
-    // If URL contains direct view parameter or auto-login QR code, skip entrance screen
-    if (mode || code || view) return "app";
+    // Only bypass welcome screen if explicitly requested as public presentation display mode
+    if (mode === "public" || view === "public" || params.get("tv") === "1") {
+      return "app";
+    }
+    // For all other cases, including QR code links (?code=...), always open the login page first
     return "welcome";
   });
 

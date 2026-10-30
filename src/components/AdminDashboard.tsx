@@ -45,6 +45,7 @@ import { PDFReportModal } from "./PDFReportModal";
 import { AdminPhotoUploadModal } from "./AdminPhotoUploadModal";
 import { BonusGuideModal } from "./BonusGuideModal";
 import { TeamsProgressionChart } from "./TeamsProgressionChart";
+import { TeamsManagementModal } from "./TeamsManagementModal";
 
 interface AdminDashboardProps {
   onBackToScoreboard: () => void;
@@ -96,6 +97,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
   const [newPinValue, setNewPinValue] = useState<string>("");
   const [showPdfReportModal, setShowPdfReportModal] = useState<boolean>(false);
   const [showAdminPhotoModal, setShowAdminPhotoModal] = useState<boolean>(false);
+  const [showTeamsManagementModal, setShowTeamsManagementModal] = useState<boolean>(false);
 
   // Navigation Tabs in Admin Dashboard
   const [activeTab, setActiveTab] = useState<"teams" | "quick_points" | "progression" | "security" | "history">("teams");
@@ -1011,7 +1013,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                 />
               </div>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    setShowTeamsManagementModal(true);
+                  }}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-black text-xs sm:text-sm shadow-md shadow-teal-500/25 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
+                  title="فتح واجهة إدارة وتعديل الـ 10 فرق المتنافسة"
+                >
+                  <Shield className="h-4 w-4" />
+                  <span>واجهة إدارة الـ 10 فرق 🛡️</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -1021,7 +1036,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                   className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs sm:text-sm shadow-md shadow-blue-600/30 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   <Plus className="h-4 w-4" />
-                  <span>إضافة فريق جديد 🛡️</span>
+                  <span>إضافة فريق جديد ➕</span>
                 </button>
               </div>
             </div>
@@ -2612,6 +2627,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
             setShowBonusGuideModal(false);
             setBonusGuideInitialEdit(false);
           }}
+        />
+      )}
+
+      {/* Teams Management Modal (واجهة إدارة الـ 10 فرق المتنافسة) 🛡️ */}
+      {showTeamsManagementModal && (
+        <TeamsManagementModal
+          onClose={() => setShowTeamsManagementModal(false)}
         />
       )}
     </div>
