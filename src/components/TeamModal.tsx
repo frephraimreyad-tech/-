@@ -28,6 +28,7 @@ import { formatArabicTimestamp } from "../utils/dateFormatter";
 import { authStore, type SystemUser } from "../utils/authStore";
 import { QRScannerModal } from "./QRScannerModal";
 import { TeamPhotoModal } from "./TeamPhotoModal";
+import { AdminPhotoUploadModal } from "./AdminPhotoUploadModal";
 
 interface TeamModalProps {
   team: ProcessedMeetingTeam | null;
@@ -61,6 +62,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
   const [showScannerForMember, setShowScannerForMember] = useState<CustomMember | null>(null);
   const [showAddMemberForm, setShowAddMemberForm] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [photoTargetMember, setPhotoTargetMember] = useState<CustomMember | null>(null);
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberRole, setNewMemberRole] = useState<RoleType>("member");
 
@@ -160,14 +162,20 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
     );
     if (res) {
       sounds.playVictory();
-      setToastMsg(`تم إضافة +${quickAddPoints} XP للفريق بنجاح!`);
+      const memCount = team.members.length;
+      const ptsPerMem = memCount > 0 ? Math.round(quickAddPoints / memCount) : 0;
+      setToastMsg(
+        memCount > 0
+          ? `تم إضافة +${quickAddPoints} XP للفريق وتقسيمها بالتساوي (+${ptsPerMem} XP لكل عضو من الـ ${memCount} أعضاء) بنجاح! ⚡`
+          : `تم إضافة +${quickAddPoints} XP للفريق بنجاح! ⚡`
+      );
       setShowQuickForm(false);
       setQuickAddReason("");
     } else {
       sounds.playClose();
       setToastMsg("تعذر رصد النقاط");
     }
-    setTimeout(() => setToastMsg(null), 3000);
+    setTimeout(() => setToastMsg(null), 3500);
   };
 
   const getRolePriority = (role?: RoleType): number => {
@@ -437,6 +445,18 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                         </button>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {team.members.length > 0 && (
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300">
+                    <Users className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+                    <span>
+                      تقسيم تلقائي: الفريق يضم {team.members.length} أعضاء، سيحصل كل عضو على{" "}
+                      <strong className="text-white font-mono">
+                        +{Math.round(quickAddPoints / team.members.length)} XP
+                      </strong>
+                    </span>
                   </div>
                 )}
 
@@ -749,13 +769,26 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                               key={member.id}
                               className="p-3 sm:p-4 rounded-2xl border transition-all shadow-sm flex items-center gap-3.5 border-amber-500/40 bg-gradient-to-l from-amber-950/30 via-slate-900/80 to-slate-900"
                             >
-                              <div className="relative shrink-0">
-                                <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full border-2 border-amber-500/60 bg-slate-800 overflow-hidden flex items-center justify-center shadow-md">
+                              <div
+                                onClick={() => {
+                                  sounds.playTap();
+                                  setPhotoTargetMember(member);
+                                }}
+                                className="relative shrink-0 cursor-pointer group/avatar"
+                                title="انقر لتعديل أو رفع صورة للقائد من الموبايل أو الكمبيوتر 📷"
+                              >
+                                <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full border-2 border-amber-500/60 bg-slate-800 overflow-hidden flex items-center justify-center shadow-md group-hover/avatar:ring-2 group-hover/avatar:ring-amber-400 group-hover/avatar:scale-105 transition-all">
                                   {member.avatarUrl ? (
                                     <img src={member.avatarUrl} alt={member.name} className="h-full w-full object-cover" />
                                   ) : (
                                     <User className="h-6 w-6 sm:h-7 sm:w-7 text-amber-400" />
                                   )}
+                                </div>
+                                <div className="absolute inset-0 rounded-full bg-slate-950/70 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center text-amber-300 transition-opacity">
+                                  <Camera className="h-4 w-4" />
+                                </div>
+                                <div className="absolute -top-1 -left-1 bg-slate-900 border border-amber-400/80 rounded-full p-1 text-[8px] text-amber-300 shadow-md">
+                                  <Camera className="h-2 w-2" />
                                 </div>
                                 <div className="absolute -bottom-1 -right-1 bg-amber-500 rounded-full p-1 border-2 border-slate-900 shadow-sm" title="قائد مجموعة">
                                   <Crown className="h-2.5 w-2.5 text-slate-950" />
@@ -865,13 +898,26 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                               key={member.id}
                               className="p-3 sm:p-4 rounded-2xl border transition-all shadow-sm flex items-center gap-3.5 border-purple-500/40 bg-gradient-to-l from-purple-950/30 via-slate-900/80 to-slate-900"
                             >
-                              <div className="relative shrink-0">
-                                <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full border-2 border-purple-500/60 bg-slate-800 overflow-hidden flex items-center justify-center shadow-md">
+                              <div
+                                onClick={() => {
+                                  sounds.playTap();
+                                  setPhotoTargetMember(member);
+                                }}
+                                className="relative shrink-0 cursor-pointer group/avatar"
+                                title="انقر لتعديل أو رفع صورة للخادم من الموبايل أو الكمبيوتر 📷"
+                              >
+                                <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full border-2 border-purple-500/60 bg-slate-800 overflow-hidden flex items-center justify-center shadow-md group-hover/avatar:ring-2 group-hover/avatar:ring-purple-400 group-hover/avatar:scale-105 transition-all">
                                   {member.avatarUrl ? (
                                     <img src={member.avatarUrl} alt={member.name} className="h-full w-full object-cover" />
                                   ) : (
                                     <User className="h-6 w-6 sm:h-7 sm:w-7 text-purple-400" />
                                   )}
+                                </div>
+                                <div className="absolute inset-0 rounded-full bg-slate-950/70 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center text-purple-300 transition-opacity">
+                                  <Camera className="h-4 w-4" />
+                                </div>
+                                <div className="absolute -top-1 -left-1 bg-slate-900 border border-purple-400/80 rounded-full p-1 text-[8px] text-purple-300 shadow-md">
+                                  <Camera className="h-2 w-2" />
                                 </div>
                                 <div className="absolute -bottom-1 -right-1 bg-purple-600 rounded-full p-1 border-2 border-slate-900 shadow-sm text-[9px] text-white flex items-center justify-center" title="خادم">
                                   ✝️
@@ -981,13 +1027,26 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                               key={member.id}
                               className="p-3 sm:p-4 rounded-2xl border transition-all shadow-sm flex items-center gap-3.5 border-slate-800/80 bg-slate-900/60 hover:bg-slate-900/80"
                             >
-                              <div className="relative shrink-0">
-                                <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full border-2 border-slate-700/50 bg-slate-800 overflow-hidden flex items-center justify-center shadow-md">
+                              <div
+                                onClick={() => {
+                                  sounds.playTap();
+                                  setPhotoTargetMember(member);
+                                }}
+                                className="relative shrink-0 cursor-pointer group/avatar"
+                                title="انقر لتعديل أو رفع صورة للمشارك من الموبايل أو الكمبيوتر 📷"
+                              >
+                                <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full border-2 border-slate-700/50 bg-slate-800 overflow-hidden flex items-center justify-center shadow-md group-hover/avatar:ring-2 group-hover/avatar:ring-teal-400 group-hover/avatar:scale-105 transition-all">
                                   {member.avatarUrl ? (
                                     <img src={member.avatarUrl} alt={member.name} className="h-full w-full object-cover" />
                                   ) : (
                                     <User className="h-6 w-6 sm:h-7 sm:w-7 text-slate-500" />
                                   )}
+                                </div>
+                                <div className="absolute inset-0 rounded-full bg-slate-950/70 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center text-teal-300 transition-opacity">
+                                  <Camera className="h-4 w-4" />
+                                </div>
+                                <div className="absolute -top-1 -left-1 bg-slate-900 border border-teal-400/80 rounded-full p-1 text-[8px] text-teal-300 shadow-md">
+                                  <Camera className="h-2 w-2" />
                                 </div>
                               </div>
 
@@ -1069,13 +1128,26 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                               : "border-slate-800/80 bg-slate-900/60 hover:bg-slate-900/80"
                           }`}
                         >
-                          <div className="relative shrink-0">
-                            <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full border-2 border-slate-700/50 bg-slate-800 overflow-hidden flex items-center justify-center shadow-md">
+                          <div
+                            onClick={() => {
+                              sounds.playTap();
+                              setPhotoTargetMember(member);
+                            }}
+                            className="relative shrink-0 cursor-pointer group/avatar"
+                            title="انقر لتعديل أو رفع صورة للعضو من الموبايل أو الكمبيوتر 📷"
+                          >
+                            <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full border-2 border-slate-700/50 bg-slate-800 overflow-hidden flex items-center justify-center shadow-md group-hover/avatar:ring-2 group-hover/avatar:ring-amber-400 group-hover/avatar:scale-105 transition-all">
                               {member.avatarUrl ? (
                                 <img src={member.avatarUrl} alt={member.name} className="h-full w-full object-cover" />
                               ) : (
                                 <User className="h-6 w-6 sm:h-7 sm:w-7 text-slate-500" />
                               )}
+                            </div>
+                            <div className="absolute inset-0 rounded-full bg-slate-950/70 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center text-amber-300 transition-opacity">
+                              <Camera className="h-4 w-4" />
+                            </div>
+                            <div className="absolute -top-1 -left-1 bg-slate-900 border border-amber-400/80 rounded-full p-1 text-[8px] text-amber-300 shadow-md">
+                              <Camera className="h-2 w-2" />
                             </div>
                             {isLeader && (
                               <div className="absolute -bottom-1 -right-1 bg-amber-500 rounded-full p-1 border-2 border-slate-900 shadow-sm" title="قائد مجموعة">
@@ -1273,6 +1345,28 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
             onSuccess={(msg) => {
               setToastMsg(msg);
               setTimeout(() => setToastMsg(null), 4000);
+            }}
+          />
+        )}
+
+        {/* Member Photo Upload Modal (Direct upload from mobile or computer) */}
+        {photoTargetMember && (
+          <AdminPhotoUploadModal
+            targetUser={{
+              id: photoTargetMember.id,
+              name: photoTargetMember.name,
+              roleLabel: photoTargetMember.roleLabel,
+              avatarUrl: photoTargetMember.avatarUrl,
+            }}
+            onClose={() => setPhotoTargetMember(null)}
+            onSaved={(newUrl) => {
+              if (team) {
+                const mem = team.members.find((m) => m.id === photoTargetMember.id);
+                if (mem) mem.avatarUrl = newUrl;
+              }
+              setToastMsg(`تم تحديث صورة "${photoTargetMember.name}" بنجاح! 📸`);
+              setTimeout(() => setToastMsg(null), 3500);
+              setPhotoTargetMember(null);
             }}
           />
         )}

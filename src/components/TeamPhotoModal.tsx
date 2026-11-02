@@ -20,6 +20,7 @@ import type { ProcessedMeetingTeam } from "../types";
 import { meetingStore } from "../utils/meetingStore";
 import { authStore } from "../utils/authStore";
 import { sounds } from "../utils/soundEffects";
+import { compressImageFile } from "../utils/imageCompressor";
 
 interface TeamPhotoModalProps {
   team: ProcessedMeetingTeam;
@@ -97,67 +98,27 @@ export const TeamPhotoModal: React.FC<TeamPhotoModalProps> = ({ team, onClose, o
 
   const currentUser = authStore.getCurrentUser();
 
-  // Handle local file selection and compress image using Canvas
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle local file selection and compress image safely
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      setErrorMessage("يرجى اختيار ملف صورة صالح (JPG, PNG, WebP).");
-      return;
-    }
-
     setIsProcessing(true);
     setErrorMessage(null);
+    sounds.playTap();
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        try {
-          // Compress and scale to max 400x400
-          const canvas = document.createElement("canvas");
-          const MAX_SIZE = 400;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > MAX_SIZE) {
-              height = Math.round((height * MAX_SIZE) / width);
-              width = MAX_SIZE;
-            }
-          } else {
-            if (height > MAX_SIZE) {
-              width = Math.round((width * MAX_SIZE) / height);
-              height = MAX_SIZE;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) {
-            throw new Error("فشل في معالجة أبعاد الصورة");
-          }
-
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressedDataUrl = canvas.toDataURL("image/webp", 0.85);
-
-          setPhotoPreview(compressedDataUrl);
-          setIsProcessing(false);
-        } catch (err) {
-          // Fallback to original data URL if canvas fails
-          setPhotoPreview(event.target?.result as string);
-          setIsProcessing(false);
-        }
-      };
-      img.onerror = () => {
-        setErrorMessage("تعذر قراءة الصورة المحددة. يرجى تجربة صورة أخرى.");
-        setIsProcessing(false);
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+    try {
+      const res = await compressImageFile(file, 350, 0.82);
+      setPhotoPreview(res.dataUrl);
+      sounds.playVictory();
+    } catch (err: any) {
+      console.error(err);
+      setErrorMessage(err?.message || "حدث خطأ أثناء معالجة الصورة من جهازك.");
+      sounds.playClose();
+    } finally {
+      setIsProcessing(false);
+      e.target.value = "";
+    }
   };
 
   // Handle saving the photo to the team record

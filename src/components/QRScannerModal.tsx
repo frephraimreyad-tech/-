@@ -22,6 +22,7 @@ import type { CustomMember, EventSession, ProcessedMeetingTeam } from "../types"
 import { meetingStore } from "../utils/meetingStore";
 import { authStore, type SystemUser } from "../utils/authStore";
 import { sounds } from "../utils/soundEffects";
+import { useTheme } from "../utils/themeStore";
 import { BonusGuideModal } from "./BonusGuideModal";
 
 interface QRScannerModalProps {
@@ -37,6 +38,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   defaultMemberId,
   defaultEventId,
 }) => {
+  const { isLight } = useTheme();
   const [currentUser, setCurrentUser] = useState<SystemUser>(authStore.getCurrentUser());
   const data = meetingStore.getData();
 
@@ -401,7 +403,11 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         onChange={handleScanImageFile}
       />
 
-      <div className="relative w-full max-w-lg rounded-3xl border border-slate-700 bg-[#0B132B] p-4 sm:p-6 shadow-2xl text-slate-100 space-y-4 max-h-[92vh] overflow-y-auto">
+      <div className={`relative w-full max-w-lg rounded-3xl border-2 p-4 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto ${
+        isLight
+          ? "bg-slate-50 border-slate-300 text-slate-900 shadow-slate-200/90"
+          : "bg-[#0B132B] border-slate-700 text-slate-100"
+      }`}>
         {/* Close Button */}
         <button
           onClick={() => {
@@ -409,7 +415,11 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
             sounds.playClose();
             onClose();
           }}
-          className="absolute top-4 left-4 p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer z-10"
+          className={`absolute top-4 left-4 p-2 rounded-full transition-all cursor-pointer z-10 ${
+            isLight
+              ? "bg-slate-200 hover:bg-slate-300 text-slate-800 border border-slate-300"
+              : "bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
+          }`}
         >
           <X className="h-5 w-5" />
         </button>
@@ -417,34 +427,42 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         {/* Header */}
         <div className="space-y-1 pr-6">
           <div className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400">
+            <span className={`flex h-9 w-9 items-center justify-center rounded-2xl border ${
+              isLight ? "bg-amber-100 border-amber-300 text-amber-800" : "bg-amber-500/20 text-amber-400"
+            }`}>
               <QrCode className="h-5 w-5" />
             </span>
-            <h3 className="text-lg sm:text-xl font-black text-white">
+            <h3 className={`text-lg sm:text-xl font-black ${isLight ? "text-slate-900" : "text-white"}`}>
               رصد الحضور وبونص الموعد 📱
             </h3>
           </div>
-          <p className="text-xs text-slate-400">
+          <p className={`text-xs ${isLight ? "text-slate-600 font-medium" : "text-slate-400"}`}>
             المنفذ:{" "}
-            <span className="text-amber-300 font-bold">
+            <span className={`font-bold ${isLight ? "text-amber-900" : "text-amber-300"}`}>
               {currentUser.name} ({currentUser.roleLabel})
             </span>
           </p>
         </div>
 
         {/* 1. Global Event Selector Card */}
-        <div className="rounded-2xl border border-teal-500/30 bg-slate-900/90 p-3.5 space-y-2">
+        <div className={`rounded-2xl border-2 p-3.5 space-y-2 ${
+          isLight ? "bg-white border-slate-300 text-slate-900 shadow-xs" : "border-teal-500/30 bg-slate-900/90"
+        }`}>
           <div className="flex items-center justify-between">
-            <label className="text-xs font-black text-teal-300 flex items-center gap-1.5">
-              <QrCode className="h-4 w-4 text-teal-400" />
+            <label className={`text-xs font-black flex items-center gap-1.5 ${isLight ? "text-teal-900" : "text-teal-300"}`}>
+              <QrCode className="h-4 w-4 text-teal-600" />
               <span>الفعالية المستهدفة لتسجيل الحضور:</span>
             </label>
             {currentEvent?.isActive ? (
-              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-[10px] font-black text-emerald-400">
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${
+                isLight ? "bg-emerald-100 text-emerald-900 border-emerald-300" : "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
+              }`}>
                 نشطة وتقبل الحضور
               </span>
             ) : (
-              <span className="px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-[10px] font-black text-rose-400">
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${
+                isLight ? "bg-rose-100 text-rose-900 border-rose-300" : "bg-rose-500/20 border-rose-500/40 text-rose-400"
+              }`}>
                 مغلقة
               </span>
             )}
@@ -457,7 +475,11 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
               setSelectedEventId(e.target.value);
               setScanResult(null);
             }}
-            className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-xs sm:text-sm font-bold text-white focus:outline-none focus:border-teal-400 cursor-pointer"
+            className={`w-full rounded-xl border-2 px-3 py-2 text-xs sm:text-sm font-bold focus:outline-none cursor-pointer ${
+              isLight
+                ? "bg-white border-slate-300 text-slate-900 focus:border-teal-600"
+                : "bg-slate-950 border-slate-700 text-white focus:border-teal-400"
+            }`}
           >
             {data.events.map((evt) => (
               <option key={evt.id} value={evt.id}>

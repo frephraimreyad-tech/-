@@ -543,11 +543,15 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
           : "max-w-6xl px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-16"
       }`}>
         {/* Top Header Card */}
-        <header className="rounded-3xl border border-slate-700/60 bg-slate-900/85 backdrop-blur-2xl p-4 sm:p-5 shadow-[0_20px_50px_rgba(0,0,0,0.5)] mb-5">
+        <header className={`rounded-3xl border transition-all duration-300 p-4 sm:p-5 mb-5 ${
+          isLight
+            ? "bg-white/95 border-2 border-slate-300 shadow-[0_10px_30px_rgba(0,0,0,0.06)] text-slate-900"
+            : "border-slate-700/60 bg-slate-900/85 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] text-slate-100"
+        }`}>
           <div className="flex items-center justify-between gap-3 flex-wrap md:flex-nowrap">
             {/* Title & Brand */}
             <div className="flex items-center gap-3">
-              <div className="relative flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-white/95 border-2 border-amber-400/80 shadow-lg shadow-amber-500/20 shrink-0 overflow-hidden p-0.5">
+              <div className="relative flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-white/95 border-2 border-amber-400 shadow-md shadow-amber-500/20 shrink-0 overflow-hidden p-0.5">
                 <img
                   src={data.config.meetingLogoUrl || "/assets/aistudio/_______________________55ad5e73.png"}
                   alt="لوجو أسرة الشهيد العظيم أبي سيفين وتماف إيريني"
@@ -557,17 +561,23 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
 
               <div className="space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-[10px] sm:text-[11px] font-black text-emerald-400">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  <span className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black border ${
+                    isLight
+                      ? "bg-emerald-50 border-emerald-500/50 text-emerald-800"
+                      : "bg-emerald-500/15 border-emerald-500/40 text-emerald-400"
+                  }`}>
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />
                     <span>مباشر • لوحة شرف الاجتماع</span>
                   </span>
-                  <span className="text-[10px] sm:text-xs text-slate-400 font-medium">
+                  <span className={`text-[10px] sm:text-xs font-bold ${isLight ? "text-slate-600" : "text-slate-400"}`}>
                     {data.config.churchName}
                   </span>
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight leading-tight">
+                  <h1 className={`text-xl sm:text-2xl lg:text-3xl font-black tracking-tight leading-tight ${
+                    isLight ? "text-slate-900" : "text-white"
+                  }`}>
                     {data.config.meetingName}
                   </h1>
                   {!isPublicDisplayMode && currentUser.role === "admin" && (
@@ -577,25 +587,37 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                         setAdminInitialTab("settings");
                         setViewMode("admin");
                       }}
-                      className="p-1.5 rounded-lg bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700 transition-all cursor-pointer"
+                      className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                        isLight
+                          ? "bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700"
+                          : "bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700 border-slate-700"
+                      }`}
                       title="تعديل اسم الاجتماع والكنيسة"
                     >
                       <Edit2 className="h-4 w-4" />
                     </button>
                   )}
                 </div>
-                <p className="text-[10px] sm:text-xs text-slate-300 font-medium">
+                <p className={`text-[10px] sm:text-xs font-medium ${isLight ? "text-slate-600" : "text-slate-300"}`}>
                   {data.config.subTitle} • المس أي فريق لعرض قائمة الأعضاء والنقاط
                 </p>
               </div>
             </div>
 
             {/* Emblem */}
-            <div className="flex flex-col items-center justify-center px-4 py-2 rounded-2xl bg-slate-900/90 border border-amber-500/30 shadow-inner shrink-0">
-              <span className="text-[10px] sm:text-[11px] font-black text-amber-400 tracking-wider">
+            <div className={`flex flex-col items-center justify-center px-4 py-2 rounded-2xl border-2 shrink-0 ${
+              isLight
+                ? "bg-amber-50/90 border-amber-400 shadow-xs"
+                : "bg-slate-900/90 border-amber-500/30 shadow-inner"
+            }`}>
+              <span className={`text-[10px] sm:text-[11px] font-black tracking-wider ${
+                isLight ? "text-amber-800" : "text-amber-400"
+              }`}>
                 TOP
               </span>
-              <span className="text-sm sm:text-base font-black text-amber-300 leading-none">
+              <span className={`text-sm sm:text-base font-black leading-none ${
+                isLight ? "text-amber-900" : "text-amber-300"
+              }`}>
                 {totalTeams}
               </span>
             </div>
@@ -604,29 +626,45 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
             <div className="flex flex-col gap-2 items-end shrink-0">
               <div className="flex items-center gap-2">
                 {/* Total points badge */}
-                <div className="flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/80 px-3 py-1.5">
-                  <Sparkles className="h-4 w-4 text-amber-400 shrink-0" />
+                <div className={`flex items-center gap-2 rounded-2xl border-2 px-3 py-1.5 ${
+                  isLight
+                    ? "bg-white border-slate-300 shadow-xs"
+                    : "border-slate-800 bg-slate-900/80"
+                }`}>
+                  <Sparkles className="h-4 w-4 text-amber-500 shrink-0" />
                   <div className="text-right">
-                    <div className="text-xs font-black text-amber-300 leading-none font-mono">
+                    <div className={`text-xs font-black leading-none font-mono ${
+                      isLight ? "text-amber-800" : "text-amber-300"
+                    }`}>
                       {totalPoints.toLocaleString("en-US")} XP
                     </div>
-                    <div className="text-[9px] text-slate-400 mt-0.5">إجمالي النقاط</div>
+                    <div className={`text-[9px] mt-0.5 ${isLight ? "text-slate-600 font-bold" : "text-slate-400"}`}>
+                      إجمالي النقاط
+                    </div>
                   </div>
                 </div>
 
                 {/* Total attendees badge */}
-                <div className="flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/80 px-3 py-1.5">
-                  <Users className="h-4 w-4 text-sky-400 shrink-0" />
+                <div className={`flex items-center gap-2 rounded-2xl border-2 px-3 py-1.5 ${
+                  isLight
+                    ? "bg-white border-slate-300 shadow-xs"
+                    : "border-slate-800 bg-slate-900/80"
+                }`}>
+                  <Users className="h-4 w-4 text-sky-500 shrink-0" />
                   <div className="text-right">
-                    <div className="text-xs font-black text-sky-400 leading-none font-mono">
+                    <div className={`text-xs font-black leading-none font-mono ${
+                      isLight ? "text-sky-800" : "text-sky-400"
+                    }`}>
                       {totalMembers} عضو
                     </div>
-                    <div className="text-[9px] text-slate-400 mt-0.5">{totalTeams} مجموعات</div>
+                    <div className={`text-[9px] mt-0.5 ${isLight ? "text-slate-600 font-bold" : "text-slate-400"}`}>
+                      {totalTeams} مجموعات
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Action buttons row - Unified Design System */}
+              {/* Action buttons row - Unified Design System with crisp Outlines */}
               <div className="flex items-center gap-2 flex-wrap justify-end">
                 {/* Administrative Controls - Hidden in Public / Makhdoum View */}
                 {!isPublicDisplayMode ? (
@@ -638,10 +676,14 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                         sounds.playTap();
                         setShowUserSwitcher(true);
                       }}
-                      className="h-9 px-3.5 rounded-xl bg-slate-900 border border-amber-500/40 text-amber-300 text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                      className={`h-9 px-3.5 rounded-xl text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border-2 ${
+                        isLight
+                          ? "bg-white hover:bg-amber-50 border-amber-400 text-amber-900"
+                          : "bg-slate-900 hover:bg-slate-800 border-amber-500/40 text-amber-300"
+                      }`}
                       title="تبديل الحساب أو تسجيل الدخول بكود العضو"
                     >
-                      <KeyRound className="h-4 w-4 text-amber-400 shrink-0" />
+                      <KeyRound className="h-4 w-4 text-amber-500 shrink-0" />
                       <span>{currentUser.name.split(" ")[0]} ({currentUser.roleLabel}) 🔑</span>
                     </button>
 
@@ -652,7 +694,7 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                         sounds.playTap();
                         setShowQRScanner(true);
                       }}
-                      className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-black shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                      className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-black shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border-2 border-emerald-600/40"
                       title="مسح رمز QR الفعالية لتسجيل الحضور واحتساب النقاط تلقائياً"
                     >
                       <Camera className="h-4 w-4 shrink-0" />
@@ -666,10 +708,14 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                         sounds.playTap();
                         setViewMode("admin");
                       }}
-                      className="h-9 px-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 text-xs font-black shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                      className={`h-9 px-3.5 rounded-xl text-xs font-black shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border-2 ${
+                        isLight
+                          ? "bg-white hover:bg-slate-100 text-slate-800 border-slate-300"
+                          : "bg-slate-800 hover:bg-slate-700 text-amber-300 border-amber-500/40"
+                      }`}
                       title="فتح لوحة تحكم الخادم لرصد النقاط وتعديل الفرق"
                     >
-                      <Settings className="h-4 w-4 shrink-0" />
+                      <Settings className="h-4 w-4 shrink-0 text-amber-500" />
                       <span>لوحة تحكم الخادم ⚙️</span>
                     </button>
 
@@ -680,7 +726,7 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                         sounds.playTap();
                         setShowTeamsManagement(true);
                       }}
-                      className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-black shadow-md shadow-blue-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                      className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-black shadow-md shadow-blue-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border-2 border-blue-700/40"
                       title="واجهة إدارة الـ 10 فرق المتنافسة (تغيير الأسماء، الحذف، الإضافة)"
                     >
                       <Shield className="h-4 w-4 shrink-0" />
@@ -699,7 +745,11 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                           message: "تم تسجيل الخروج والعودة للشاشة العامة المقروءة فقط.",
                         });
                       }}
-                      className="h-9 px-3.5 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-300 hover:text-white text-xs font-black shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                      className={`h-9 px-3.5 rounded-xl text-xs font-black shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border-2 ${
+                        isLight
+                          ? "bg-rose-50 hover:bg-rose-100 border-rose-300 text-rose-800"
+                          : "bg-rose-950/80 hover:bg-rose-900 border-rose-500/40 text-rose-300"
+                      }`}
                       title="تسجيل الخروج والرجوع إلى شاشة العرض العامة المقروءة للمخدومين فقط"
                     >
                       <span>🚪 خروج للشاشة العامة</span>
@@ -714,7 +764,7 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                           sounds.playTap();
                           onReturnToWelcome();
                         }}
-                        className="h-9 px-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 border border-amber-300/40 text-xs font-black shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                        className="h-9 px-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 border-2 border-amber-600/40 text-xs font-black shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
                         title="العودة لصفحة الدخول والشعار الرئيسية لإدخال الكود أو مسح الباركود"
                       >
                         <KeyRound className="h-4 w-4 shrink-0" />
@@ -728,7 +778,7 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                 <button
                   type="button"
                   onClick={triggerCelebrate}
-                  className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-xs font-black shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                  className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-xs font-black shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border-2 border-amber-600/30"
                   title="احتفال بالمتصدر"
                 >
                   <PartyPopper className="h-4 w-4 shrink-0" />
@@ -742,7 +792,7 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                     sounds.playTap();
                     setShowProgressionModal(true);
                   }}
-                  className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 text-slate-950 text-xs font-black shadow-md shadow-cyan-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                  className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 text-slate-950 text-xs font-black shadow-md shadow-cyan-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border-2 border-teal-600/30"
                   title="عرض منحنى تطور وصعود وهبوط الفرق الـ 10 التفاعلي عبر أيام الاجتماع"
                 >
                   <TrendingUp className="h-4 w-4 shrink-0" />
@@ -753,10 +803,10 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                 <button
                   type="button"
                   onClick={toggleFullscreen}
-                  className={`h-9 px-3.5 rounded-xl text-xs font-black shadow-md active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 border shrink-0 ${
+                  className={`h-9 px-3.5 rounded-xl text-xs font-black shadow-md active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 border-2 shrink-0 ${
                     isFullscreen
                       ? "bg-gradient-to-r from-rose-500 to-amber-500 text-slate-950 border-amber-300 shadow-rose-500/25 ring-2 ring-amber-400"
-                      : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white border-purple-400/40 shadow-purple-500/20"
+                      : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white border-purple-400/60 shadow-purple-500/20"
                   }`}
                   title="عرض لوحة الشرف بنظام ملء الشاشة لقاعات المؤتمرات والشاشات الكبيرة"
                 >
@@ -777,18 +827,26 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                 <button
                   type="button"
                   onClick={toggleMute}
-                  className="h-9 w-9 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white shadow-xs active:scale-95 transition-all cursor-pointer flex items-center justify-center shrink-0"
+                  className={`h-9 w-9 rounded-xl border-2 shadow-xs active:scale-95 transition-all cursor-pointer flex items-center justify-center shrink-0 ${
+                    isLight
+                      ? "bg-white hover:bg-slate-100 border-slate-300 text-slate-700"
+                      : "border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white"
+                  }`}
                   title={isMuted ? "تشغيل المؤثرات الصوتية" : "كتم الصوت"}
                 >
                   {isMuted ? (
-                    <VolumeX className="h-4 w-4 text-rose-400 shrink-0" />
+                    <VolumeX className="h-4 w-4 text-rose-500 shrink-0" />
                   ) : (
-                    <Volume2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                    <Volume2 className="h-4 w-4 text-emerald-500 shrink-0" />
                   )}
                 </button>
 
                 {/* Theme Switcher Toggle (Auto Time / Day / Night) */}
-                <div className="flex items-center gap-1 bg-slate-900/90 border border-amber-500/30 p-1 rounded-xl shrink-0 shadow-xs">
+                <div className={`flex items-center gap-1 p-1 rounded-xl shrink-0 border-2 transition-all ${
+                  isLight
+                    ? "bg-white border-slate-300 shadow-xs"
+                    : "bg-slate-900/90 border-amber-500/30 shadow-xs"
+                }`}>
                   <button
                     type="button"
                     onClick={() => {
@@ -797,7 +855,9 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                     }}
                     className={`h-7 px-2 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
                       themePreference === "auto"
-                        ? "bg-amber-500 text-slate-950 font-black shadow-xs"
+                        ? "bg-amber-500 text-slate-950 font-black shadow-xs border border-amber-600/30"
+                        : isLight
+                        ? "text-slate-700 hover:text-slate-950 hover:bg-slate-100"
                         : "text-slate-300 hover:text-white"
                     }`}
                     title={`تلقائي حسب الوقت (${isDaytime ? "نهار ☀️ 06:00-18:00" : "ليل 🌙 18:00-06:00"})`}
@@ -815,7 +875,9 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                     }}
                     className={`h-7 px-2 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
                       themePreference === "light"
-                        ? "bg-amber-400 text-slate-950 font-black shadow-xs"
+                        ? "bg-amber-400 text-slate-950 font-black shadow-xs border border-amber-500/40"
+                        : isLight
+                        ? "text-slate-700 hover:text-slate-950 hover:bg-slate-100"
                         : "text-slate-300 hover:text-white"
                     }`}
                     title="الوضع النهاري (فاتح ومشرق)"
@@ -833,6 +895,8 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                     className={`h-7 px-2 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
                       themePreference === "dark"
                         ? "bg-indigo-600 text-white font-black shadow-xs"
+                        : isLight
+                        ? "text-slate-700 hover:text-slate-950 hover:bg-slate-100"
                         : "text-slate-300 hover:text-white"
                     }`}
                     title="الوضع الليلي (داكن وجميل)"
@@ -846,22 +910,34 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
           </div>
 
           {/* Search & Sort Filter Control Bar */}
-          <div className="relative mt-3.5 pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className={`relative mt-3.5 pt-3 border-t flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 ${
+            isLight ? "border-slate-200" : "border-slate-800/80"
+          }`}>
             {/* Search Input */}
             <div className="relative flex-1">
-              <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+              <Search className={`absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none ${
+                isLight ? "text-slate-500" : "text-slate-400"
+              }`} />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="ابحث عن اسم فريق أو قائد أو شعار بسرعة..."
-                className="w-full h-10 sm:h-11 pr-10 pl-8 rounded-2xl bg-slate-950/80 border border-slate-700/80 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400 transition-colors shadow-inner"
+                className={`w-full h-10 sm:h-11 pr-10 pl-8 rounded-2xl border-2 text-xs sm:text-sm transition-colors shadow-xs focus:outline-none ${
+                  isLight
+                    ? "bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-amber-500"
+                    : "bg-slate-950/80 border-slate-700/80 text-white placeholder:text-slate-500 focus:border-amber-400 shadow-inner"
+                }`}
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery("")}
-                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-white px-2 py-0.5 bg-slate-800 rounded-lg cursor-pointer"
+                  className={`absolute left-2.5 top-1/2 -translate-y-1/2 text-xs px-2 py-0.5 rounded-lg cursor-pointer border ${
+                    isLight
+                      ? "bg-slate-200 hover:bg-slate-300 text-slate-700 border-slate-300"
+                      : "bg-slate-800 text-slate-400 hover:text-white border-slate-700"
+                  }`}
                 >
                   مسح
                 </button>
@@ -869,8 +945,14 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
             </div>
 
             {/* Sort Controls */}
-            <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-2xl border border-slate-800 shrink-0 overflow-x-auto no-scrollbar">
-              <span className="text-[11px] text-slate-400 px-2 font-bold whitespace-nowrap hidden sm:inline-block">
+            <div className={`flex items-center gap-1 p-1 rounded-2xl border-2 shrink-0 overflow-x-auto no-scrollbar ${
+              isLight
+                ? "bg-white border-slate-300 shadow-xs"
+                : "bg-slate-950/80 border-slate-800"
+            }`}>
+              <span className={`text-[11px] px-2 font-black whitespace-nowrap hidden sm:inline-block ${
+                isLight ? "text-slate-600" : "text-slate-400"
+              }`}>
                 ترتيب الفرق:
               </span>
               <button
@@ -879,9 +961,11 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                   sounds.playTap();
                   setSortOrder("points-desc");
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                   sortOrder === "points-desc"
-                    ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black"
+                    ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black border border-amber-600/30"
+                    : isLight
+                    ? "text-slate-700 hover:text-slate-950 hover:bg-slate-100"
                     : "text-slate-300 hover:text-white hover:bg-slate-800"
                 }`}
                 title="ترتيب الفرق حسب النقاط تنازلياً (الأعلى أولاً)"
@@ -896,9 +980,11 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                   sounds.playTap();
                   setSortOrder("points-asc");
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                   sortOrder === "points-asc"
-                    ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black"
+                    ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black border border-amber-600/30"
+                    : isLight
+                    ? "text-slate-700 hover:text-slate-950 hover:bg-slate-100"
                     : "text-slate-300 hover:text-white hover:bg-slate-800"
                 }`}
                 title="ترتيب الفرق حسب النقاط تصاعدياً (الأقل أولاً)"
@@ -937,7 +1023,11 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
               initial={{ opacity: 0, y: -10, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.98 }}
-              className="mb-5 p-3.5 sm:p-4 rounded-3xl bg-gradient-to-r from-amber-950/90 via-slate-900/95 to-amber-950/90 border-2 border-amber-400/80 shadow-[0_15px_40px_rgba(245,158,11,0.25)] backdrop-blur-2xl flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-100"
+              className={`mb-5 p-3.5 sm:p-4 rounded-3xl border-2 transition-all flex flex-col sm:flex-row items-center justify-between gap-3 ${
+                isLight
+                  ? "bg-white/95 border-amber-400 text-slate-900 shadow-lg shadow-amber-500/10"
+                  : "bg-gradient-to-r from-amber-950/90 via-slate-900/95 to-amber-950/90 border-amber-400/80 shadow-[0_15px_40px_rgba(245,158,11,0.25)] backdrop-blur-2xl text-slate-100"
+              }`}
             >
               <div className="flex items-center gap-3">
                 <span className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 font-black shadow-lg shadow-amber-500/30 shrink-0">
@@ -945,15 +1035,23 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                 </span>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
-                    <h3 className="text-sm sm:text-base lg:text-lg font-black text-amber-300">
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-ping" />
+                    <h3 className={`text-sm sm:text-base lg:text-lg font-black ${
+                      isLight ? "text-amber-950" : "text-amber-300"
+                    }`}>
                       نمط الشاشات الكبيرة والبروجكتور نشط 📽️ (TV / Projector Mode)
                     </h3>
-                    <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-black">
+                    <span className={`px-2 py-0.5 rounded-full border text-[10px] font-black ${
+                      isLight
+                        ? "bg-amber-100 text-amber-900 border-amber-300"
+                        : "bg-amber-400/20 text-amber-300 border-amber-400/40"
+                    }`}>
                       قاعات المؤتمرات والاجتماعات
                     </span>
                   </div>
-                  <p className="text-xs text-slate-300 hidden sm:block mt-0.5 font-medium">
+                  <p className={`text-xs hidden sm:block mt-0.5 font-medium ${
+                    isLight ? "text-slate-600" : "text-slate-300"
+                  }`}>
                     تم تكبير أحجام الخطوط والأرقام والشعارات لضمان أعلى درجات الوضوح والتباين لجمهور القاعة عن بُعد
                   </p>
                 </div>
@@ -962,8 +1060,14 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
               {/* Controls: Scale & Layout Grid */}
               <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap justify-end w-full sm:w-auto">
                 {/* Scale buttons */}
-                <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-2xl border border-slate-700/80">
-                  <span className="text-[11px] text-slate-400 font-bold px-1.5 hidden md:inline">
+                <div className={`flex items-center gap-1 p-1 rounded-2xl border-2 ${
+                  isLight
+                    ? "bg-slate-100 border-slate-300 shadow-xs"
+                    : "bg-slate-950/80 border-slate-700/80"
+                }`}>
+                  <span className={`text-[11px] font-black px-1.5 hidden md:inline ${
+                    isLight ? "text-slate-600" : "text-slate-400"
+                  }`}>
                     حجم الخط:
                   </span>
                   <button
@@ -972,9 +1076,11 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                       sounds.playTap();
                       setTvScale("normal");
                     }}
-                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-xl text-xs font-black transition-all cursor-pointer ${
                       tvScale === "normal"
-                        ? "bg-amber-500 text-slate-950 font-black shadow-xs"
+                        ? "bg-amber-500 text-slate-950 shadow-xs border border-amber-600/30"
+                        : isLight
+                        ? "text-slate-700 hover:text-slate-950 hover:bg-white"
                         : "text-slate-300 hover:text-white"
                     }`}
                   >
@@ -986,9 +1092,11 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                       sounds.playTap();
                       setTvScale("large");
                     }}
-                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`px-3 py-1 rounded-xl text-xs font-black transition-all cursor-pointer ${
                       tvScale === "large"
-                        ? "bg-amber-500 text-slate-950 font-black shadow-xs"
+                        ? "bg-amber-500 text-slate-950 shadow-xs border border-amber-600/30"
+                        : isLight
+                        ? "text-slate-700 hover:text-slate-950 hover:bg-white"
                         : "text-slate-300 hover:text-white"
                     }`}
                   >
@@ -1000,9 +1108,11 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                       sounds.playTap();
                       setTvScale("xl");
                     }}
-                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`px-3 py-1 rounded-xl text-xs font-black transition-all cursor-pointer ${
                       tvScale === "xl"
-                        ? "bg-amber-500 text-slate-950 font-black shadow-xs"
+                        ? "bg-amber-500 text-slate-950 shadow-xs border border-amber-600/30"
+                        : isLight
+                        ? "text-slate-700 hover:text-slate-950 hover:bg-white"
                         : "text-slate-300 hover:text-white"
                     }`}
                   >
@@ -1011,7 +1121,11 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                 </div>
 
                 {/* Column layout toggle on wide screens */}
-                <div className="hidden lg:flex items-center gap-1 bg-slate-950/80 p-1 rounded-2xl border border-slate-700/80">
+                <div className={`hidden lg:flex items-center gap-1 p-1 rounded-2xl border-2 ${
+                  isLight
+                    ? "bg-slate-100 border-slate-300 shadow-xs"
+                    : "bg-slate-950/80 border-slate-700/80"
+                }`}>
                   <button
                     type="button"
                     onClick={() => {
@@ -1020,7 +1134,9 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                     }}
                     className={`p-1.5 rounded-xl transition-all cursor-pointer ${
                       tvColumns === "single"
-                        ? "bg-amber-500 text-slate-950"
+                        ? "bg-amber-500 text-slate-950 font-black border border-amber-600/30"
+                        : isLight
+                        ? "text-slate-700 hover:text-slate-950 hover:bg-white"
                         : "text-slate-400 hover:text-white"
                     }`}
                     title="عرض رأسي فردي"
@@ -1035,7 +1151,9 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                     }}
                     className={`p-1.5 rounded-xl transition-all cursor-pointer ${
                       tvColumns === "grid"
-                        ? "bg-amber-500 text-slate-950"
+                        ? "bg-amber-500 text-slate-950 font-black border border-amber-600/30"
+                        : isLight
+                        ? "text-slate-700 hover:text-slate-950 hover:bg-white"
                         : "text-slate-400 hover:text-white"
                     }`}
                     title="عرض شبكي مزدوج (عمودين متجاورين للشاشات العريضة)"
@@ -1051,7 +1169,11 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                     sounds.playTap();
                     setIsTvMode(false);
                   }}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-colors cursor-pointer"
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors cursor-pointer border ${
+                    isLight
+                      ? "bg-slate-200 hover:bg-slate-300 text-slate-800 border-slate-300"
+                      : "bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700"
+                  }`}
                 >
                   إلغاء ✕
                 </button>
@@ -1177,16 +1299,28 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                     }}
                     className={`group relative flex flex-row items-center justify-between px-3.5 sm:px-5 py-3 sm:py-3.5 rounded-2xl sm:rounded-3xl border transition-all duration-300 cursor-pointer shadow-lg ${
                       hasShiftedUp
-                        ? "ring-2 ring-emerald-400 border-emerald-400 shadow-[0_0_35px_rgba(16,185,129,0.35)] bg-gradient-to-r from-emerald-950/60 via-slate-900 to-teal-950/60"
+                        ? isLight
+                          ? "ring-2 ring-emerald-500 border-2 border-emerald-500 shadow-md shadow-emerald-200/60 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 text-slate-900"
+                          : "ring-2 ring-emerald-400 border-emerald-400 shadow-[0_0_35px_rgba(16,185,129,0.35)] bg-gradient-to-r from-emerald-950/60 via-slate-900 to-teal-950/60 text-white"
                         : hasShiftedDown
-                        ? "ring-1 ring-rose-500/80 border-rose-500/80 shadow-[0_0_25px_rgba(244,63,94,0.25)] bg-gradient-to-r from-rose-950/50 via-slate-900 to-slate-950"
+                        ? isLight
+                          ? "ring-1 ring-rose-400 border-2 border-rose-400 shadow-md shadow-rose-200/60 bg-gradient-to-r from-rose-50 via-slate-50 to-rose-50 text-slate-900"
+                          : "ring-1 ring-rose-500/80 border-rose-500/80 shadow-[0_0_25px_rgba(244,63,94,0.25)] bg-gradient-to-r from-rose-950/50 via-slate-900 to-slate-950 text-white"
                         : isRank1
-                        ? "bg-gradient-to-r from-amber-950/75 via-slate-900/95 to-amber-950/75 border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.25)] ring-1 ring-amber-400/40"
+                        ? isLight
+                          ? "bg-gradient-to-r from-amber-50 via-yellow-50/80 to-amber-50 border-2 border-amber-400 shadow-lg shadow-amber-200/60 ring-2 ring-amber-400/40 text-slate-950"
+                          : "bg-gradient-to-r from-amber-950/75 via-slate-900/95 to-amber-950/75 border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.25)] ring-1 ring-amber-400/40 text-white"
                         : isRank2
-                        ? "bg-gradient-to-r from-sky-950/70 via-slate-900/95 to-sky-950/70 border-cyan-400/80 shadow-[0_0_24px_rgba(6,182,212,0.2)]"
+                        ? isLight
+                          ? "bg-gradient-to-r from-sky-50 via-slate-50 to-sky-50 border-2 border-sky-400 shadow-md shadow-sky-200/60 ring-1 ring-sky-300/60 text-slate-950"
+                          : "bg-gradient-to-r from-sky-950/70 via-slate-900/95 to-sky-950/70 border-cyan-400/80 shadow-[0_0_24px_rgba(6,182,212,0.2)] text-white"
                         : isRank3
-                        ? "bg-gradient-to-r from-orange-950/70 via-slate-900/95 to-amber-950/70 border-orange-400/80 shadow-[0_0_24px_rgba(249,115,22,0.2)]"
-                        : "bg-slate-900/80 hover:bg-slate-800/90 border-slate-700/60 hover:border-slate-500/80 shadow-black/40"
+                        ? isLight
+                          ? "bg-gradient-to-r from-orange-50 via-amber-50/60 to-orange-50 border-2 border-orange-400 shadow-md shadow-orange-200/60 ring-1 ring-orange-300/60 text-slate-950"
+                          : "bg-gradient-to-r from-orange-950/70 via-slate-900/95 to-amber-950/70 border-orange-400/80 shadow-[0_0_24px_rgba(249,115,22,0.2)] text-white"
+                        : isLight
+                        ? "bg-white hover:bg-slate-50 border-2 border-slate-300/90 hover:border-slate-400 shadow-md shadow-slate-200/70 text-slate-900"
+                        : "bg-slate-900/80 hover:bg-slate-800/90 border-slate-700/60 hover:border-slate-500/80 shadow-black/40 text-white"
                     }`}
                     style={{
                       borderRightWidth: "6px",
@@ -1239,13 +1373,15 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                     <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 pl-2 sm:pl-3">
                       {/* Rank Badge */}
                       <div
-                        className={`relative flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-2xl font-black shadow-md border ${
+                        className={`relative flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-2xl font-black shadow-md border-2 ${
                           isRank1
                             ? "bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 border-white shadow-amber-500/30"
                             : isRank2
                             ? "bg-gradient-to-br from-slate-200 to-slate-400 text-slate-950 border-white shadow-slate-400/25"
                             : isRank3
                             ? "bg-gradient-to-br from-orange-400 to-amber-700 text-white border-white shadow-orange-500/25"
+                            : isLight
+                            ? "bg-slate-100 text-slate-900 border-slate-300 shadow-xs"
                             : "bg-slate-800/90 text-slate-200 border-slate-700/80"
                         }`}
                       >
@@ -1292,7 +1428,9 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                           sounds.playTap();
                           setPhotoUploadTeam(team);
                         }}
-                        className="relative group/photo flex h-11 w-11 sm:h-13 sm:w-13 shrink-0 items-center justify-center rounded-2xl overflow-hidden border-2 shadow-md transition-all duration-300 hover:scale-105 cursor-pointer ring-1 ring-white/10"
+                        className={`relative group/photo flex h-11 w-11 sm:h-13 sm:w-13 shrink-0 items-center justify-center rounded-2xl overflow-hidden border-2 shadow-md transition-all duration-300 hover:scale-105 cursor-pointer ${
+                          isLight ? "ring-2 ring-slate-300" : "ring-1 ring-white/10"
+                        }`}
                         style={{
                           backgroundColor: `${team.color}22`,
                           borderColor: team.color || "#F59E0B",
@@ -1328,11 +1466,19 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                           <h3
                             className={`font-black text-base sm:text-lg lg:text-xl tracking-tight transition-colors whitespace-nowrap ${
                               isRank1
-                                ? "text-amber-300"
+                                ? isLight
+                                  ? "text-amber-950"
+                                  : "text-amber-300"
                                 : isRank2
-                                ? "text-slate-100"
+                                ? isLight
+                                  ? "text-slate-900"
+                                  : "text-slate-100"
                                 : isRank3
-                                ? "text-orange-300"
+                                ? isLight
+                                  ? "text-orange-950"
+                                  : "text-orange-300"
+                                : isLight
+                                ? "text-slate-900 group-hover:text-amber-800"
                                 : "text-white group-hover:text-amber-300"
                             }`}
                           >
@@ -1348,7 +1494,11 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                                 sounds.playTap();
                                 setPhotoUploadTeam(team);
                               }}
-                              className="opacity-60 hover:opacity-100 p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-amber-300 transition-all text-xs flex items-center gap-1 cursor-pointer"
+                              className={`opacity-60 hover:opacity-100 p-1 rounded-lg border transition-all text-xs flex items-center gap-1 cursor-pointer ${
+                                isLight
+                                  ? "hover:bg-slate-100 text-slate-600 hover:text-slate-900 border-transparent hover:border-slate-300"
+                                  : "hover:bg-slate-800 text-slate-400 hover:text-amber-300 border-transparent hover:border-slate-700"
+                              }`}
                               title="تحميل أو تعديل صورة الفريق 📸"
                             >
                               <Camera className="h-3.5 w-3.5" />
@@ -1362,49 +1512,61 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                               animate={{ scale: 1, opacity: 1, x: 0 }}
                               exit={{ scale: 0, opacity: 0 }}
                               transition={{ type: "spring", stiffness: 500, damping: 20 }}
-                              className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black flex items-center gap-1 shadow-sm shrink-0 ${
+                              className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black flex items-center gap-1 shadow-sm shrink-0 border-2 ${
                                 hasShiftedUp
-                                  ? "bg-emerald-500/25 text-emerald-300 border border-emerald-400/50 shadow-emerald-500/20"
-                                  : "bg-rose-500/20 text-rose-300 border border-rose-400/40"
+                                  ? isLight
+                                    ? "bg-emerald-100 text-emerald-900 border-emerald-400 shadow-emerald-200/50"
+                                    : "bg-emerald-500/25 text-emerald-300 border-emerald-400/50 shadow-emerald-500/20"
+                                  : isLight
+                                  ? "bg-rose-100 text-rose-900 border-rose-300"
+                                  : "bg-rose-500/20 text-rose-300 border-rose-400/40"
                               }`}
                               title={hasShiftedUp ? `صعد +${change.delta} مراكز في الجولة الحالية` : `تراجع ${change.delta} مراكز`}
                             >
                               {hasShiftedUp ? (
                                 <>
-                                  <ArrowUp className="h-3 w-3 stroke-[3] text-emerald-400" />
+                                  <ArrowUp className="h-3 w-3 stroke-[3]" />
                                   <span>+{change.delta} صعود</span>
                                 </>
                               ) : (
                                 <>
-                                  <ArrowDown className="h-3 w-3 stroke-[3] text-rose-400" />
+                                  <ArrowDown className="h-3 w-3 stroke-[3]" />
                                   <span>{change.delta} تراجع</span>
                                 </>
                               )}
                             </motion.span>
                           ) : team.previousRank && team.previousRank !== team.rank ? (
                             <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black flex items-center gap-1 shadow-xs shrink-0 ${
+                              className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black flex items-center gap-1 shadow-xs shrink-0 border ${
                                 team.previousRank > team.rank
-                                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
-                                  : "bg-rose-500/20 text-rose-400 border border-rose-500/40"
+                                  ? isLight
+                                    ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                                    : "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                                  : isLight
+                                  ? "bg-rose-100 text-rose-900 border-rose-300"
+                                  : "bg-rose-500/20 text-rose-400 border-rose-500/40"
                               }`}
                               title={`الترتيب السابق #${team.previousRank} ➔ الحالي #${team.rank}`}
                             >
                               {team.previousRank > team.rank ? (
                                 <>
-                                  <ArrowUp className="h-3 w-3 stroke-[3] text-emerald-400" />
+                                  <ArrowUp className="h-3 w-3 stroke-[3]" />
                                   <span>+{team.previousRank - team.rank} صعود</span>
                                 </>
                               ) : (
                                 <>
-                                  <ArrowDown className="h-3 w-3 stroke-[3] text-rose-400" />
+                                  <ArrowDown className="h-3 w-3 stroke-[3]" />
                                   <span>-{team.rank - team.previousRank} تراجع</span>
                                 </>
                               )}
                             </span>
                           ) : (
                             <span
-                              className="px-2 py-0.5 rounded-full bg-slate-800/80 text-slate-400 border border-slate-700/60 text-[10px] font-bold flex items-center gap-1 shrink-0"
+                              className={`px-2 py-0.5 rounded-full border text-[10px] font-bold flex items-center gap-1 shrink-0 ${
+                                isLight
+                                  ? "bg-slate-100 text-slate-700 border-slate-300"
+                                  : "bg-slate-800/80 text-slate-400 border-slate-700/60"
+                              }`}
                               title="مستقر في الترتيب مقارنة بالجولة السابقة"
                             >
                               <span className="text-[9px]">➖</span>
@@ -1413,25 +1575,41 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                           )}
 
                           {team.isTied ? (
-                            <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[10px] sm:text-[11px] font-black flex items-center gap-1 shrink-0">
-                              <Sparkles className="h-3 w-3 text-amber-400" />
+                            <span className={`px-2 py-0.5 rounded-full border-2 text-[10px] sm:text-[11px] font-black flex items-center gap-1 shrink-0 ${
+                              isLight
+                                ? "bg-amber-100 border-amber-400 text-amber-950"
+                                : "bg-amber-400/20 text-amber-300 border-amber-400/30"
+                            }`}>
+                              <Sparkles className="h-3 w-3 text-amber-500" />
                               <span>تعادل في الصدارة</span>
                             </span>
                           ) : (
                             <>
                               {isRank1 && (
-                                <span className="px-2.5 py-0.5 rounded-full bg-amber-400/25 text-amber-300 border border-amber-400/50 text-[10px] sm:text-[11px] font-black flex items-center gap-1 shrink-0">
-                                  <Crown className="h-3 w-3 text-amber-400" />
+                                <span className={`px-2.5 py-0.5 rounded-full border-2 text-[10px] sm:text-[11px] font-black flex items-center gap-1 shrink-0 ${
+                                  isLight
+                                    ? "bg-amber-100 border-amber-400 text-amber-950 shadow-xs"
+                                    : "bg-amber-400/25 text-amber-300 border-amber-400/50"
+                                }`}>
+                                  <Crown className="h-3 w-3 text-amber-500" />
                                   <span>المتصدر</span>
                                 </span>
                               )}
                               {isRank2 && (
-                                <span className="px-2.5 py-0.5 rounded-full bg-slate-300/20 text-slate-200 border border-slate-300/40 text-[10px] sm:text-[11px] font-black shrink-0">
+                                <span className={`px-2.5 py-0.5 rounded-full border-2 text-[10px] sm:text-[11px] font-black shrink-0 ${
+                                  isLight
+                                    ? "bg-sky-100 border-sky-400 text-sky-950 shadow-xs"
+                                    : "bg-slate-300/20 text-slate-200 border-slate-300/40"
+                                }`}>
                                   الوصيف
                                 </span>
                               )}
                               {isRank3 && (
-                                <span className="px-2.5 py-0.5 rounded-full bg-orange-400/20 text-orange-300 border border-orange-400/40 text-[10px] sm:text-[11px] font-black shrink-0">
+                                <span className={`px-2.5 py-0.5 rounded-full border-2 text-[10px] sm:text-[11px] font-black shrink-0 ${
+                                  isLight
+                                    ? "bg-orange-100 border-orange-400 text-orange-950 shadow-xs"
+                                    : "bg-orange-400/20 text-orange-300 border-orange-400/40"
+                                }`}>
                                   المركز الثالث
                                 </span>
                               )}
@@ -1439,43 +1617,67 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                           )}
                         </div>
 
-                        {/* Stats Badges */}
-                        <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-slate-300 flex-wrap">
+                        {/* Stats Badges with crisp outlines */}
+                        <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs flex-wrap">
                           {team.slogan && (
                             <>
-                              <span className="text-amber-300/90 font-medium truncate max-w-[200px] sm:max-w-none">
+                              <span className={`font-medium truncate max-w-[200px] sm:max-w-none ${
+                                isLight ? "text-amber-900/90 italic" : "text-amber-300/90"
+                              }`}>
                                 "{team.slogan}"
                               </span>
-                              <span className="text-slate-500">•</span>
+                              <span className={isLight ? "text-slate-400" : "text-slate-500"}>•</span>
                             </>
                           )}
                           {/* Hierarchy Order: Leader -> Servant -> Makhdoumeen */}
                           {team.leaderName ? (
-                            <span className="text-amber-300 font-bold flex items-center gap-1">
+                            <span className={`flex items-center gap-1 ${
+                              isLight
+                                ? "bg-amber-100/90 border border-amber-300/80 text-amber-950 px-2 py-0.5 rounded-lg font-bold shadow-2xs"
+                                : "text-amber-300 font-bold"
+                            }`}>
                               <span>👑 القائد:</span>
-                              <span className="text-white font-semibold">{team.leaderName}</span>
+                              <span className={isLight ? "text-slate-900 font-black" : "text-white font-semibold"}>
+                                {team.leaderName}
+                              </span>
                             </span>
                           ) : team.leadersCount > 0 ? (
-                            <span className="text-amber-300 font-bold flex items-center gap-1">
+                            <span className={`flex items-center gap-1 ${
+                              isLight
+                                ? "bg-amber-100/90 border border-amber-300/80 text-amber-950 px-2 py-0.5 rounded-lg font-bold shadow-2xs"
+                                : "text-amber-300 font-bold"
+                            }`}>
                               <span>👑 القادة:</span>
-                              <span className="text-white font-semibold">{team.leadersCount}</span>
+                              <span className={isLight ? "text-slate-900 font-black" : "text-white font-semibold"}>
+                                {team.leadersCount}
+                              </span>
                             </span>
                           ) : null}
 
                           {(team.servantsCount || 0) > 0 && (
                             <>
-                              <span className="text-slate-500">•</span>
-                              <span className="text-purple-300 font-medium flex items-center gap-1">
+                              <span className={isLight ? "text-slate-400" : "text-slate-500"}>•</span>
+                              <span className={`flex items-center gap-1 ${
+                                isLight
+                                  ? "bg-purple-100/90 border border-purple-300/80 text-purple-950 px-2 py-0.5 rounded-lg font-bold shadow-2xs"
+                                  : "text-purple-300 font-medium"
+                              }`}>
                                 <span>✝️ الخدام:</span>
-                                <span className="text-slate-100 font-semibold">{team.servantsCount}</span>
+                                <span className={isLight ? "text-slate-900 font-black" : "text-slate-100 font-semibold"}>
+                                  {team.servantsCount}
+                                </span>
                               </span>
                             </>
                           )}
 
-                          <span className="text-slate-500">•</span>
-                          <span className="text-teal-300 font-medium flex items-center gap-1">
+                          <span className={isLight ? "text-slate-400" : "text-slate-500"}>•</span>
+                          <span className={`flex items-center gap-1 ${
+                            isLight
+                              ? "bg-teal-100/90 border border-teal-300/80 text-teal-950 px-2 py-0.5 rounded-lg font-bold shadow-2xs"
+                              : "text-teal-300 font-medium"
+                          }`}>
                             <span>👥 المخدومين:</span>
-                            <span className="text-slate-100 font-semibold">
+                            <span className={isLight ? "text-slate-900 font-black" : "text-slate-100 font-semibold"}>
                               {team.makhdoumeenCount !== undefined ? team.makhdoumeenCount : team.membersCount}
                             </span>
                           </span>
@@ -1490,7 +1692,11 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                         <button
                           type="button"
                           onClick={(e) => handleQuickAdd(e, team, 50)}
-                          className="hidden sm:flex h-8 px-2.5 rounded-xl bg-slate-800/80 hover:bg-amber-500 hover:text-slate-950 text-amber-400 text-xs font-bold border border-slate-700 items-center gap-1 transition-all cursor-pointer shadow-xs active:scale-95"
+                          className={`hidden sm:flex h-8 px-2.5 rounded-xl border-2 items-center gap-1 transition-all cursor-pointer shadow-xs active:scale-95 ${
+                            isLight
+                              ? "bg-white hover:bg-amber-500 hover:text-slate-950 text-amber-900 border-amber-400 font-black"
+                              : "bg-slate-800/80 hover:bg-amber-500 hover:text-slate-950 text-amber-400 text-xs font-bold border-slate-700"
+                          }`}
                           title="إضافة سريعة +50 نقطة للفريق"
                         >
                           <Plus className="h-3.5 w-3.5" />
@@ -1499,8 +1705,12 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                       )}
 
                       <div className="flex flex-col items-start" dir="ltr">
-                        <div className="flex items-baseline gap-1 text-amber-400 font-display">
-                          <span className="text-xs sm:text-sm font-bold text-amber-300/90 font-arabic">
+                        <div className={`flex items-baseline gap-1 font-display ${
+                          isLight ? "text-amber-700" : "text-amber-400"
+                        }`}>
+                          <span className={`text-xs sm:text-sm font-bold font-arabic ${
+                            isLight ? "text-amber-800" : "text-amber-300/90"
+                          }`}>
                             XP
                           </span>
                           <motion.span
@@ -1518,12 +1728,16 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                               textShadow: "none",
                             }}
                             transition={{ duration: 0.8, ease: "easeOut" }}
-                            className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight font-display"
+                            className={`text-xl sm:text-2xl lg:text-3xl font-black tracking-tight font-display ${
+                              isLight ? "text-slate-950" : ""
+                            }`}
                           >
                             {team.points.toLocaleString("en-US")}
                           </motion.span>
                         </div>
-                        <div className="text-[10px] text-slate-400" dir="rtl">
+                        <div className={`text-[10px] font-bold ${
+                          isLight ? "text-slate-600" : "text-slate-400"
+                        }`} dir="rtl">
                           المجموع التراكمي
                         </div>
                       </div>

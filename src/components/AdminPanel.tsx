@@ -55,6 +55,7 @@ import { QRScannerModal } from "./QRScannerModal";
 import { UserSwitcherModal } from "./UserSwitcherModal";
 import { MemberCard } from "./MemberCard";
 import { AdminPhotoUploadModal } from "./AdminPhotoUploadModal";
+import { compressImageFile } from "../utils/imageCompressor";
 
 interface AdminPanelProps {
   onBackToScoreboard: () => void;
@@ -313,42 +314,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
   const memberPhotoFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const handleMemberPhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMemberPhotoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     sounds.playTap();
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const maxDim = 400;
-        let w = img.width;
-        let h = img.height;
-        if (w > h) {
-          if (w > maxDim) {
-            h = Math.round((h * maxDim) / w);
-            w = maxDim;
-          }
-        } else {
-          if (h > maxDim) {
-            w = Math.round((w * maxDim) / h);
-            h = maxDim;
-          }
-        }
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, w, h);
-          const compressed = canvas.toDataURL("image/jpeg", 0.85);
-          setNewMemberAvatarUrl(compressed);
-        }
-      };
-      img.src = reader.result as string;
-    };
-    reader.readAsDataURL(file);
+    try {
+      const res = await compressImageFile(file, 300, 0.8);
+      setNewMemberAvatarUrl(res.dataUrl);
+      sounds.playVictory();
+      showFeedback("تم تحسين وضغط صورة العضو بنجاح!");
+    } catch (err: any) {
+      console.error(err);
+      sounds.playClose();
+      showFeedback(err?.message || "تعذر معالجة الصورة", "error");
+    } finally {
+      e.target.value = "";
+    }
   };
 
   const handleSaveMember = async (e: React.FormEvent) => {

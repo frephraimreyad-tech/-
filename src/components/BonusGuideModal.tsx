@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { sounds } from "../utils/soundEffects";
 import { meetingStore } from "../utils/meetingStore";
+import { useTheme } from "../utils/themeStore";
 import type { ActivityReason } from "../types";
 
 export interface BonusGuideModalProps {
@@ -237,6 +238,7 @@ export const BonusGuideModal: React.FC<BonusGuideModalProps> = ({
   onSelectReason,
   initialEditMode = false,
 }) => {
+  const { isLight } = useTheme();
   const [activeTab, setActiveTab] = useState<"reasons" | "how_to">("reasons");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [isEditMode, setIsEditMode] = useState<boolean>(initialEditMode);
@@ -387,29 +389,39 @@ export const BonusGuideModal: React.FC<BonusGuideModalProps> = ({
       className="fixed inset-0 z-[300] flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-fadeIn font-arabic select-none"
       dir="rtl"
     >
-      <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col rounded-3xl border border-slate-700 bg-[#0B132B] shadow-2xl text-slate-100 overflow-hidden">
+      <div className={`relative w-full max-w-4xl max-h-[92vh] flex flex-col rounded-3xl border-2 shadow-2xl overflow-hidden ${
+        isLight
+          ? "bg-slate-50 border-slate-300 text-slate-900 shadow-slate-200/90"
+          : "bg-[#0B132B] border-slate-700 text-slate-100"
+      }`}>
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/90 shrink-0 gap-3">
+        <div className={`p-4 sm:p-5 border-b flex items-center justify-between shrink-0 gap-3 ${
+          isLight ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900/90 border-slate-800 text-slate-100"
+        }`}>
           <div className="flex items-center gap-3 min-w-0">
             <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-600 text-slate-950 font-black shadow-md shadow-amber-500/20 shrink-0">
               <Award className="h-6 w-6" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-base sm:text-lg font-black text-white truncate">
+                <h3 className={`text-base sm:text-lg font-black truncate ${isLight ? "text-slate-900" : "text-white"}`}>
                   دليل وبنك درجات البونص المعتمد
                 </h3>
                 {isEditMode ? (
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-black border border-emerald-500/30 flex items-center gap-1">
+                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-black border flex items-center gap-1 ${
+                    isLight ? "bg-emerald-100 text-emerald-900 border-emerald-300" : "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                  }`}>
                     <Edit2 className="h-3 w-3" /> وضع التعديل مفعّل
                   </span>
                 ) : (
-                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[11px] font-bold border border-amber-500/30">
+                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                    isLight ? "bg-amber-100 text-amber-900 border-amber-300" : "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                  }`}>
                     للقادة والخدام
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-400 truncate">
+              <p className={`text-xs truncate ${isLight ? "text-slate-600 font-medium" : "text-slate-400"}`}>
                 {isEditMode
                   ? "يمكنك تعديل أي نشاط، تغيير مقادير الـ XP، إضافة أسباب جديدة، أو الحذف"
                   : "قائمة الأنشطة الرسمية وتوزيع النقاط المعتمد لأسرة أبي سيفين وتماف إيريني"}
@@ -427,7 +439,9 @@ export const BonusGuideModal: React.FC<BonusGuideModalProps> = ({
               }}
               className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95 ${
                 isEditMode
-                  ? "bg-emerald-500 hover:bg-emerald-400 text-slate-950 border border-emerald-400"
+                  ? "bg-emerald-500 hover:bg-emerald-400 text-slate-950 border-2 border-emerald-600"
+                  : isLight
+                  ? "bg-amber-100 hover:bg-amber-200 text-amber-950 border-2 border-amber-400 font-black"
                   : "bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40"
               }`}
             >
@@ -440,7 +454,11 @@ export const BonusGuideModal: React.FC<BonusGuideModalProps> = ({
                 sounds.playClose();
                 onClose();
               }}
-              className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer"
+              className={`p-2 rounded-full transition-all cursor-pointer ${
+                isLight
+                  ? "bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-950 border border-slate-300"
+                  : "bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
+              }`}
             >
               <X className="h-5 w-5" />
             </button>
@@ -448,7 +466,9 @@ export const BonusGuideModal: React.FC<BonusGuideModalProps> = ({
         </div>
 
         {/* Top Tabs */}
-        <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950 px-4 pt-2 shrink-0 gap-2 flex-wrap">
+        <div className={`flex items-center justify-between border-b px-4 pt-2 shrink-0 gap-2 flex-wrap ${
+          isLight ? "bg-slate-100/90 border-slate-200" : "bg-slate-950 border-slate-800"
+        }`}>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -458,8 +478,8 @@ export const BonusGuideModal: React.FC<BonusGuideModalProps> = ({
               }}
               className={`pb-2.5 px-4 text-xs font-black border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
                 activeTab === "reasons"
-                  ? "border-amber-400 text-amber-300"
-                  : "border-transparent text-slate-400 hover:text-white"
+                  ? isLight ? "border-amber-600 text-amber-950 font-black" : "border-amber-400 text-amber-300"
+                  : isLight ? "border-transparent text-slate-600 hover:text-slate-950 font-bold" : "border-transparent text-slate-400 hover:text-white"
               }`}
             >
               <Sparkles className="h-4 w-4" />
@@ -474,8 +494,8 @@ export const BonusGuideModal: React.FC<BonusGuideModalProps> = ({
               }}
               className={`pb-2.5 px-4 text-xs font-black border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
                 activeTab === "how_to"
-                  ? "border-amber-400 text-amber-300"
-                  : "border-transparent text-slate-400 hover:text-white"
+                  ? isLight ? "border-amber-600 text-amber-950 font-black" : "border-amber-400 text-amber-300"
+                  : isLight ? "border-transparent text-slate-600 hover:text-slate-950 font-bold" : "border-transparent text-slate-400 hover:text-white"
               }`}
             >
               <HelpCircle className="h-4 w-4" />
@@ -498,7 +518,11 @@ export const BonusGuideModal: React.FC<BonusGuideModalProps> = ({
               <button
                 type="button"
                 onClick={handleResetDefaults}
-                className="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-amber-300 border border-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                  isLight
+                    ? "bg-white hover:bg-slate-100 text-slate-800 border-2 border-slate-300"
+                    : "bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-amber-300 border border-slate-700"
+                }`}
                 title="استعادة القائمة النموذجية الافتراضية"
               >
                 <RotateCcw className="h-3 w-3" />
@@ -529,10 +553,12 @@ export const BonusGuideModal: React.FC<BonusGuideModalProps> = ({
                       sounds.playTap();
                       setSelectedCategory(c.id);
                     }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap border-2 ${
                       selectedCategory === c.id
-                        ? "bg-amber-500 text-slate-950 font-black shadow-sm"
-                        : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
+                        ? "bg-amber-500 text-slate-950 border-amber-600 font-black shadow-sm"
+                        : isLight
+                        ? "bg-white text-slate-800 hover:bg-slate-100 border-slate-300 font-bold"
+                        : "bg-slate-900 text-slate-400 hover:text-white border-slate-800"
                     }`}
                   >
                     {c.label}
@@ -545,33 +571,43 @@ export const BonusGuideModal: React.FC<BonusGuideModalProps> = ({
                 {filteredItems.map((item) => (
                   <div
                     key={item.id}
-                    className={`p-3.5 rounded-2xl bg-slate-900/80 border transition-all flex flex-col justify-between gap-2.5 group shadow-sm ${
-                      isEditMode
-                        ? "border-emerald-500/40 hover:border-emerald-400"
-                        : "border-slate-800 hover:border-amber-500/40"
+                    className={`p-3.5 rounded-2xl border-2 transition-all flex flex-col justify-between gap-2.5 group shadow-sm ${
+                      isLight
+                        ? isEditMode
+                          ? "bg-white border-emerald-400 hover:border-emerald-500 text-slate-900"
+                          : "bg-white border-slate-300 hover:border-amber-400 text-slate-900"
+                        : isEditMode
+                        ? "bg-slate-900/80 border-emerald-500/40 hover:border-emerald-400"
+                        : "bg-slate-900/80 border-slate-800 hover:border-amber-500/40"
                     }`}
                   >
                     <div className="space-y-1">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-2xl p-1 bg-slate-950 rounded-xl border border-slate-800 shrink-0">
+                          <span className={`text-2xl p-1 rounded-xl border shrink-0 ${
+                            isLight ? "bg-slate-100 border-slate-200" : "bg-slate-950 border-slate-800"
+                          }`}>
                             {item.icon}
                           </span>
-                          <span className="text-xs sm:text-sm font-bold text-white group-hover:text-amber-300 transition-colors truncate">
+                          <span className={`text-xs sm:text-sm font-bold transition-colors truncate ${
+                            isLight ? "text-slate-900 group-hover:text-amber-800" : "text-white group-hover:text-amber-300"
+                          }`}>
                             {item.title}
                           </span>
                         </div>
-                        <span className="px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-300 font-black font-mono text-xs border border-amber-500/30 shrink-0 shadow-inner">
+                        <span className={`px-2.5 py-1 rounded-xl font-black font-mono text-xs border-2 shrink-0 ${
+                          isLight ? "bg-amber-100 text-amber-950 border-amber-400" : "bg-amber-500/20 text-amber-300 border-amber-500/30 shadow-inner"
+                        }`}>
                           +{item.points} XP
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-400 leading-relaxed pr-9">
+                      <p className={`text-[11px] leading-relaxed pr-9 ${isLight ? "text-slate-600 font-medium" : "text-slate-400"}`}>
                         {item.description}
                       </p>
                     </div>
 
-                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
-                      <span className="text-[10px] text-teal-400 font-medium truncate">
+                    <div className={`pt-2 border-t flex items-center justify-between gap-2 ${isLight ? "border-slate-200" : "border-slate-800/80"}`}>
+                      <span className={`text-[10px] font-bold truncate ${isLight ? "text-teal-800" : "text-teal-400"}`}>
                         💡 {item.howToAward}
                       </span>
 
@@ -581,7 +617,11 @@ export const BonusGuideModal: React.FC<BonusGuideModalProps> = ({
                           <button
                             type="button"
                             onClick={() => handleOpenEdit(item)}
-                            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 border border-slate-700"
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 border-2 ${
+                              isLight
+                                ? "bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300"
+                                : "bg-slate-800 hover:bg-slate-700 text-amber-300 border-slate-700"
+                            }`}
                             title="تعديل هذا السبب"
                           >
                             <Edit2 className="h-3 w-3" />
@@ -590,7 +630,11 @@ export const BonusGuideModal: React.FC<BonusGuideModalProps> = ({
                           <button
                             type="button"
                             onClick={(e) => handleDeleteItem(item.id, e)}
-                            className="p-1 rounded-lg bg-rose-950/60 hover:bg-rose-900 text-rose-400 text-xs transition-all cursor-pointer border border-rose-800/40"
+                            className={`p-1 rounded-lg text-xs transition-all cursor-pointer border-2 ${
+                              isLight
+                                ? "bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-300"
+                                : "bg-rose-950/60 hover:bg-rose-900 text-rose-400 border-rose-800/40"
+                            }`}
                             title="حذف هذا السبب"
                           >
                             <Trash2 className="h-3.5 w-3.5" />

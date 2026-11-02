@@ -19,6 +19,7 @@ import {
   Award,
   Layers,
   ArrowRight,
+  Users,
 } from "lucide-react";
 import type { CustomTeam, ProcessedMeetingTeam } from "../types";
 import { meetingStore } from "../utils/meetingStore";
@@ -245,8 +246,15 @@ export const TeamsManagementModal: React.FC<TeamsManagementModalProps> = ({
       );
       if (res) {
         sounds.playVictory();
+        const teamMems = data.members.filter((m) => m.teamId === teamForPoints.id);
+        const ptsPerMem = teamMems.length > 0 ? Math.round(pointsDeltaInput / teamMems.length) : 0;
         const sign = pointsDeltaInput > 0 ? "+" : "";
-        showToast(`تم تحديث نقاط فريق «${teamForPoints.name}» بـ (${sign}${pointsDeltaInput} XP) بنجاح! ⚡`, "success");
+        showToast(
+          teamMems.length > 0
+            ? `تم تحديث نقاط فريق «${teamForPoints.name}» بـ (${sign}${pointsDeltaInput} XP) وتم تقسيمها بالتساوي (${sign}${ptsPerMem} XP لكل عضو من الـ ${teamMems.length}) بنجاح! ⚡`
+            : `تم تحديث نقاط فريق «${teamForPoints.name}» بـ (${sign}${pointsDeltaInput} XP) بنجاح! ⚡`,
+          "success"
+        );
         setTeamForPoints(null);
       } else {
         sounds.playClose();
@@ -433,7 +441,7 @@ export const TeamsManagementModal: React.FC<TeamsManagementModalProps> = ({
               placeholder="ابحث عن اسم فريق، شعار، أو اسم القائد..."
               className={`w-full h-10 pr-10 pl-4 rounded-2xl text-xs sm:text-sm focus:outline-none transition-all shadow-inner ${
                 isLight
-                  ? "bg-white border border-slate-300 text-slate-900 focus:border-blue-500"
+                  ? "bg-white border-2 border-slate-300 text-slate-900 placeholder:text-slate-500 focus:border-blue-500 font-medium"
                   : "bg-slate-900/90 border border-slate-700 text-white placeholder:text-slate-500 focus:border-amber-400"
               }`}
             />
@@ -470,7 +478,7 @@ export const TeamsManagementModal: React.FC<TeamsManagementModalProps> = ({
                   key={team.id}
                   className={`relative p-4 rounded-3xl border transition-all flex flex-col justify-between gap-3 shadow-md group ${
                     isLight
-                      ? "bg-white border-slate-200 hover:border-slate-300 shadow-slate-200/50"
+                      ? "bg-white border-2 border-slate-300 hover:border-slate-400 shadow-slate-200/80 text-slate-900"
                       : "bg-slate-900/80 border-slate-800 hover:border-slate-700"
                   }`}
                   style={{ borderRightWidth: 5, borderRightColor: team.color || "#3B82F6" }}
@@ -500,14 +508,16 @@ export const TeamsManagementModal: React.FC<TeamsManagementModalProps> = ({
                       {/* Name & Slogan */}
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs px-2 py-0.5 rounded-full font-black font-mono bg-slate-800 text-amber-300">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-black font-mono ${
+                            isLight ? "bg-slate-100 text-slate-900 border border-slate-300" : "bg-slate-800 text-amber-300"
+                          }`}>
                             #{team.rank}
                           </span>
-                          <h3 className="text-base font-black truncate">
+                          <h3 className={`text-base font-black truncate ${isLight ? "text-slate-900" : "text-white"}`}>
                             {team.name}
                           </h3>
                         </div>
-                        <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">
+                        <p className={`text-xs line-clamp-1 mt-0.5 ${isLight ? "text-slate-600 font-medium" : "text-slate-400"}`}>
                           {team.slogan || "لا يوجد شعار بعد"}
                         </p>
                       </div>
@@ -515,27 +525,29 @@ export const TeamsManagementModal: React.FC<TeamsManagementModalProps> = ({
 
                     {/* Points Total */}
                     <div className="text-left shrink-0">
-                      <div className="text-lg font-black text-amber-400 font-mono">
+                      <div className={`text-lg font-black font-mono ${isLight ? "text-amber-800 font-black" : "text-amber-400"}`}>
                         {team.points.toLocaleString()} XP
                       </div>
-                      <span className="text-[10px] text-slate-400">
+                      <span className={`text-[10px] ${isLight ? "text-slate-600 font-bold" : "text-slate-400"}`}>
                         {team.membersCount} عضو
                       </span>
                     </div>
                   </div>
 
                   {/* Metadata Row: Leader, Servants, Color Swatch */}
-                  <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-800/60">
+                  <div className={`flex items-center justify-between text-xs pt-2 border-t ${
+                    isLight ? "border-slate-200 text-slate-700" : "border-slate-800/60 text-slate-400"
+                  }`}>
                     <div className="flex items-center gap-3">
                       {team.leaderName && (
-                        <span className="text-amber-300 font-semibold flex items-center gap-1">
+                        <span className={`font-semibold flex items-center gap-1 ${isLight ? "text-amber-900 font-bold" : "text-amber-300"}`}>
                           <Crown className="h-3.5 w-3.5" />
                           <span>{team.leaderName}</span>
                         </span>
                       )}
                       <span className="flex items-center gap-1">
                         <span
-                          className="h-2.5 w-2.5 rounded-full inline-block"
+                          className="h-2.5 w-2.5 rounded-full inline-block border border-slate-300"
                           style={{ backgroundColor: team.color }}
                         />
                         <span className="text-[11px] font-mono">{team.color}</span>
@@ -547,7 +559,9 @@ export const TeamsManagementModal: React.FC<TeamsManagementModalProps> = ({
                       <button
                         type="button"
                         onClick={() => onOpenPhotoModal(team)}
-                        className="text-xs text-slate-400 hover:text-amber-300 flex items-center gap-1 transition-colors cursor-pointer"
+                        className={`text-xs flex items-center gap-1 transition-colors cursor-pointer ${
+                          isLight ? "text-slate-600 hover:text-amber-800 font-bold" : "text-slate-400 hover:text-amber-300"
+                        }`}
                         title="تغيير صورة الفريق"
                       >
                         <Camera className="h-3.5 w-3.5" />
@@ -562,7 +576,11 @@ export const TeamsManagementModal: React.FC<TeamsManagementModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleOpenEdit(team)}
-                      className="flex-1 py-1.5 px-2.5 rounded-xl bg-blue-600/15 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95"
+                      className={`flex-1 py-1.5 px-2.5 rounded-xl border text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95 ${
+                        isLight
+                          ? "bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-900 border-2 border-blue-300"
+                          : "bg-blue-600/15 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30"
+                      }`}
                     >
                       <Edit2 className="h-3.5 w-3.5" />
                       <span>تعديل الاسم والبيانات ✏️</span>
@@ -576,7 +594,11 @@ export const TeamsManagementModal: React.FC<TeamsManagementModalProps> = ({
                         setTeamForPoints(team);
                         setPointsDeltaInput(50);
                       }}
-                      className="py-1.5 px-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500 text-amber-300 hover:text-slate-950 border border-amber-500/30 text-xs font-black transition-all cursor-pointer flex items-center gap-1 active:scale-95"
+                      className={`py-1.5 px-2.5 rounded-xl border text-xs font-black transition-all cursor-pointer flex items-center gap-1 active:scale-95 ${
+                        isLight
+                          ? "bg-amber-100 hover:bg-amber-500 hover:text-slate-950 text-amber-950 border-2 border-amber-400 font-black"
+                          : "bg-amber-500/15 hover:bg-amber-500 text-amber-300 hover:text-slate-950 border border-amber-500/30"
+                      }`}
                       title="تعديل أو رصد نقاط الفريق"
                     >
                       <Zap className="h-3.5 w-3.5" />
@@ -590,7 +612,11 @@ export const TeamsManagementModal: React.FC<TeamsManagementModalProps> = ({
                         sounds.playTap();
                         setTeamToDelete(team);
                       }}
-                      className="p-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 text-xs transition-all cursor-pointer shrink-0 active:scale-95"
+                      className={`p-1.5 rounded-xl border text-xs transition-all cursor-pointer shrink-0 active:scale-95 ${
+                        isLight
+                          ? "bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-900 border-2 border-rose-300"
+                          : "bg-rose-500/15 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30"
+                      }`}
                       title="حذف هذا الفريق"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -912,6 +938,31 @@ export const TeamsManagementModal: React.FC<TeamsManagementModalProps> = ({
                     placeholder="مثال: فوز في المسابقة، حضور مبكر..."
                     className="w-full h-10 px-3 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-400 shadow-inner"
                   />
+                </div>
+
+                {/* Score Division Note */}
+                <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 space-y-1">
+                  <div className="flex items-center justify-between font-bold">
+                    <span className="flex items-center gap-1.5">
+                      <Users className="h-4 w-4 text-amber-400" />
+                      <span>تقسيم تلقائي على أعضاء الفريق:</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[11px]">
+                      {data.members.filter((m) => m.teamId === teamForPoints.id).length} أعضاء
+                    </span>
+                  </div>
+                  {data.members.filter((m) => m.teamId === teamForPoints.id).length > 0 ? (
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      سيتم توزيع الـ ({pointsDeltaInput > 0 ? `+${pointsDeltaInput}` : pointsDeltaInput} XP) بالتساوي على جميع الأعضاء:
+                      <strong className="text-amber-300 font-black font-mono mx-1">
+                        ({Math.round(pointsDeltaInput / data.members.filter((m) => m.teamId === teamForPoints.id).length) > 0 ? `+${Math.round(pointsDeltaInput / data.members.filter((m) => m.teamId === teamForPoints.id).length)}` : Math.round(pointsDeltaInput / data.members.filter((m) => m.teamId === teamForPoints.id).length)} XP لكل عضو)
+                      </strong>
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-slate-400">
+                      لا يوجد أعضاء مسجلين بهذا الفريق حتى الآن، ستُضاف النقاط لرصيد الفريق فقط.
+                    </p>
+                  )}
                 </div>
               </div>
 

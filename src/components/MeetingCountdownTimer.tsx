@@ -268,14 +268,24 @@ export const MeetingCountdownTimer: React.FC<MeetingCountdownTimerProps> = ({
           <div className="flex items-center gap-2">
             {/* Quick Extension Pills for Servants & Admins */}
             {canEditTime && !timeLeft.isExpired && (
-              <div className="hidden sm:flex items-center gap-1.5 bg-slate-950/70 p-1 rounded-2xl border border-slate-700/60 shadow-inner">
-                <span className="text-[10px] text-slate-400 font-bold px-1.5">
+              <div
+                className={`hidden sm:flex items-center gap-1.5 p-1 rounded-2xl border transition-all ${
+                  isLight
+                    ? "bg-slate-100 border-2 border-slate-300 shadow-xs"
+                    : "bg-slate-950/70 border border-slate-700/60 shadow-inner"
+                }`}
+              >
+                <span className={`text-[10px] font-black px-1.5 ${isLight ? "text-slate-600" : "text-slate-400"}`}>
                   تمديد:
                 </span>
                 <button
                   type="button"
                   onClick={() => handleAddMinutes(15)}
-                  className="px-2 py-0.5 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-300 text-[11px] font-mono font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+                  className={`px-2 py-0.5 rounded-xl text-[11px] font-mono font-black transition-all cursor-pointer shadow-xs active:scale-95 ${
+                    isLight
+                      ? "bg-white hover:bg-amber-100 text-amber-900 border border-slate-300"
+                      : "bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-300"
+                  }`}
                   title="إضافة 15 دقيقة لموعد ختام الاجتماع"
                 >
                   +15د
@@ -283,7 +293,11 @@ export const MeetingCountdownTimer: React.FC<MeetingCountdownTimerProps> = ({
                 <button
                   type="button"
                   onClick={() => handleAddMinutes(30)}
-                  className="px-2 py-0.5 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-300 text-[11px] font-mono font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+                  className={`px-2 py-0.5 rounded-xl text-[11px] font-mono font-black transition-all cursor-pointer shadow-xs active:scale-95 ${
+                    isLight
+                      ? "bg-white hover:bg-amber-100 text-amber-900 border border-slate-300"
+                      : "bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-300"
+                  }`}
                   title="إضافة 30 دقيقة لموعد ختام الاجتماع"
                 >
                   +30د
@@ -291,7 +305,11 @@ export const MeetingCountdownTimer: React.FC<MeetingCountdownTimerProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowCustomPicker(!showCustomPicker)}
-                  className="px-2 py-0.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1"
+                  className={`px-2 py-0.5 rounded-xl text-[11px] font-black transition-all cursor-pointer flex items-center gap-1 ${
+                    isLight
+                      ? "bg-white hover:bg-slate-100 text-slate-800 border border-slate-300"
+                      : "bg-slate-800 hover:bg-slate-700 text-slate-300"
+                  }`}
                   title="تعديل وقت الختام بدقة"
                 >
                   <Edit2 className="h-3 w-3" />
@@ -305,7 +323,7 @@ export const MeetingCountdownTimer: React.FC<MeetingCountdownTimerProps> = ({
               <button
                 type="button"
                 onClick={onCelebrateWinner}
-                className="px-4 py-2 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/30 animate-bounce cursor-pointer flex items-center gap-1.5"
+                className="px-4 py-2 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/30 animate-bounce cursor-pointer flex items-center gap-1.5 border-2 border-amber-600/40"
               >
                 <PartyPopper className="h-4 w-4" />
                 <span>احتفال بالبطل وتتويج الفائزين 🏆</span>
@@ -316,7 +334,11 @@ export const MeetingCountdownTimer: React.FC<MeetingCountdownTimerProps> = ({
             <button
               type="button"
               onClick={() => setIsExpanded(!isExpanded)}
-              className="p-2 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer border border-slate-700"
+              className={`p-2 rounded-2xl transition-all cursor-pointer border ${
+                isLight
+                  ? "bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 border-2 border-slate-300 shadow-xs"
+                  : "bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700"
+              }`}
               title={isExpanded ? "طي المؤقت" : "توسيع المؤقت"}
             >
               {isExpanded ? (
@@ -332,28 +354,40 @@ export const MeetingCountdownTimer: React.FC<MeetingCountdownTimerProps> = ({
         {showCustomPicker && canEditTime && (
           <form
             onSubmit={handleSetCustomTime}
-            className="p-3 rounded-2xl bg-slate-950/90 border border-amber-500/40 flex items-center gap-3 flex-wrap animate-fadeIn"
+            className={`p-3 rounded-2xl border flex items-center gap-3 flex-wrap animate-fadeIn ${
+              isLight
+                ? "bg-amber-50/90 border-2 border-amber-300 text-slate-900 shadow-sm"
+                : "bg-slate-950/90 border border-amber-500/40 text-white"
+            }`}
           >
-            <span className="text-xs text-amber-300 font-bold">
+            <span className={`text-xs font-black ${isLight ? "text-amber-950" : "text-amber-300"}`}>
               حدد موعد ختام اجتماع الشباب اليوم:
             </span>
             <input
               type="time"
               value={customTimeInput}
               onChange={(e) => setCustomTimeInput(e.target.value)}
-              className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-sm font-mono text-white focus:outline-none focus:border-amber-400"
+              className={`px-3 py-1.5 rounded-xl border text-sm font-mono focus:outline-none focus:border-amber-500 ${
+                isLight
+                  ? "bg-white border-2 border-slate-300 text-slate-900"
+                  : "bg-slate-900 border-slate-700 text-white"
+              }`}
               required
             />
             <button
               type="submit"
-              className="px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black shadow-md transition-all cursor-pointer"
+              className="px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black shadow-md transition-all cursor-pointer border border-amber-600/30"
             >
               حفظ واعتماد التوقيت ⚡
             </button>
             <button
               type="button"
               onClick={() => setShowCustomPicker(false)}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white text-xs cursor-pointer"
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer border ${
+                isLight
+                  ? "bg-slate-200 text-slate-700 hover:bg-slate-300 border-slate-300"
+                  : "bg-slate-800 text-slate-400 hover:text-white border-slate-700"
+              }`}
             >
               إلغاء
             </button>
@@ -367,16 +401,16 @@ export const MeetingCountdownTimer: React.FC<MeetingCountdownTimerProps> = ({
               {/* Days (if any) or Hours */}
               {timeLeft.days > 0 ? (
                 <div
-                  className={`p-2.5 sm:p-3.5 rounded-2xl border text-center transition-all ${
+                  className={`p-2.5 sm:p-3.5 rounded-2xl border-2 text-center transition-all ${
                     isLight
-                      ? "bg-slate-50 border-slate-200"
+                      ? "bg-white border-slate-300 shadow-sm"
                       : "bg-slate-950/80 border-slate-800"
                   }`}
                 >
-                  <div className="text-xl sm:text-3xl font-black font-mono tracking-tight text-amber-400">
+                  <div className={`text-xl sm:text-3xl font-black font-mono tracking-tight ${isLight ? "text-amber-700" : "text-amber-400"}`}>
                     {String(timeLeft.days).padStart(2, "0")}
                   </div>
-                  <div className="text-[10px] sm:text-xs text-slate-400 font-bold mt-1">
+                  <div className={`text-[10px] sm:text-xs font-black mt-1 ${isLight ? "text-slate-600" : "text-slate-400"}`}>
                     أيام
                   </div>
                 </div>
@@ -384,42 +418,44 @@ export const MeetingCountdownTimer: React.FC<MeetingCountdownTimerProps> = ({
 
               {/* Hours */}
               <div
-                className={`p-2.5 sm:p-3.5 rounded-2xl border text-center transition-all ${
+                className={`p-2.5 sm:p-3.5 rounded-2xl border-2 text-center transition-all ${
                   isLight
-                    ? "bg-slate-50 border-slate-200 shadow-xs"
+                    ? "bg-white border-slate-300 shadow-sm"
                     : "bg-slate-950/80 border-slate-800 shadow-inner"
                 }`}
               >
                 <div
                   className={`text-2xl sm:text-4xl font-black font-mono tracking-tight ${
                     timeLeft.isExpired
-                      ? "text-emerald-400"
+                      ? "text-emerald-500"
                       : isUrgent
-                      ? "text-rose-400 animate-pulse"
+                      ? "text-rose-500 animate-pulse"
+                      : isLight
+                      ? "text-slate-900"
                       : "text-amber-400"
                   }`}
                 >
                   {String(timeLeft.hours).padStart(2, "0")}
                 </div>
-                <div className="text-[10px] sm:text-xs text-slate-400 font-bold mt-1">
+                <div className={`text-[10px] sm:text-xs font-black mt-1 ${isLight ? "text-slate-600" : "text-slate-400"}`}>
                   ساعة
                 </div>
               </div>
 
               {/* Minutes */}
               <div
-                className={`p-2.5 sm:p-3.5 rounded-2xl border text-center transition-all ${
+                className={`p-2.5 sm:p-3.5 rounded-2xl border-2 text-center transition-all ${
                   isLight
-                    ? "bg-slate-50 border-slate-200 shadow-xs"
+                    ? "bg-white border-slate-300 shadow-sm"
                     : "bg-slate-950/80 border-slate-800 shadow-inner"
                 }`}
               >
                 <div
                   className={`text-2xl sm:text-4xl font-black font-mono tracking-tight ${
                     timeLeft.isExpired
-                      ? "text-emerald-400"
+                      ? "text-emerald-500"
                       : isUrgent
-                      ? "text-rose-400 animate-pulse"
+                      ? "text-rose-500 animate-pulse"
                       : isLight
                       ? "text-slate-900"
                       : "text-white"
@@ -427,47 +463,49 @@ export const MeetingCountdownTimer: React.FC<MeetingCountdownTimerProps> = ({
                 >
                   {String(timeLeft.minutes).padStart(2, "0")}
                 </div>
-                <div className="text-[10px] sm:text-xs text-slate-400 font-bold mt-1">
+                <div className={`text-[10px] sm:text-xs font-black mt-1 ${isLight ? "text-slate-600" : "text-slate-400"}`}>
                   دقيقة
                 </div>
               </div>
 
               {/* Seconds */}
               <div
-                className={`p-2.5 sm:p-3.5 rounded-2xl border text-center relative overflow-hidden transition-all ${
+                className={`p-2.5 sm:p-3.5 rounded-2xl border-2 text-center relative overflow-hidden transition-all ${
                   isLight
-                    ? "bg-amber-50/70 border-amber-300 shadow-xs"
+                    ? "bg-amber-50/90 border-amber-400 shadow-sm ring-1 ring-amber-400/30"
                     : "bg-slate-950/90 border-amber-500/50 shadow-inner ring-1 ring-amber-500/30"
                 }`}
               >
                 <div
                   className={`text-2xl sm:text-4xl font-black font-mono tracking-tight ${
                     timeLeft.isExpired
-                      ? "text-emerald-400"
+                      ? "text-emerald-500"
                       : isUrgent
-                      ? "text-rose-400 animate-ping"
+                      ? "text-rose-500 animate-ping"
+                      : isLight
+                      ? "text-amber-700"
                       : "text-amber-400"
                   }`}
                 >
                   {String(timeLeft.seconds).padStart(2, "0")}
                 </div>
-                <div className="text-[10px] sm:text-xs text-amber-500 font-bold mt-1">
+                <div className={`text-[10px] sm:text-xs font-black mt-1 ${isLight ? "text-amber-800" : "text-amber-500"}`}>
                   ثانية
                 </div>
               </div>
 
               {/* Status Badge */}
               <div
-                className={`p-2.5 sm:p-3.5 rounded-2xl border flex flex-col items-center justify-center text-center transition-all ${
+                className={`p-2.5 sm:p-3.5 rounded-2xl border-2 flex flex-col items-center justify-center text-center transition-all ${
                   isLight
-                    ? "bg-slate-50 border-slate-200 shadow-xs"
+                    ? "bg-white border-slate-300 shadow-sm"
                     : "bg-slate-950/80 border-slate-800 shadow-inner"
                 }`}
               >
                 <div className="text-xl sm:text-2xl">
                   {timeLeft.isExpired ? "🏆" : isUrgent ? "⚡" : "🎯"}
                 </div>
-                <div className="text-[9px] sm:text-[10px] font-black text-amber-400 leading-tight mt-1">
+                <div className={`text-[9px] sm:text-[10px] font-black leading-tight mt-1 ${isLight ? "text-amber-800" : "text-amber-400"}`}>
                   {timeLeft.isExpired ? "النهاية" : `${progressPercent}% انقضى`}
                 </div>
               </div>
@@ -475,11 +513,13 @@ export const MeetingCountdownTimer: React.FC<MeetingCountdownTimerProps> = ({
 
             {/* Progress Bar */}
             <div className="space-y-1 max-w-xl mx-auto pt-1">
-              <div className="w-full h-2 rounded-full bg-slate-800/80 overflow-hidden p-0.5 border border-slate-700/60">
+              <div className={`w-full h-2.5 rounded-full overflow-hidden p-0.5 border ${
+                isLight ? "bg-slate-200 border-slate-300" : "bg-slate-800/80 border-slate-700/60"
+              }`}>
                 <div
                   className={`h-full rounded-full transition-all duration-1000 ${
                     timeLeft.isExpired
-                      ? "bg-emerald-400 w-full"
+                      ? "bg-emerald-500 w-full"
                       : isUrgent
                       ? "bg-gradient-to-r from-amber-400 to-rose-500 animate-pulse"
                       : "bg-gradient-to-r from-amber-500 to-orange-400"
@@ -487,7 +527,9 @@ export const MeetingCountdownTimer: React.FC<MeetingCountdownTimerProps> = ({
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
-              <div className="flex justify-between items-center text-[10px] text-slate-400 px-1 font-mono">
+              <div className={`flex justify-between items-center text-[10px] px-1 font-mono font-bold ${
+                isLight ? "text-slate-600" : "text-slate-400"
+              }`}>
                 <span>انطلاق الاجتماع 🏁</span>
                 <span>{progressPercent}% من وقت اللقاء</span>
                 <span>صافرة الختام 🏆</span>

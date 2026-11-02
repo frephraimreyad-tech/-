@@ -958,6 +958,8 @@ class MeetingStore {
     let targetName = "";
     let teamId = "";
     let teamName = "";
+    let pointsPerMember = 0;
+    let distributedMembersCount = 0;
 
     if (targetType === "team") {
       const team = this.data.teams.find((t) => t.id === targetId);
@@ -966,6 +968,22 @@ class MeetingStore {
       targetName = team.name;
       teamId = team.id;
       teamName = team.name;
+
+      // تقسيم سكور الفريق بالتساوي على جميع أعضاء الفريق
+      // مثال: إذا أُعطي الفريق 100 XP وكان به 10 أعضاء، يحصل كل عضو على 10 XP
+      const teamMembers = this.data.members.filter((m) => m.teamId === team.id);
+      distributedMembersCount = teamMembers.length;
+      if (distributedMembersCount > 0) {
+        pointsPerMember = points >= 0
+          ? Math.max(points > 0 ? 1 : 0, Math.round(points / distributedMembersCount))
+          : Math.min(points < 0 ? -1 : 0, -Math.round(Math.abs(points) / distributedMembersCount));
+
+        if (pointsPerMember !== 0) {
+          teamMembers.forEach((member) => {
+            member.points = Math.max(0, (member.points || 0) + pointsPerMember);
+          });
+        }
+      }
     } else {
       const member = this.data.members.find((m) => m.id === targetId);
       if (!member) return null;
@@ -982,6 +1000,10 @@ class MeetingStore {
       }
     }
 
+    const txNotes = notes || (targetType === "team" && distributedMembersCount > 0
+      ? `تم تقسيم السكور بالتساوي: (${pointsPerMember > 0 ? "+" : ""}${pointsPerMember} XP لكل عضو من أعضاء الفريق الـ ${distributedMembersCount})`
+      : "");
+
     const tx: ScoreTransaction = {
       id: "tx-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       timestamp: timestamp || new Date().toISOString(),
@@ -993,11 +1015,13 @@ class MeetingStore {
       points,
       reason,
       category: category || "عام",
-      notes: notes || "",
+      notes: txNotes,
       executorId: executor?.id || "admin",
       executorName: executor?.name || "المسؤول المختص",
       executorRole: executor?.role || "admin",
     };
+
+    this.data.transactions = [tx, ...this.data.transactions.slice(0, 499)];
 
     const batch = writeBatch(db);
     batch.set(doc(db, "transactions", tx.id), tx);
@@ -1007,6 +1031,14 @@ class MeetingStore {
       if (team) {
         batch.update(doc(db, "teams", team.id), { points: team.points });
       }
+      // مزامنة نقاط أعضاء الفريق في قاعدة البيانات
+      const teamMembers = this.data.members.filter((m) => m.teamId === targetId);
+      if (teamMembers.length > 0 && pointsPerMember !== 0) {
+        teamMembers.forEach((mem) => {
+          batch.update(doc(db, "members", mem.id), { points: mem.points });
+        });
+      }
+      this.saveMembersToStorage(this.data.members);
     } else {
       const member = this.data.members.find((m) => m.id === targetId);
       if (member) {
@@ -1027,7 +1059,9 @@ class MeetingStore {
       targetType,
       targetId,
       targetName,
-      details: `رصد ${points > 0 ? "+" : ""}${points} XP [${category || "عام"}] لـ ${targetName}: ${reason}`,
+      details: targetType === "team" && distributedMembersCount > 0
+        ? `رصد ${points > 0 ? "+" : ""}${points} XP لفريق ${targetName} وتم تقسيمها بالتساوي (${pointsPerMember > 0 ? "+" : ""}${pointsPerMember} XP لكل عضو من الـ ${distributedMembersCount} أعضاء): ${reason}`
+        : `رصد ${points > 0 ? "+" : ""}${points} XP [${category || "عام"}] لـ ${targetName}: ${reason}`,
       status: "success",
     });
 
@@ -1369,20 +1403,40 @@ class MeetingStore {
     if (tx.targetType === "team") {
       const team = this.data.teams.find((t) => t.id === tx.targetId);
       if (team) {
-        batch.update(doc(db, "teams", team.id), { points: Math.max(0, team.points - tx.points) });
+        team.points = Math.max(0, team.points - tx.points);
+        batch.update(doc(db, "teams", team.id), { points: team.points });
+      }
+      const teamMembers = this.data.members.filter((m) => m.teamId === tx.targetId);
+      if (teamMembers.length > 0) {
+        const pointsPerMember = tx.points >= 0
+          ? Math.max(tx.points > 0 ? 1 : 0, Math.round(tx.points / teamMembers.length))
+          : Math.min(tx.points < 0 ? -1 : 0, -Math.round(Math.abs(tx.points) / teamMembers.length));
+
+        if (pointsPerMember !== 0) {
+          teamMembers.forEach((mem) => {
+            mem.points = Math.max(0, (mem.points || 0) - pointsPerMember);
+            batch.update(doc(db, "members", mem.id), { points: mem.points });
+          });
+        }
+        this.saveMembersToStorage(this.data.members);
       }
     } else {
       const member = this.data.members.find((m) => m.id === tx.targetId);
       if (member) {
-        batch.update(doc(db, "members", member.id), { points: Math.max(0, member.points - tx.points) });
+        member.points = Math.max(0, member.points - tx.points);
+        batch.update(doc(db, "members", member.id), { points: member.points });
       }
       const team = this.data.teams.find((t) => t.id === tx.teamId);
       if (team) {
-        batch.update(doc(db, "teams", team.id), { points: Math.max(0, team.points - tx.points) });
+        team.points = Math.max(0, team.points - tx.points);
+        batch.update(doc(db, "teams", team.id), { points: team.points });
       }
+      this.saveMembersToStorage(this.data.members);
     }
 
+    this.data.transactions = this.data.transactions.filter((t) => t.id !== transactionId);
     await batch.commit();
+    this.triggerAutoSync();
     return true;
   }
 

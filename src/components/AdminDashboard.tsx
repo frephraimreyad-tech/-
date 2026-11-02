@@ -46,6 +46,7 @@ import { AdminPhotoUploadModal } from "./AdminPhotoUploadModal";
 import { BonusGuideModal } from "./BonusGuideModal";
 import { TeamsProgressionChart } from "./TeamsProgressionChart";
 import { TeamsManagementModal } from "./TeamsManagementModal";
+import { AdminSideActivityWidget } from "./AdminSideActivityWidget";
 
 interface AdminDashboardProps {
   onBackToScoreboard: () => void;
@@ -433,10 +434,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
     if (res) {
       sounds.playVictory();
       const sign = deltaPoints > 0 ? "+" : "";
-      const msg = `تم تطبيق ${sign}${deltaPoints} XP لفريق (${team.name}) بنجاح! ⚡`;
+      const teamMembers = data.members.filter((m) => m.teamId === team.id);
+      const count = teamMembers.length;
+      const ptsPerMem = count > 0 ? Math.round(Math.abs(deltaPoints) / count) : 0;
+      const memberMsg = count > 0 ? ` وتم تقسيمها بالتساوي (${sign}${ptsPerMem} XP لكل عضو من الـ ${count} أعضاء)` : "";
+      const msg = `تم تطبيق ${sign}${deltaPoints} XP لفريق (${team.name})${memberMsg} بنجاح! ⚡`;
       showFeedback(msg, "success");
       setPointsFormFeedback({ text: msg, type: "success" });
-      setTimeout(() => setPointsFormFeedback(null), 5000);
+      setTimeout(() => setPointsFormFeedback(null), 6000);
     } else {
       sounds.playClose();
       const msg = "تعذر تحديث النقاط، تحقق من الصلاحيات";
@@ -596,9 +601,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
         {/* ========================================================= */}
         {/* TOP HEADER BAR */}
         {/* ========================================================= */}
-        <header className="rounded-3xl border border-slate-800 bg-[#0B132B]/90 backdrop-blur-xl p-5 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <header className={`rounded-3xl border-2 p-5 shadow-xl transition-all duration-300 flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+          isLight
+            ? "bg-white border-slate-300 text-slate-900 shadow-slate-200/60"
+            : "border-slate-800 bg-[#0B132B]/90 backdrop-blur-xl shadow-2xl text-slate-100"
+        }`}>
           <div className="flex items-center gap-3.5">
-            <div className="h-12 w-12 rounded-2xl bg-white/95 border-2 border-amber-400/80 p-0.5 flex items-center justify-center text-slate-950 shadow-lg shadow-amber-500/20 font-black overflow-hidden shrink-0">
+            <div className="h-12 w-12 rounded-2xl bg-white/95 border-2 border-amber-400 p-0.5 flex items-center justify-center text-slate-950 shadow-md shadow-amber-500/20 font-black overflow-hidden shrink-0">
               <img
                 src={data.config.meetingLogoUrl || "/assets/aistudio/_______________________55ad5e73.png"}
                 alt="لوجو الاجتماع"
@@ -607,14 +616,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                <h1 className={`text-xl sm:text-2xl font-black tracking-tight ${
+                  isLight ? "text-slate-900" : "text-white"
+                }`}>
                   لوحة التحكم الإدارية (Admin Dashboard)
                 </h1>
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold font-mono">
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold font-mono border ${
+                  isLight
+                    ? "bg-amber-100 border-amber-300 text-amber-950"
+                    : "bg-amber-500/15 border-amber-500/30 text-amber-300"
+                }`}>
                   v2.8 نظام متكامل
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className={`text-xs mt-0.5 font-medium ${
+                isLight ? "text-slate-600" : "text-slate-400"
+              }`}>
                 إضافة وتعديل الفرق، وتحديث النقاط المباشر، ونظام حماية وأمان ذكي بالرمز السري
               </p>
             </div>
@@ -623,17 +640,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
           {/* Quick Actions & Security Status */}
           <div className="flex items-center gap-2 flex-wrap justify-end">
             {/* Simple Security Badge & Toggle */}
-            <div className="flex items-center gap-1.5 bg-slate-900/90 border border-slate-700/80 px-3 py-1.5 rounded-2xl shadow-inner">
-              <span className="text-xs font-bold text-slate-300 flex items-center gap-1">
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border-2 transition-all ${
+              isLight
+                ? "bg-slate-50 border-slate-300 shadow-xs"
+                : "bg-slate-900/90 border-slate-700/80 shadow-inner"
+            }`}>
+              <span className={`text-xs font-black flex items-center gap-1 ${
+                isLight ? "text-slate-800" : "text-slate-300"
+              }`}>
                 {isUnlocked ? (
                   <>
-                    <Unlock className="h-3.5 w-3.5 text-emerald-400" />
-                    <span className="text-emerald-300">مفتوحة ومصرحة</span>
+                    <Unlock className="h-3.5 w-3.5 text-emerald-500" />
+                    <span className={isLight ? "text-emerald-800" : "text-emerald-300"}>مفتوحة ومصرحة</span>
                   </>
                 ) : (
                   <>
-                    <Lock className="h-3.5 w-3.5 text-rose-400" />
-                    <span className="text-rose-300">مقفلة بالحماية</span>
+                    <Lock className="h-3.5 w-3.5 text-rose-500" />
+                    <span className={isLight ? "text-rose-800" : "text-rose-300"}>مقفلة بالحماية</span>
                   </>
                 )}
               </span>
@@ -642,7 +665,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                 <button
                   type="button"
                   onClick={handleLockDashboard}
-                  className="px-2 py-0.5 rounded-lg bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white border border-rose-500/40 text-[11px] font-black transition-all cursor-pointer mr-1"
+                  className="px-2 py-0.5 rounded-lg bg-rose-500/20 hover:bg-rose-500 text-rose-700 hover:text-white border border-rose-500/40 text-[11px] font-black transition-all cursor-pointer mr-1"
                   title="قفل لوحة التحكم فوراً لمنع التعديلات غير المصرح بها"
                 >
                   قفل الآن 🔒
@@ -651,7 +674,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                 <button
                   type="button"
                   onClick={() => setActiveTab("security")}
-                  className="px-2 py-0.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-slate-950 border border-emerald-500/40 text-[11px] font-black transition-all cursor-pointer mr-1"
+                  className="px-2 py-0.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-700 hover:text-slate-950 border border-emerald-500/40 text-[11px] font-black transition-all cursor-pointer mr-1"
                   title="إدخال رمز المرور لفك القفل"
                 >
                   فك القفل 🔑
@@ -666,7 +689,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                 sounds.playTap();
                 setShowAdminPhotoModal(true);
               }}
-              className="px-2.5 py-1.5 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-amber-500/50 text-amber-300 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95 group"
+              className={`px-2.5 py-1.5 rounded-2xl border-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-95 group ${
+                isLight
+                  ? "bg-white hover:bg-amber-50 border-amber-400 text-amber-950"
+                  : "bg-slate-800 hover:bg-slate-700 border-amber-500/50 text-amber-300"
+              }`}
               title="تحديث صورة مدير النظام (أبونا افرايم رياض)"
             >
               <div className="relative h-6 w-6 rounded-full bg-slate-900 border border-amber-400 overflow-hidden flex items-center justify-center shrink-0">
@@ -686,10 +713,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                 sounds.playTap();
                 setShowUserSwitcher(true);
               }}
-              className="px-3.5 py-1.5 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95"
+              className={`px-3.5 py-1.5 rounded-2xl border-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-95 ${
+                isLight
+                  ? "bg-white hover:bg-slate-50 border-slate-300 text-slate-800"
+                  : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-amber-300"
+              }`}
               title="تبديل حساب المستخدم النشط"
             >
-              <KeyRound className="h-3.5 w-3.5 text-amber-400" />
+              <KeyRound className="h-3.5 w-3.5 text-amber-500" />
               <span>{currentUser.name.split(" ")[0]} ({currentUser.roleLabel})</span>
             </button>
 
@@ -700,7 +731,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                 sounds.playTap();
                 setShowQRScanner(true);
               }}
-              className="px-3.5 py-1.5 rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95"
+              className="px-3.5 py-1.5 rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 border-2 border-emerald-600/40"
               title="مسح QR للحضور الفوري"
             >
               <Camera className="h-3.5 w-3.5" />
@@ -714,10 +745,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                 sounds.playTap();
                 setShowAdvancedPanel(true);
               }}
-              className="px-3 py-1.5 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95"
+              className={`px-3 py-1.5 rounded-2xl border-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-95 ${
+                isLight
+                  ? "bg-white hover:bg-slate-50 border-slate-300 text-slate-800"
+                  : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300 hover:text-white"
+              }`}
               title="فتح لوحة الإعدادات الشاملة (الأعضاء والفعاليات والنسخ الاحتياطي)"
             >
-              <Settings className="h-3.5 w-3.5 text-slate-400" />
+              <Settings className="h-3.5 w-3.5 text-amber-500" />
               <span>إعدادات شاملة ⚙️</span>
             </button>
 
@@ -728,7 +763,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                 sounds.playTap();
                 setShowPdfReportModal(true);
               }}
-              className="px-3.5 py-1.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-95"
+              className="px-3.5 py-1.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-95 border-2 border-amber-600/40"
               title="تصدير تقرير نهائي لنتائج وترتيب الفرق بتنسيق PDF أو صورة للتليجرام والواتساب"
             >
               <Download className="h-3.5 w-3.5" />
@@ -736,7 +771,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
             </button>
 
             {/* Theme Switcher Toggle (Auto Time / Day / Night) */}
-            <div className="flex items-center gap-1 bg-slate-900/90 border border-amber-500/30 p-1 rounded-2xl shadow-sm">
+            <div className={`flex items-center gap-1 p-1 rounded-2xl border-2 shadow-xs ${
+              isLight
+                ? "bg-white border-slate-300"
+                : "bg-slate-900/90 border-amber-500/30"
+            }`}>
               <button
                 type="button"
                 onClick={() => {
@@ -745,7 +784,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                 }}
                 className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
                   themePreference === "auto"
-                    ? "bg-amber-500 text-slate-950 font-black shadow-xs"
+                    ? "bg-amber-500 text-slate-950 font-black shadow-xs border border-amber-600/30"
+                    : isLight
+                    ? "text-slate-700 hover:text-slate-950 hover:bg-slate-100"
                     : "text-slate-300 hover:text-white"
                 }`}
                 title={`تلقائي حسب الوقت (${isDaytime ? "نهار ☀️ 06:00-18:00" : "ليل 🌙 18:00-06:00"})`}
@@ -762,7 +803,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                 }}
                 className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
                   themePreference === "light"
-                    ? "bg-amber-400 text-slate-950 font-black shadow-xs"
+                    ? "bg-amber-400 text-slate-950 font-black shadow-xs border border-amber-500/40"
+                    : isLight
+                    ? "text-slate-700 hover:text-slate-950 hover:bg-slate-100"
                     : "text-slate-300 hover:text-white"
                 }`}
                 title="الوضع النهاري"
@@ -780,6 +823,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                 className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
                   themePreference === "dark"
                     ? "bg-indigo-600 text-white font-black shadow-xs"
+                    : isLight
+                    ? "text-slate-700 hover:text-slate-950 hover:bg-slate-100"
                     : "text-slate-300 hover:text-white"
                 }`}
                 title="الوضع الليلي"
@@ -796,7 +841,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                 sounds.playTap();
                 onBackToScoreboard();
               }}
-              className="px-4 py-1.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-95"
+              className="px-4 py-1.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-95 border-2 border-amber-600/40"
             >
               <span>لوحة الشرف الكبرى</span>
               <ArrowRight className="h-4 w-4" />
@@ -808,63 +853,101 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
         {/* STATS OVERVIEW CARDS */}
         {/* ========================================================= */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-          <div className="p-4 rounded-3xl border border-slate-800 bg-[#0B132B]/80 backdrop-blur-md shadow-lg space-y-1">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
+          <div className={`p-4 rounded-3xl border-2 space-y-1 transition-all ${
+            isLight
+              ? "bg-white border-slate-300 shadow-sm text-slate-900"
+              : "border-slate-800 bg-[#0B132B]/80 backdrop-blur-md shadow-lg text-slate-100"
+          }`}>
+            <div className={`flex items-center justify-between text-xs font-bold ${
+              isLight ? "text-slate-600" : "text-slate-400"
+            }`}>
               <span>إجمالي الفرق المشاركة</span>
-              <Shield className="h-4 w-4 text-blue-400" />
+              <Shield className="h-4 w-4 text-blue-500" />
             </div>
-            <div className="text-2xl sm:text-3xl font-black text-white font-mono">
+            <div className={`text-2xl sm:text-3xl font-black font-mono ${
+              isLight ? "text-slate-900" : "text-white"
+            }`}>
               {totalTeams}
             </div>
-            <div className="text-[11px] text-slate-400">
+            <div className={`text-[11px] font-medium ${
+              isLight ? "text-slate-600" : "text-slate-400"
+            }`}>
               {data.members.length} عضو مسجل بالفرق
             </div>
           </div>
 
-          <div className="p-4 rounded-3xl border border-slate-800 bg-[#0B132B]/80 backdrop-blur-md shadow-lg space-y-1">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
+          <div className={`p-4 rounded-3xl border-2 space-y-1 transition-all ${
+            isLight
+              ? "bg-white border-slate-300 shadow-sm text-slate-900"
+              : "border-slate-800 bg-[#0B132B]/80 backdrop-blur-md shadow-lg text-slate-100"
+          }`}>
+            <div className={`flex items-center justify-between text-xs font-bold ${
+              isLight ? "text-slate-600" : "text-slate-400"
+            }`}>
               <span>مجموع النقاط الممنوحة</span>
-              <Zap className="h-4 w-4 text-amber-400" />
+              <Zap className="h-4 w-4 text-amber-500" />
             </div>
-            <div className="text-2xl sm:text-3xl font-black text-amber-400 font-mono">
-              {totalPoints.toLocaleString()} <span className="text-xs text-amber-300 font-arabic">XP</span>
+            <div className={`text-2xl sm:text-3xl font-black font-mono ${
+              isLight ? "text-amber-800" : "text-amber-400"
+            }`}>
+              {totalPoints.toLocaleString()} <span className="text-xs text-amber-600 font-arabic font-bold">XP</span>
             </div>
-            <div className="text-[11px] text-slate-400">
+            <div className={`text-[11px] font-medium ${
+              isLight ? "text-slate-600" : "text-slate-400"
+            }`}>
               متوسط: {avgPoints.toLocaleString()} XP لكل فريق
             </div>
           </div>
 
-          <div className="p-4 rounded-3xl border border-slate-800 bg-[#0B132B]/80 backdrop-blur-md shadow-lg space-y-1">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
+          <div className={`p-4 rounded-3xl border-2 space-y-1 transition-all ${
+            isLight
+              ? "bg-white border-slate-300 shadow-sm text-slate-900"
+              : "border-slate-800 bg-[#0B132B]/80 backdrop-blur-md shadow-lg text-slate-100"
+          }`}>
+            <div className={`flex items-center justify-between text-xs font-bold ${
+              isLight ? "text-slate-600" : "text-slate-400"
+            }`}>
               <span>الفريق المتصدر حالياً</span>
-              <Trophy className="h-4 w-4 text-yellow-400" />
+              <Trophy className="h-4 w-4 text-yellow-500" />
             </div>
-            <div className="text-base sm:text-lg font-black text-emerald-400 truncate flex items-center gap-1.5">
+            <div className={`text-base sm:text-lg font-black truncate flex items-center gap-1.5 ${
+              isLight ? "text-emerald-800" : "text-emerald-400"
+            }`}>
               <span>{topTeam?.icon || "🏆"}</span>
               <span className="truncate">{topTeam?.name || "لا يوجد فرق"}</span>
             </div>
-            <div className="text-[11px] text-slate-400 font-mono">
+            <div className={`text-[11px] font-mono font-bold ${
+              isLight ? "text-slate-600" : "text-slate-400"
+            }`}>
               {topTeam ? `${topTeam.points.toLocaleString()} XP` : "-"}
             </div>
           </div>
 
-          <div className="p-4 rounded-3xl border border-slate-800 bg-[#0B132B]/80 backdrop-blur-md shadow-lg space-y-1">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
+          <div className={`p-4 rounded-3xl border-2 space-y-1 transition-all ${
+            isLight
+              ? "bg-white border-slate-300 shadow-sm text-slate-900"
+              : "border-slate-800 bg-[#0B132B]/80 backdrop-blur-md shadow-lg text-slate-100"
+          }`}>
+            <div className={`flex items-center justify-between text-xs font-bold ${
+              isLight ? "text-slate-600" : "text-slate-400"
+            }`}>
               <span>حالة الحماية والأمان</span>
-              <Lock className="h-4 w-4 text-purple-400" />
+              <Lock className="h-4 w-4 text-purple-500" />
             </div>
             <div className="text-base sm:text-lg font-black flex items-center gap-1.5">
               {isUnlocked ? (
-                <span className="text-emerald-400 flex items-center gap-1">
+                <span className="text-emerald-600 flex items-center gap-1">
                   <CheckCircle className="h-4 w-4" /> موثقة ومفتوحة
                 </span>
               ) : (
-                <span className="text-rose-400 flex items-center gap-1">
+                <span className="text-rose-600 flex items-center gap-1">
                   <Lock className="h-4 w-4" /> محمية برقم PIN
                 </span>
               )}
             </div>
-            <div className="text-[11px] text-slate-400">
+            <div className={`text-[11px] font-medium ${
+              isLight ? "text-slate-600" : "text-slate-400"
+            }`}>
               {isUnlocked ? "مسموح بتحديث الفرق والنقاط" : "أدخل الرمز السري للتعديل"}
             </div>
           </div>
@@ -875,7 +958,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
         {/* ========================================================= */}
         {feedback && (
           <div
-            className={`p-4 rounded-2xl border flex items-center gap-3 shadow-xl transition-all animate-bounce ${
+            className={`p-4 rounded-2xl border-2 flex items-center gap-3 shadow-xl transition-all animate-bounce ${
               feedback.type === "success"
                 ? "bg-emerald-950/90 border-emerald-500/60 text-emerald-200"
                 : feedback.type === "error"
@@ -904,10 +987,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
               sounds.playTap();
               setActiveTab("teams");
             }}
-            className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap border-2 ${
               activeTab === "teams"
-                ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/20 font-black scale-102"
-                : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800"
+                ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/20 font-black scale-102 border-blue-700/40"
+                : isLight
+                ? "bg-white hover:bg-slate-50 text-slate-800 border-slate-300 shadow-xs"
+                : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border-slate-800"
             }`}
           >
             <Shield className="h-4 w-4" />
@@ -920,10 +1005,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
               sounds.playTap();
               setActiveTab("quick_points");
             }}
-            className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap border-2 ${
               activeTab === "quick_points"
-                ? "bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-lg shadow-amber-500/20 font-black scale-102"
-                : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800"
+                ? "bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-lg shadow-amber-500/20 font-black scale-102 border-amber-600/40"
+                : isLight
+                ? "bg-white hover:bg-slate-50 text-slate-800 border-slate-300 shadow-xs"
+                : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border-slate-800"
             }`}
           >
             <Zap className="h-4 w-4" />
@@ -936,10 +1023,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
               sounds.playTap();
               setActiveTab("progression");
             }}
-            className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap border-2 ${
               activeTab === "progression"
-                ? "bg-gradient-to-r from-teal-500 to-cyan-500 text-slate-950 shadow-lg shadow-teal-500/20 font-black scale-102"
-                : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800"
+                ? "bg-gradient-to-r from-teal-500 to-cyan-500 text-slate-950 shadow-lg shadow-teal-500/20 font-black scale-102 border-teal-600/40"
+                : isLight
+                ? "bg-white hover:bg-slate-50 text-slate-800 border-slate-300 shadow-xs"
+                : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border-slate-800"
             }`}
           >
             <TrendingUp className="h-4 w-4" />
@@ -952,10 +1041,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
               sounds.playTap();
               setActiveTab("security");
             }}
-            className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap border-2 ${
               activeTab === "security"
-                ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/20 font-black scale-102"
-                : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800"
+                ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/20 font-black scale-102 border-purple-700/40"
+                : isLight
+                ? "bg-white hover:bg-slate-50 text-slate-800 border-slate-300 shadow-xs"
+                : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border-slate-800"
             }`}
           >
             <Lock className="h-4 w-4" />
@@ -968,10 +1059,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
               sounds.playTap();
               setActiveTab("history");
             }}
-            className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap border-2 ${
               activeTab === "history"
-                ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-500/20 font-black scale-102"
-                : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800"
+                ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-500/20 font-black scale-102 border-emerald-700/40"
+                : isLight
+                ? "bg-white hover:bg-slate-50 text-slate-800 border-slate-300 shadow-xs"
+                : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border-slate-800"
             }`}
           >
             <Clock className="h-4 w-4" />
@@ -984,10 +1077,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
               sounds.playTap();
               setActiveTab("google_sheets" as any);
             }}
-            className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap border-2 ${
               (activeTab as any) === "google_sheets"
-                ? "bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-lg shadow-emerald-500/20 font-black scale-102"
-                : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800"
+                ? "bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-lg shadow-emerald-500/20 font-black scale-102 border-emerald-700/40"
+                : isLight
+                ? "bg-white hover:bg-slate-50 text-slate-800 border-slate-300 shadow-xs"
+                : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border-slate-800"
             }`}
           >
             <Share2 className="h-4 w-4" />
@@ -1207,14 +1302,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
         {/* TAB 2: QUICK POINTS UPDATER (تحديث ورصد النقاط) */}
         {/* ========================================================= */}
         {activeTab === "quick_points" && (
-          <div className="rounded-3xl border border-slate-800 bg-[#0B132B]/85 backdrop-blur-xl p-5 sm:p-7 shadow-2xl space-y-6">
-            <div className="border-b border-slate-800 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className={`rounded-3xl border-2 p-5 sm:p-7 shadow-xl space-y-6 transition-all ${
+            isLight
+              ? "bg-white border-slate-300 text-slate-900 shadow-slate-200/60"
+              : "border-slate-800 bg-[#0B132B]/85 backdrop-blur-xl shadow-2xl text-slate-100"
+          }`}>
+            <div className={`border-b pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+              isLight ? "border-slate-200" : "border-slate-800"
+            }`}>
               <div>
-                <h2 className="text-lg sm:text-xl font-black text-amber-300 flex items-center gap-2">
-                  <Zap className="h-5 w-5 text-amber-400" />
+                <h2 className={`text-lg sm:text-xl font-black flex items-center gap-2 ${
+                  isLight ? "text-amber-950" : "text-amber-300"
+                }`}>
+                  <Zap className="h-5 w-5 text-amber-500" />
                   <span>رصد وتحديث النقاط والبونص المباشر (+ / - XP)</span>
                 </h2>
-                <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                <p className={`text-xs sm:text-sm mt-1 font-medium ${
+                  isLight ? "text-slate-600" : "text-slate-400"
+                }`}>
                   اختر الفريق أو العضو المستهدف بالبونص، وحدد المقدار والسبب ليتم التحديث الفوري على لوحة الشرف!
                 </p>
               </div>
@@ -1228,7 +1333,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                     setBonusGuideInitialEdit(false);
                     setShowBonusGuideModal(true);
                   }}
-                  className="px-4 py-2 rounded-2xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500 hover:to-orange-500 text-amber-300 hover:text-slate-950 border border-amber-500/40 text-xs font-black transition-all cursor-pointer flex items-center gap-2 shadow-sm self-start sm:self-auto shrink-0 active:scale-95"
+                  className={`px-4 py-2 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 shadow-xs self-start sm:self-auto shrink-0 active:scale-95 border-2 ${
+                    isLight
+                      ? "bg-amber-100 hover:bg-amber-500 hover:text-slate-950 text-amber-950 border-amber-400"
+                      : "bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500 hover:to-orange-500 text-amber-300 hover:text-slate-950 border-amber-500/40"
+                  }`}
                 >
                   <Award className="h-4 w-4" />
                   <span>دليل وبنك درجات البونص 🎯</span>
@@ -1242,7 +1351,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                     setBonusGuideInitialEdit(true);
                     setShowBonusGuideModal(true);
                   }}
-                  className="px-4 py-2 rounded-2xl bg-gradient-to-r from-emerald-600/20 to-teal-600/20 hover:from-emerald-500 hover:to-teal-500 text-emerald-300 hover:text-slate-950 border border-emerald-500/40 text-xs font-black transition-all cursor-pointer flex items-center gap-2 shadow-sm self-start sm:self-auto shrink-0 active:scale-95"
+                  className={`px-4 py-2 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 shadow-xs self-start sm:self-auto shrink-0 active:scale-95 border-2 ${
+                    isLight
+                      ? "bg-emerald-100 hover:bg-emerald-500 hover:text-slate-950 text-emerald-950 border-emerald-400"
+                      : "bg-gradient-to-r from-emerald-600/20 to-teal-600/20 hover:from-emerald-500 hover:to-teal-500 text-emerald-300 hover:text-slate-950 border-emerald-500/40"
+                  }`}
                 >
                   <Edit2 className="h-4 w-4" />
                   <span>تعديل دليل النقاط ✏️</span>
@@ -1257,19 +1370,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                   {/* Select Target: Team vs Member */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-slate-300 block">
+                      <label className={`text-xs font-black block ${
+                        isLight ? "text-slate-900" : "text-slate-300"
+                      }`}>
                         1. اختر جهة الرصد المستهدفة:
                       </label>
-                      <div className="flex items-center gap-1.5 p-1 bg-slate-900 rounded-xl border border-slate-800">
+                      <div className={`flex items-center gap-1.5 p-1 rounded-xl border-2 ${
+                        isLight ? "bg-slate-100 border-slate-300 shadow-xs" : "bg-slate-900 border-slate-800"
+                      }`}>
                         <button
                           type="button"
                           onClick={() => {
                             sounds.playTap();
                             setPointTargetType("team");
                           }}
-                          className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                          className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1 ${
                             pointTargetType === "team"
-                              ? "bg-amber-500 text-slate-950 font-black shadow-sm"
+                              ? "bg-amber-500 text-slate-950 shadow-sm border border-amber-600/30"
+                              : isLight
+                              ? "text-slate-700 hover:text-slate-950 hover:bg-white"
                               : "text-slate-400 hover:text-white"
                           }`}
                         >
@@ -1282,9 +1401,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                             sounds.playTap();
                             setPointTargetType("member");
                           }}
-                          className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                          className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1 ${
                             pointTargetType === "member"
-                              ? "bg-amber-500 text-slate-950 font-black shadow-sm"
+                              ? "bg-amber-500 text-slate-950 shadow-sm border border-amber-600/30"
+                              : isLight
+                              ? "text-slate-700 hover:text-slate-950 hover:bg-white"
                               : "text-slate-400 hover:text-white"
                           }`}
                         >
@@ -1306,9 +1427,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                                 sounds.playTap();
                                 setPointTargetTeamId(t.id);
                               }}
-                              className={`p-3 rounded-2xl border text-right transition-all cursor-pointer flex flex-col justify-between gap-2 ${
+                              className={`p-3 rounded-2xl border-2 text-right transition-all cursor-pointer flex flex-col justify-between gap-2 ${
                                 isSelected
-                                  ? "bg-amber-500/25 border-2 border-amber-400 text-white font-black shadow-lg shadow-amber-500/20 scale-[1.02]"
+                                  ? isLight
+                                    ? "bg-amber-100 border-amber-500 text-slate-950 font-black shadow-md ring-2 ring-amber-400/40 scale-[1.02]"
+                                    : "bg-amber-500/25 border-amber-400 text-white font-black shadow-lg shadow-amber-500/20 scale-[1.02]"
+                                  : isLight
+                                  ? "bg-slate-50 hover:bg-white border-slate-300 text-slate-800 shadow-xs"
                                   : "bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-850 hover:border-slate-700"
                               }`}
                             >
@@ -1316,12 +1441,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                                 <span className="text-2xl">{t.icon}</span>
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center justify-between gap-1">
-                                    <span className="text-xs font-bold truncate">{t.name}</span>
+                                    <span className="text-xs font-black truncate">{t.name}</span>
                                     {isSelected && (
-                                      <CheckCircle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                                      <CheckCircle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                                     )}
                                   </div>
-                                  <span className="text-[11px] text-amber-300 font-mono font-bold block">
+                                  <span className={`text-[11px] font-mono font-black block ${
+                                    isLight ? "text-amber-800" : "text-amber-300"
+                                  }`}>
                                     {t.points.toLocaleString()} XP
                                   </span>
                                 </div>
@@ -1329,7 +1456,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
 
                               {/* Quick 1-Tap Action Chips right on Team Card */}
                               <div
-                                className="flex items-center gap-1 pt-1.5 border-t border-slate-800/80"
+                                className={`flex items-center gap-1 pt-1.5 border-t ${
+                                  isLight ? "border-slate-200" : "border-slate-800/80"
+                                }`}
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <button
@@ -1339,7 +1468,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                                     setPointTargetTeamId(t.id);
                                     handleApplyTeamPoints(t.id, 30, "رصد بونص مباشر سريع (+30 XP)", "نشاط جماعي");
                                   }}
-                                  className="flex-1 py-1 px-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 hover:text-slate-950 text-emerald-400 text-[10px] font-mono font-black transition-all border border-emerald-500/30 text-center active:scale-95 cursor-pointer"
+                                  className={`flex-1 py-1 px-1.5 rounded-lg text-[10px] font-mono font-black transition-all border text-center active:scale-95 cursor-pointer ${
+                                    isLight
+                                      ? "bg-emerald-100 hover:bg-emerald-500 hover:text-slate-950 text-emerald-900 border-emerald-300"
+                                      : "bg-emerald-500/20 hover:bg-emerald-500 hover:text-slate-950 text-emerald-400 border-emerald-500/30"
+                                  }`}
                                   title="رصد +30 XP فوري لهذا الفريق"
                                 >
                                   +30 XP
@@ -1351,7 +1484,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                                     setPointTargetTeamId(t.id);
                                     handleApplyTeamPoints(t.id, 50, "رصد بونص تميز سريع (+50 XP)", "نشاط جماعي");
                                   }}
-                                  className="flex-1 py-1 px-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500 hover:text-slate-950 text-amber-300 text-[10px] font-mono font-black transition-all border border-amber-500/30 text-center active:scale-95 cursor-pointer"
+                                  className={`flex-1 py-1 px-1.5 rounded-lg text-[10px] font-mono font-black transition-all border text-center active:scale-95 cursor-pointer ${
+                                    isLight
+                                      ? "bg-amber-100 hover:bg-amber-500 hover:text-slate-950 text-amber-900 border-amber-300"
+                                      : "bg-amber-500/20 hover:bg-amber-500 hover:text-slate-950 text-amber-300 border-amber-500/30"
+                                  }`}
                                   title="رصد +50 XP فوري لهذا الفريق"
                                 >
                                   +50 XP
@@ -1365,16 +1502,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
 
                     {/* TARGET TYPE 2: INDIVIDUAL MEMBERS */}
                     {pointTargetType === "member" && (
-                      <div className="space-y-2.5 bg-slate-900/70 p-3.5 rounded-2xl border border-slate-800">
+                      <div className={`space-y-2.5 p-3.5 rounded-2xl border-2 ${
+                        isLight ? "bg-slate-50 border-slate-300" : "bg-slate-900/70 border-slate-800"
+                      }`}>
                         <div className="relative">
                           <input
                             type="text"
                             value={pointMemberSearch}
                             onChange={(e) => setPointMemberSearch(e.target.value)}
                             placeholder="ابحث باسم المخدوم أو الكود..."
-                            className="w-full h-10 pr-9 pl-3 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
+                            className={`w-full h-10 pr-9 pl-3 rounded-xl border text-xs focus:outline-none ${
+                              isLight
+                                ? "bg-white border-2 border-slate-300 text-slate-900 placeholder:text-slate-500 focus:border-amber-500 font-medium"
+                                : "bg-slate-950 border border-slate-700 text-white placeholder:text-slate-500 focus:border-amber-400"
+                            }`}
                           />
-                          <Search className="absolute right-3 top-3 h-4 w-4 text-slate-500" />
+                          <Search className={`absolute right-3 top-3 h-4 w-4 ${isLight ? "text-slate-500" : "text-slate-500"}`} />
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto no-scrollbar">
@@ -1398,27 +1541,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                                     sounds.playTap();
                                     setPointTargetMemberId(m.id);
                                   }}
-                                  className={`p-2.5 rounded-xl border text-right transition-all cursor-pointer flex items-center gap-2 ${
+                                  className={`p-2.5 rounded-xl border-2 text-right transition-all cursor-pointer flex items-center gap-2 ${
                                     isSelected
-                                      ? "bg-amber-500/25 border-2 border-amber-400 text-white font-black shadow-md scale-[1.01]"
+                                      ? isLight
+                                        ? "bg-amber-100 border-amber-500 text-slate-950 font-black shadow-md scale-[1.01]"
+                                        : "bg-amber-500/25 border-amber-400 text-white font-black shadow-md scale-[1.01]"
+                                      : isLight
+                                      ? "bg-white border-slate-300 text-slate-900 hover:bg-slate-50"
                                       : "bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800"
                                   }`}
                                 >
-                                  <div className="h-8 w-8 rounded-full overflow-hidden bg-slate-800 border border-slate-700 shrink-0 flex items-center justify-center text-xs">
+                                  <div className={`h-8 w-8 rounded-full overflow-hidden border shrink-0 flex items-center justify-center text-xs ${
+                                    isLight ? "bg-slate-100 border-slate-300" : "bg-slate-800 border-slate-700"
+                                  }`}>
                                     {m.avatarUrl ? (
                                       <img src={m.avatarUrl} alt="" className="h-full w-full object-cover" />
                                     ) : (
-                                      <span className="font-bold text-amber-400">{m.name.charAt(0)}</span>
+                                      <span className={`font-bold ${isLight ? "text-amber-800" : "text-amber-400"}`}>{m.name.charAt(0)}</span>
                                     )}
                                   </div>
                                   <div className="min-w-0 flex-1">
                                     <div className="flex items-center justify-between gap-1">
-                                      <span className="text-xs font-bold truncate">{m.name}</span>
-                                      {isSelected && <CheckCircle className="h-3.5 w-3.5 text-amber-400 shrink-0" />}
+                                      <span className={`text-xs font-bold truncate ${isLight ? "text-slate-900" : "text-white"}`}>{m.name}</span>
+                                      {isSelected && <CheckCircle className="h-3.5 w-3.5 text-amber-500 shrink-0" />}
                                     </div>
-                                    <span className="text-[10px] text-slate-400 block truncate">
+                                    <span className={`text-[10px] block truncate ${isLight ? "text-slate-600 font-medium" : "text-slate-400"}`}>
                                       {team?.icon} {team?.name || "بدون فريق"} •{" "}
-                                      <span className="font-mono text-amber-400 font-bold">{m.points} XP</span>
+                                      <span className={`font-mono font-bold ${isLight ? "text-amber-800" : "text-amber-400"}`}>{m.points} XP</span>
                                     </span>
                                   </div>
                                 </button>
@@ -1432,12 +1581,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                   {/* Operation: Add or Deduct */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-slate-300 block">
+                      <label className={`text-xs font-bold block ${isLight ? "text-slate-900" : "text-slate-300"}`}>
                         2. نوع العملية (إضافة نقاط تفوق أو خصم):
                       </label>
-                      <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border ${
+                      <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border-2 ${
                         pointOperation === "add"
-                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                          ? isLight
+                            ? "bg-emerald-100 text-emerald-900 border-emerald-400"
+                            : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                          : isLight
+                          ? "bg-rose-100 text-rose-900 border-rose-400"
                           : "bg-rose-500/20 text-rose-300 border-rose-500/40"
                       }`}>
                         {pointOperation === "add" ? "✓ الوضع المختار: إضافة نقاط (+)" : "✓ الوضع المختار: خصم نقاط (-)"}
@@ -1453,11 +1606,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                         }}
                         className={`flex-1 py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm border-2 transition-all cursor-pointer flex items-center justify-center gap-2 ${
                           pointOperation === "add"
-                            ? "bg-emerald-500 text-slate-950 border-emerald-300 shadow-xl shadow-emerald-500/25 scale-[1.02]"
+                            ? "bg-emerald-500 text-slate-950 border-emerald-600 shadow-xl shadow-emerald-500/25 scale-[1.02]"
+                            : isLight
+                            ? "bg-white border-slate-300 text-slate-800 hover:bg-slate-100"
                             : "bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
                         }`}
                       >
-                        <Plus className={`h-4 w-4 ${pointOperation === "add" ? "text-slate-950" : "text-emerald-400"}`} />
+                        <Plus className={`h-4 w-4 ${pointOperation === "add" ? "text-slate-950" : isLight ? "text-emerald-700" : "text-emerald-400"}`} />
                         <span>إضافة نقاط (+ XP) ⚡</span>
                       </button>
 
@@ -1469,7 +1624,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                         }}
                         className={`flex-1 py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm border-2 transition-all cursor-pointer flex items-center justify-center gap-2 ${
                           pointOperation === "deduct"
-                            ? "bg-rose-600 text-white border-rose-400 shadow-xl shadow-rose-600/25 scale-[1.02]"
+                            ? "bg-rose-600 text-white border-rose-700 shadow-xl shadow-rose-600/25 scale-[1.02]"
+                            : isLight
+                            ? "bg-white border-slate-300 text-slate-800 hover:bg-slate-100"
                             : "bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
                         }`}
                       >
@@ -1481,7 +1638,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
 
                   {/* Amount of Points */}
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-300 block">
+                    <label className={`text-xs font-bold block ${isLight ? "text-slate-900" : "text-slate-300"}`}>
                       3. مقدار النقاط:
                     </label>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -1494,11 +1651,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                             setPointDelta(val);
                             setCustomPointAmount("");
                           }}
-                          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-mono font-black border transition-all cursor-pointer ${
+                          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-mono font-black border-2 transition-all cursor-pointer ${
                             pointDelta === val && !customPointAmount
                               ? pointOperation === "add"
-                                ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow-md font-black"
-                                : "bg-rose-600 text-white border-rose-400 shadow-md font-black"
+                                ? "bg-emerald-500 text-slate-950 border-emerald-600 shadow-md font-black"
+                                : "bg-rose-600 text-white border-rose-700 shadow-md font-black"
+                              : isLight
+                              ? "bg-white text-slate-900 border-slate-300 hover:bg-slate-100 shadow-xs"
                               : "bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800"
                           }`}
                         >
@@ -1507,13 +1666,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                       ))}
 
                       <div className="flex items-center gap-1.5 mr-auto">
-                        <span className="text-xs text-slate-400">أو مخصص:</span>
+                        <span className={`text-xs font-bold ${isLight ? "text-slate-700" : "text-slate-400"}`}>أو مخصص:</span>
                         <input
                           type="number"
                           value={customPointAmount}
                           onChange={(e) => setCustomPointAmount(e.target.value)}
                           placeholder="XP مخصص"
-                          className="w-24 h-9 px-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400"
+                          className={`w-24 h-9 px-3 rounded-xl border text-xs font-mono font-bold focus:outline-none ${
+                            isLight
+                              ? "bg-white border-2 border-slate-300 text-amber-900 placeholder:text-slate-400 focus:border-amber-500 font-black"
+                              : "bg-slate-900 border border-slate-700 text-amber-300 focus:border-amber-400"
+                          }`}
                         />
                       </div>
                     </div>
@@ -1522,7 +1685,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                   {/* Reason Selection */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-slate-300 block">
+                      <label className={`text-xs font-bold block ${isLight ? "text-slate-900" : "text-slate-300"}`}>
                         4. سبب الرصد / نوع النشاط المعتمد:
                       </label>
                       <button
@@ -1532,7 +1695,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                           setBonusGuideInitialEdit(true);
                           setShowBonusGuideModal(true);
                         }}
-                        className="text-[11px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer"
+                        className={`text-[11px] font-bold flex items-center gap-1 cursor-pointer ${
+                          isLight ? "text-amber-800 hover:text-amber-950" : "text-amber-400 hover:text-amber-300"
+                        }`}
                       >
                         <Edit2 className="h-3 w-3" />
                         <span>تعديل دليل النقاط ✏️</span>
@@ -1544,33 +1709,88 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                       value={pointReason}
                       onChange={(e) => setPointReason(e.target.value)}
                       placeholder="أو اكتب سبب الرصد أو تفاصيل النشاط هنا..."
-                      className="w-full h-11 px-4 rounded-2xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
+                      className={`w-full h-11 px-4 rounded-2xl border text-xs sm:text-sm focus:outline-none ${
+                        isLight
+                          ? "bg-white border-2 border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-amber-500 font-medium"
+                          : "bg-slate-900 border border-slate-700 text-white placeholder:text-slate-500 focus:border-amber-400"
+                      }`}
                     />
                   </div>
 
                   {/* Summary Box */}
-                  <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-amber-500/40 space-y-1.5 shadow-inner">
+                  <div className={`p-3.5 rounded-2xl border-2 space-y-2 shadow-sm ${
+                    isLight
+                      ? "bg-amber-50/80 border-amber-300/90 text-slate-900"
+                      : "bg-slate-950/90 border-amber-500/40 shadow-inner"
+                  }`}>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-400 font-bold">ملخص المعاملة الجاهزة للتطبيق الآن:</span>
-                      <span className={`px-2.5 py-0.5 rounded-lg text-xs font-mono font-black ${
+                      <span className={`font-bold ${isLight ? "text-slate-700" : "text-slate-400"}`}>
+                        ملخص المعاملة الجاهزة للتطبيق الآن:
+                      </span>
+                      <span className={`px-2.5 py-0.5 rounded-lg text-xs font-mono font-black border ${
                         pointOperation === "add"
-                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                          : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                          ? isLight
+                            ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                            : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                          : isLight
+                          ? "bg-rose-100 text-rose-900 border-rose-300"
+                          : "bg-rose-500/20 text-rose-400 border-rose-500/30"
                       }`}>
                         {pointOperation === "add" ? "+" : "-"}{customPointAmount || pointDelta} XP
                       </span>
                     </div>
-                    <div className="text-sm font-black text-white flex items-center gap-2">
-                      <span className="text-amber-400">
-                        {pointTargetType === "team" ? "🦁 الفريق المستهدف:" : "👤 العضو المستهدف:"}
-                      </span>
-                      <span>
-                        {pointTargetType === "team"
-                          ? (data.teams.find((t) => t.id === (pointTargetTeamId || data.teams[0]?.id))?.name || "اختر فريقاً")
-                          : (data.members.find((m) => m.id === (pointTargetMemberId || data.members[0]?.id))?.name || "اختر عضواً")}
-                      </span>
+
+                    <div className={`text-sm font-black flex items-center justify-between gap-2 flex-wrap ${isLight ? "text-slate-950" : "text-white"}`}>
+                      <div className="flex items-center gap-2">
+                        <span className={isLight ? "text-amber-800 font-bold" : "text-amber-400"}>
+                          {pointTargetType === "team" ? "🦁 الفريق المستهدف:" : "👤 العضو المستهدف:"}
+                        </span>
+                        <span>
+                          {pointTargetType === "team"
+                            ? (data.teams.find((t) => t.id === (pointTargetTeamId || data.teams[0]?.id))?.name || "اختر فريقاً")
+                            : (data.members.find((m) => m.id === (pointTargetMemberId || data.members[0]?.id))?.name || "اختر عضواً")}
+                        </span>
+                      </div>
+                      {pointTargetType === "team" && (() => {
+                        const targetTeam = data.teams.find((t) => t.id === (pointTargetTeamId || data.teams[0]?.id));
+                        const mCount = targetTeam ? data.members.filter((m) => m.teamId === targetTeam.id).length : 0;
+                        return mCount > 0 ? (
+                          <span className={`text-[11px] font-mono px-2.5 py-0.5 rounded-full border font-bold ${
+                            isLight ? "bg-blue-50 text-blue-900 border-blue-300" : "bg-blue-500/20 text-blue-300 border-blue-500/40"
+                          }`}>
+                            {mCount} أعضاء مسجلين بالفريق
+                          </span>
+                        ) : null;
+                      })()}
                     </div>
-                    <div className="text-[11px] text-slate-400 truncate">
+
+                    {/* Automatic Member Point Division Notification */}
+                    {pointTargetType === "team" && (() => {
+                      const targetTeam = data.teams.find((t) => t.id === (pointTargetTeamId || data.teams[0]?.id));
+                      const teamMembers = targetTeam ? data.members.filter((m) => m.teamId === targetTeam.id) : [];
+                      const mCount = teamMembers.length;
+                      const activeAmount = Number(customPointAmount) || pointDelta;
+                      const ptsPerMem = mCount > 0 ? Math.round(activeAmount / mCount) : 0;
+
+                      return mCount > 0 ? (
+                        <div className={`p-2.5 rounded-xl border text-xs flex items-center gap-2 font-bold ${
+                          isLight
+                            ? "bg-emerald-50 text-emerald-950 border-emerald-300"
+                            : "bg-emerald-950/40 text-emerald-300 border-emerald-500/40"
+                        }`}>
+                          <Users className="h-4 w-4 shrink-0 text-emerald-600" />
+                          <span>
+                            تقسيم تلقائي: سيتم توزيع الـ ({activeAmount} XP) بالتساوي على الأعضاء ({pointOperation === "deduct" ? "-" : "+"}{ptsPerMem} XP لكل عضو من الـ {mCount})! 🎯
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-amber-500 font-bold">
+                          (لا يوجد أعضاء مسجلون في هذا الفريق حالياً، سيتم رصد النقاط لرصيد الفريق العام)
+                        </div>
+                      );
+                    })()}
+
+                    <div className={`text-[11px] truncate ${isLight ? "text-slate-600 font-medium" : "text-slate-400"}`}>
                       السبب: {pointReason.trim() || (pointOperation === "add" ? "رصد نقاط تفوق وبونص" : "خصم نقاط بسبب مخالفة")}
                     </div>
                   </div>
@@ -1602,6 +1822,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                       <span>
                         {isSubmittingPoints
                           ? "جاري اعتماد وتحديث النقاط فوراً..."
+                          : pointTargetType === "team"
+                          ? (() => {
+                              const targetTeam = data.teams.find((t) => t.id === (pointTargetTeamId || data.teams[0]?.id));
+                              const mCount = targetTeam ? data.members.filter((m) => m.teamId === targetTeam.id).length : 0;
+                              const amt = Number(customPointAmount) || pointDelta;
+                              const ptsPerMem = mCount > 0 ? Math.round(amt / mCount) : 0;
+                              return mCount > 0
+                                ? `اعتماد وتحديث نقاط الفريق (${pointOperation === "deduct" ? "-" : "+"}${amt} XP) وتقسيمها (${pointOperation === "deduct" ? "-" : "+"}${ptsPerMem} لكل عضو) ⚡`
+                                : `اعتماد وتحديث النقاط فوراً (${pointOperation === "deduct" ? "-" : "+"}${amt} XP) ⚡`;
+                            })()
                           : `اعتماد وتحديث النقاط فوراً (${pointOperation === "deduct" ? "-" : "+"}${customPointAmount || pointDelta} XP) ⚡`}
                       </span>
                     </button>
@@ -1612,49 +1842,85 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
               {/* RIGHT: Live Feed & Mini Board */}
               <div className="space-y-6">
                 {/* Mini Leaderboard */}
-                <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 space-y-3">
-                  <h3 className="text-xs font-black text-white flex items-center gap-1.5 uppercase tracking-wider">
-                    <Trophy className="h-3.5 w-3.5 text-amber-400" />
+                <div className={`rounded-2xl border-2 p-4 space-y-3 ${
+                  isLight ? "border-slate-300 bg-white shadow-md text-slate-900" : "border-slate-800 bg-slate-900/40"
+                }`}>
+                  <h3 className={`text-xs font-black flex items-center gap-1.5 uppercase tracking-wider ${
+                    isLight ? "text-slate-900" : "text-white"
+                  }`}>
+                    <Trophy className={`h-3.5 w-3.5 ${isLight ? "text-amber-600" : "text-amber-400"}`} />
                     <span>ترتيب الفرق المباشر</span>
                   </h3>
                   <div className="space-y-2">
                     {meetingStore.getProcessedTeams().slice(0, 5).map((t, idx) => (
-                      <div key={t.id} className="flex items-center justify-between p-2 rounded-xl bg-slate-950/50 border border-slate-800/50">
+                      <div key={t.id} className={`flex items-center justify-between p-2 rounded-xl border ${
+                        isLight ? "bg-slate-50 border-slate-200" : "bg-slate-950/50 border-slate-800/50"
+                      }`}>
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <span className="text-[10px] font-mono font-black text-slate-500 w-4">#{idx + 1}</span>
+                          <span className={`text-[10px] font-mono font-black w-4 ${isLight ? "text-slate-600" : "text-slate-500"}`}>#{idx + 1}</span>
                           <span className="text-base">{t.icon}</span>
-                          <span className="text-[11px] font-bold text-white truncate">{t.name}</span>
+                          <span className={`text-[11px] font-bold truncate ${isLight ? "text-slate-900" : "text-white"}`}>{t.name}</span>
                         </div>
-                        <span className="text-[11px] font-mono font-black text-amber-400">{t.points.toLocaleString()}</span>
+                        <span className={`text-[11px] font-mono font-black ${isLight ? "text-amber-800" : "text-amber-400"}`}>{t.points.toLocaleString()}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
                 {/* Live Transactions Feed */}
-                <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 space-y-3">
-                  <h3 className="text-xs font-black text-white flex items-center gap-1.5 uppercase tracking-wider">
-                    <Clock className="h-3.5 w-3.5 text-emerald-400" />
+                <div className={`rounded-2xl border-2 p-4 space-y-3 ${
+                  isLight ? "border-slate-300 bg-white shadow-md text-slate-900" : "border-slate-800 bg-slate-900/40"
+                }`}>
+                  <h3 className={`text-xs font-black flex items-center gap-1.5 uppercase tracking-wider ${
+                    isLight ? "text-slate-900" : "text-white"
+                  }`}>
+                    <Clock className={`h-3.5 w-3.5 ${isLight ? "text-emerald-700" : "text-emerald-400"}`} />
                     <span>آخر التحديثات المسجلة</span>
                   </h3>
                   <div className="space-y-2.5">
-                    {data.transactions.slice(0, 5).map((tx) => (
-                      <div key={tx.id} className="text-[10px] space-y-1 p-2 rounded-xl border border-slate-800 bg-slate-950/30 animate-in fade-in slide-in-from-right-2 duration-300">
-                        <div className="flex justify-between items-center">
-                          <span className="font-black text-white">{tx.targetName}</span>
-                          <span className={`font-mono font-black ${tx.points > 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                            {tx.points > 0 ? "+" : ""}{tx.points} XP
-                          </span>
+                    {data.transactions.slice(0, 5).map((tx) => {
+                      const matchedTeam = data.teams.find(
+                        (t) => t.id === tx.teamId || t.name === tx.teamName || (tx.targetType === "team" && t.id === tx.targetId)
+                      );
+                      const teamName = tx.teamName || (tx.targetType === "team" ? tx.targetName : (matchedTeam?.name || "فريق عام"));
+                      const teamIcon = matchedTeam?.icon || "🦁";
+
+                      return (
+                        <div key={tx.id} className={`text-[10px] space-y-1 p-2 rounded-xl border animate-in fade-in slide-in-from-right-2 duration-300 ${
+                          isLight ? "border-slate-200 bg-slate-50 text-slate-900" : "border-slate-800 bg-slate-950/30"
+                        }`}>
+                          <div className="flex justify-between items-center gap-1.5">
+                            <div className="flex items-center gap-1 min-w-0">
+                              <span className="text-xs shrink-0">{teamIcon}</span>
+                              <span className={`font-black truncate ${isLight ? "text-slate-900" : "text-white"}`}>
+                                {teamName}
+                              </span>
+                              {tx.targetType === "member" && (
+                                <span className={`text-[9px] px-1 py-0.2 rounded font-bold truncate ${
+                                  isLight ? "bg-blue-100 text-blue-900" : "bg-blue-500/20 text-blue-300"
+                                }`}>
+                                  ({tx.targetName})
+                                </span>
+                              )}
+                            </div>
+                            <span className={`font-mono font-black shrink-0 ${
+                              tx.points > 0
+                                ? isLight ? "text-emerald-700 font-black" : "text-emerald-400"
+                                : isLight ? "text-rose-700 font-black" : "text-rose-400"
+                            }`}>
+                              {tx.points > 0 ? "+" : ""}{tx.points} XP
+                            </span>
+                          </div>
+                          <div className={`truncate ${isLight ? "text-slate-600 font-medium" : "text-slate-400"}`}>{tx.reason}</div>
+                          <div className={`text-[8px] flex justify-between items-center ${isLight ? "text-slate-500 font-medium" : "text-slate-600"}`}>
+                             <span>بواسطة: {tx.executorName?.split(" ")[0] || "المسؤول"}</span>
+                             <span>{new Date(tx.timestamp).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+                          </div>
                         </div>
-                        <div className="text-slate-400 truncate">{tx.reason}</div>
-                        <div className="text-[8px] text-slate-600 flex justify-between items-center">
-                           <span>بواسطة: {tx.executorName?.split(" ")[0]}</span>
-                           <span>{new Date(tx.timestamp).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })}</span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     {data.transactions.length === 0 && (
-                      <p className="text-center py-4 text-slate-600 text-[10px]">لا توجد عمليات مؤخراً</p>
+                      <p className={`text-center py-4 text-[10px] ${isLight ? "text-slate-400" : "text-slate-600"}`}>لا توجد عمليات مؤخراً</p>
                     )}
                   </div>
                 </div>
@@ -2636,6 +2902,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
           onClose={() => setShowTeamsManagementModal(false)}
         />
       )}
+
+      {/* نافذة صغيرة جانبية في لوحة تحكم الإدارة تعرض آخر 5 عمليات إضافة أو تعديل للنقاط (Activity Log) */}
+      <AdminSideActivityWidget
+        transactions={data.transactions}
+        teams={data.teams}
+        isLight={isLight}
+        onViewAllHistory={() => setActiveTab("history")}
+        onUndoTransaction={async (txId) => {
+          const ok = await meetingStore.undoTransaction(txId);
+          if (ok) {
+            showFeedback("تم التراجع عن المعاملة وعكس النقاط بنجاح! ⚡", "success");
+          }
+          return ok;
+        }}
+      />
     </div>
   );
 };
