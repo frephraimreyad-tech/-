@@ -31,6 +31,7 @@ import {
   Share2,
   Sun,
   Moon,
+  Swords,
 } from "lucide-react";
 import type { CustomTeam, ProcessedMeetingTeam, ScoreTransaction } from "../types";
 import { meetingStore } from "../utils/meetingStore";
@@ -47,10 +48,13 @@ import { BonusGuideModal } from "./BonusGuideModal";
 import { TeamsProgressionChart } from "./TeamsProgressionChart";
 import { TeamsManagementModal } from "./TeamsManagementModal";
 import { AdminSideActivityWidget } from "./AdminSideActivityWidget";
+import { AttendanceManagementTab } from "./AttendanceManagementTab";
+import { LiveDuelMode } from "./LiveDuelMode";
 
 interface AdminDashboardProps {
   onBackToScoreboard: () => void;
   initialPanelTab?: "quick_score" | "teams" | "members" | "events" | "permissions" | "log" | "settings";
+  initialActiveTab?: "teams" | "quick_points" | "attendance" | "duel" | "progression" | "security" | "history";
 }
 
 // Preset Colors for Teams
@@ -76,7 +80,7 @@ const TEAM_PRESET_ICONS = [
 const ADMIN_PIN_KEY = "admin_dashboard_simple_pin_v1";
 const ADMIN_UNLOCKED_SESSION_KEY = "admin_dashboard_unlocked_session_v1";
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboard, initialPanelTab }) => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboard, initialPanelTab, initialActiveTab }) => {
   const { preference: themePreference, isDaytime, isLight, setPreference: setThemePreference } = useTheme();
   // Store Data & User State
   const [data, setData] = useState(meetingStore.getData());
@@ -101,7 +105,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
   const [showTeamsManagementModal, setShowTeamsManagementModal] = useState<boolean>(false);
 
   // Navigation Tabs in Admin Dashboard
-  const [activeTab, setActiveTab] = useState<"teams" | "quick_points" | "progression" | "security" | "history">("teams");
+  const [activeTab, setActiveTab] = useState<"teams" | "quick_points" | "attendance" | "duel" | "progression" | "security" | "history">(
+    initialActiveTab || "teams"
+  );
 
   // Filter / Search for Teams
   const [teamSearch, setTeamSearch] = useState<string>("");
@@ -1017,6 +1023,44 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
             <span>تحديث النقاط المباشر ⚡</span>
           </button>
 
+          {/* TAB: Attendance & Friday Report (الحضور والغياب ورسالة الجمعة) */}
+          <button
+            type="button"
+            onClick={() => {
+              sounds.playTap();
+              setActiveTab("attendance");
+            }}
+            className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap border-2 ${
+              activeTab === "attendance"
+                ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-lg shadow-emerald-500/20 font-black scale-102 border-emerald-600/40"
+                : isLight
+                ? "bg-white hover:bg-slate-50 text-slate-800 border-slate-300 shadow-xs"
+                : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border-slate-800"
+            }`}
+          >
+            <CheckCircle className="h-4 w-4" />
+            <span>الحضور والغياب ورسالة الجمعة 📋</span>
+          </button>
+
+          {/* TAB: Live Duel Mode (وضع المبارزة المباشرة) ⚔️ */}
+          <button
+            type="button"
+            onClick={() => {
+              sounds.playTap();
+              setActiveTab("duel");
+            }}
+            className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap border-2 ${
+              activeTab === "duel"
+                ? "bg-gradient-to-r from-rose-600 via-amber-500 to-rose-600 text-white shadow-lg shadow-rose-500/20 font-black scale-102 border-rose-400"
+                : isLight
+                ? "bg-white hover:bg-slate-50 text-slate-800 border-slate-300 shadow-xs"
+                : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border-slate-800"
+            }`}
+          >
+            <Swords className="h-4 w-4 text-rose-400" />
+            <span>المبارزة المباشرة بين الفرق ⚔️</span>
+          </button>
+
           <button
             type="button"
             onClick={() => {
@@ -1927,6 +1971,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
               </div>
             </div>
           </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB: ATTENDANCE & FRIDAY REPORT (الحضور والغياب ورسالة الجمعة) */}
+        {/* ========================================================= */}
+        {activeTab === "attendance" && (
+          <AttendanceManagementTab
+            isLight={isLight}
+            onOpenQRScanner={() => setShowQRScanner(true)}
+          />
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB: LIVE DUEL MODE (المبارزة المباشرة بين فريقين) ⚔️ */}
+        {/* ========================================================= */}
+        {activeTab === "duel" && (
+          <LiveDuelMode
+            isLight={isLight}
+            teams={processedTeams}
+            allMembers={data.members}
+            transactions={data.transactions}
+          />
         )}
 
         {/* ========================================================= */}

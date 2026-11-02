@@ -14,6 +14,7 @@ import type {
   ScoreTransaction,
 } from "../types";
 import { type SystemUser, SUPER_ADMIN_USER, getRoleDefaultPermissions, authStore } from "./authStore";
+import { getCurrentOrNearestFridayDate } from "./fridaySchedule";
 import { db } from "./firebase";
 import { googleSheets } from "./googleSheets";
 import { 
@@ -1181,8 +1182,14 @@ class MeetingStore {
   }> {
     const { eventIdOrCode, memberId, isPunctual, executor, manualBonusPoints, manualBonusReason } = params;
 
-    // 1. Permission check
-    if (executor.role !== "admin" && !executor.permissions.canScanAttendance) {
+    // 1. Permission check (Admin, Priest, Leader, and Servant)
+    const canScan =
+      executor.role === "admin" ||
+      executor.role === "priest" ||
+      executor.role === "servant" ||
+      executor.permissions?.canScanAttendance;
+
+    if (!canScan) {
       this.logAudit({
         userId: executor.id,
         userName: executor.name,
@@ -1191,36 +1198,48 @@ class MeetingStore {
         targetType: "member",
         targetId: memberId,
         targetName: memberId,
-        details: "محاولة مسح QR للحضور دون امتلاك صلاحية المسح",
+        details: "محاولة مسح QR للحضور دون امتلاك صلاحية خادم أو مسؤول",
         status: "denied",
       });
-      return { success: false, error: "غير مصرح لك بمسح QR لتسجيل الحضور" };
+      return { success: false, error: "غير مصرح لك بمسح QR؛ يرجى تسجيل الدخول بحساب خادم أو مسؤول" };
     }
 
-    // 2. Find Event by ID or QR Code (Clean & Case-insensitive)
+    // 2. Resolve Event (Clean & Case-insensitive) - Fallback to auto-linked Friday event
+    let event: EventSession | undefined;
     const cleanEventId = (eventIdOrCode || "").trim().toLowerCase();
-    const event = this.data.events.find(
-      (e) =>
-        e.id.toLowerCase() === cleanEventId ||
-        e.qrCode.trim().toLowerCase() === cleanEventId
-    );
+    if (cleanEventId) {
+      event = this.data.events.find(
+        (e) =>
+          e.id.toLowerCase() === cleanEventId ||
+          e.qrCode.trim().toLowerCase() === cleanEventId
+      );
+    }
+
+    // If event not specified or not found, automatically bind to this week's Friday meeting
     if (!event) {
-      return { success: false, error: "رمز الفعالية غير صالح أو الفعالية غير موجودة" };
+      event = this.ensureFridayMeetingEvent();
     }
 
     if (!event.isActive) {
-      return { success: false, error: "هذه الفعالية غير نشطة حالياً ولا تقبل تسجيل الحضور" };
+      return { success: false, error: `اللقاء [${event.title}] غير نشط حالياً ولا يقبل تسجيل الحضور` };
     }
 
-    // 3. Find Member (by ID or Access Code or URL)
+    // 3. Find Member (by ID, Access Code, or URL link)
     let cleanMemberCode = (memberId || "").trim();
-    if (cleanMemberCode.includes("?code=") || cleanMemberCode.includes("&code=")) {
+    if (cleanMemberCode.includes("?")) {
       try {
-        const urlMatch = cleanMemberCode.match(/[?&]code=([^&#]+)/);
+        const queryPart = cleanMemberCode.split("?")[1] || "";
+        const urlParams = new URLSearchParams(queryPart);
+        const extracted = urlParams.get("code") || urlParams.get("member") || urlParams.get("id");
+        if (extracted) {
+          cleanMemberCode = extracted.trim();
+        }
+      } catch {
+        const urlMatch = cleanMemberCode.match(/[?&](?:code|member|id)=([^&#]+)/);
         if (urlMatch && urlMatch[1]) {
           cleanMemberCode = decodeURIComponent(urlMatch[1]).trim();
         }
-      } catch {}
+      }
     }
     const lowerMemberCode = cleanMemberCode.toLowerCase();
 
@@ -1233,7 +1252,6 @@ class MeetingStore {
       return { success: false, error: `العضو صاحب الكود (${cleanMemberCode}) غير موجود في قاعدة البيانات` };
     }
 
-    // Leader restriction check: if leader, check if member is in their team (optional check, or leader registering for their team)
     const team = this.data.teams.find((t) => t.id === member.teamId);
     const teamName = team ? team.name : "الفريق";
 
@@ -1246,12 +1264,12 @@ class MeetingStore {
     if (alreadyAttended) {
       return {
         success: false,
-        error: `تم تسجيل حضور العضو (${member.name}) في هذه الفعالية مسبقاً! يمنع النظام تكرار احتساب النقاط مرتين في نفس الفعالية.`,
+        error: `تم تسجيل حضور (${member.name}) في هذا اللقاء مسبقاً! يمنع النظام تكرار احتساب النقاط مرتين في نفس اليوم.`,
       };
     }
 
     // 5. Automatic Points Calculation with Time-Based Punctuality
-    let pointsAwarded = event.attendancePoints;
+    let pointsAwarded = event.attendancePoints || 30;
     let punctualityStatus = "";
     let effectivePunctual = !!isPunctual;
 
@@ -1289,10 +1307,10 @@ class MeetingStore {
     }
 
     // Update member points
-    member.points += pointsAwarded;
+    member.points = (member.points || 0) + pointsAwarded;
     // Update team points
     if (team) {
-      team.points += pointsAwarded;
+      team.points = (team.points || 0) + pointsAwarded;
     }
 
     // 6. Record Score Transaction
@@ -1332,20 +1350,18 @@ class MeetingStore {
     };
     this.data.attendance.unshift(attendanceRecord);
 
-    // 8. Log Audit
-    if (executor) {
-      this.logAudit({
-        userId: executor.id,
-        userName: executor.name,
-        userRole: executor.role,
-        action: "attendance_scan",
-        targetType: "member",
-        targetId: member.id,
-        targetName: member.name,
-        details: `تسجيل حضور عبر QR للعضو [${member.name}] في فعالية [${event.title}]. احتساب تلقائي: +${pointsAwarded} XP`,
-        status: "success",
-      });
-    }
+    // 8. Log Audit under Servant / Admin name
+    this.logAudit({
+      userId: executor.id,
+      userName: executor.name,
+      userRole: executor.role,
+      action: "attendance_scan",
+      targetType: "member",
+      targetId: member.id,
+      targetName: member.name,
+      details: `تسجيل حضور عبر QR للعضو [${member.name}] في [${event.title}] بواسطة الخادم [${executor.name}]. +${pointsAwarded} XP`,
+      status: "success",
+    });
 
     const batch = writeBatch(db);
     batch.set(doc(db, "attendance", attendanceRecord.id), attendanceRecord);
@@ -1370,6 +1386,204 @@ class MeetingStore {
     const list = this.data.attendance || [];
     if (!eventId) return list;
     return list.filter((a) => a.eventId === eventId);
+  }
+
+  /**
+   * يربط لقاء الجمعة تلقائياً بتاريخ الجهاز الحالي بدون الحاجة لتحديده يدوياً
+   */
+  ensureFridayMeetingEvent(dateStr?: string): EventSession {
+    const targetDate = dateStr || getCurrentOrNearestFridayDate();
+    const existing = this.data.events.find(
+      (e) => e.date === targetDate || e.id === `evt-friday-${targetDate}` || e.title.includes(targetDate)
+    );
+    if (existing) return existing;
+
+    const d = new Date(targetDate);
+    const arabicDate = !isNaN(d.getTime())
+      ? d.toLocaleDateString("ar-EG", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+      : targetDate;
+
+    const newEvent: EventSession = {
+      id: `evt-friday-${targetDate}`,
+      title: `لقاء الجمعة الروحي والدراسي (${arabicDate})`,
+      date: targetDate,
+      description: `اللقاء الأسبوعي لشباب جامعة - صلاة وتسبيح ودراسة الكلمة ومسابقات المجموعات لـ ${arabicDate}`,
+      qrCode: `EVT-FRIDAY-${targetDate.replace(/-/g, "")}`,
+      attendancePoints: 30,
+      punctualityBonusPoints: 15,
+      startTime: "18:00",
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      createdBy: "النظام التلقائي لاجتماع الشباب (تاريخ الجهاز)",
+    };
+
+    this.data.events.unshift(newEvent);
+    try {
+      setDoc(doc(db, "events", newEvent.id), newEvent).catch(() => {});
+    } catch {}
+    setTimeout(() => this.notify(), 0);
+    return newEvent;
+  }
+
+  async setMemberAttendance(params: {
+    eventId: string;
+    memberId: string;
+    isPresent: boolean;
+    isPunctual?: boolean;
+    executor: SystemUser;
+  }): Promise<{ success: boolean; record?: AttendanceRecord; error?: string }> {
+    const { eventId, memberId, isPresent, isPunctual = true, executor } = params;
+
+    const event = this.data.events.find((e) => e.id === eventId);
+    if (!event) return { success: false, error: "الفعالية أو اللقاء غير موجود" };
+
+    const member = this.data.members.find((m) => m.id === memberId);
+    if (!member) return { success: false, error: "العضو غير موجود" };
+
+    const team = this.data.teams.find((t) => t.id === member.teamId);
+    const teamName = team ? team.name : "الفريق";
+
+    if (!this.data.attendance) this.data.attendance = [];
+    const existingIndex = this.data.attendance.findIndex(
+      (a) => a.eventId === event.id && a.memberId === member.id
+    );
+
+    const batch = writeBatch(db);
+
+    if (isPresent) {
+      if (existingIndex !== -1) {
+        const existing = this.data.attendance[existingIndex];
+        if (existing.isPunctual !== isPunctual) {
+          const delta = isPunctual
+            ? (event.punctualityBonusPoints || 15)
+            : -(event.punctualityBonusPoints || 15);
+          existing.isPunctual = isPunctual;
+          existing.pointsAwarded = Math.max(0, existing.pointsAwarded + delta);
+          member.points = Math.max(0, (member.points || 0) + delta);
+          if (team) {
+            team.points = Math.max(0, (team.points || 0) + delta);
+            batch.update(doc(db, "teams", team.id), { points: team.points });
+          }
+          batch.update(doc(db, "attendance", existing.id), existing);
+          batch.update(doc(db, "members", member.id), { points: member.points });
+          await batch.commit();
+          this.triggerAutoSync();
+        }
+        return { success: true, record: existing };
+      }
+
+      const pointsAwarded =
+        (event.attendancePoints || 30) +
+        (isPunctual ? (event.punctualityBonusPoints || 15) : 0);
+      member.points = (member.points || 0) + pointsAwarded;
+      if (team) {
+        team.points = (team.points || 0) + pointsAwarded;
+        batch.update(doc(db, "teams", team.id), { points: team.points });
+      }
+
+      const tx: ScoreTransaction = {
+        id: "tx-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        timestamp: new Date().toISOString(),
+        targetType: "member",
+        targetId: member.id,
+        targetName: member.name,
+        teamId: member.teamId,
+        teamName: teamName,
+        points: pointsAwarded,
+        reason: `تسجيل حضور: ${event.title}${isPunctual ? " (في الموعد)" : ""}`,
+        category: "حضور والتزام",
+        executorId: executor.id,
+        executorName: executor.name,
+        executorRole: executor.role,
+      };
+      this.data.transactions = [tx, ...this.data.transactions.slice(0, 499)];
+
+      const record: AttendanceRecord = {
+        id: "att-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        eventId: event.id,
+        eventTitle: event.title,
+        memberId: member.id,
+        memberName: member.name,
+        teamId: member.teamId,
+        teamName: teamName,
+        scannedAt: new Date().toISOString(),
+        scannedByUserId: executor.id,
+        scannedByUserName: executor.name,
+        pointsAwarded,
+        isPunctual,
+      };
+      this.data.attendance.unshift(record);
+
+      batch.set(doc(db, "attendance", record.id), record);
+      batch.set(doc(db, "transactions", tx.id), tx);
+      batch.update(doc(db, "members", member.id), { points: member.points });
+
+      this.logAudit({
+        userId: executor.id,
+        userName: executor.name,
+        userRole: executor.role,
+        action: "attendance_scan",
+        targetType: "member",
+        targetId: member.id,
+        targetName: member.name,
+        details: `تسجيل حضور يدوي للعضو [${member.name}] في [${event.title}]. +${pointsAwarded} XP`,
+        status: "success",
+      });
+
+      await batch.commit();
+      this.triggerAutoSync();
+      return { success: true, record };
+    } else {
+      if (existingIndex !== -1) {
+        const existing = this.data.attendance[existingIndex];
+        const pts = existing.pointsAwarded || 0;
+        member.points = Math.max(0, (member.points || 0) - pts);
+        if (team) {
+          team.points = Math.max(0, (team.points || 0) - pts);
+          batch.update(doc(db, "teams", team.id), { points: team.points });
+        }
+        batch.delete(doc(db, "attendance", existing.id));
+        batch.update(doc(db, "members", member.id), { points: member.points });
+
+        this.data.attendance.splice(existingIndex, 1);
+
+        this.logAudit({
+          userId: executor.id,
+          userName: executor.name,
+          userRole: executor.role,
+          action: "attendance_scan",
+          targetType: "member",
+          targetId: member.id,
+          targetName: member.name,
+          details: `إلغاء تسجيل حضور العضو [${member.name}] واسترجاع ${pts} XP`,
+          status: "success",
+        });
+
+        await batch.commit();
+        this.triggerAutoSync();
+      }
+      return { success: true };
+    }
+  }
+
+  async batchSetAttendance(params: {
+    eventId: string;
+    memberIds: string[];
+    isPresent: boolean;
+    executor: SystemUser;
+  }): Promise<{ success: boolean; count: number }> {
+    let count = 0;
+    for (const memberId of params.memberIds) {
+      const res = await this.setMemberAttendance({
+        eventId: params.eventId,
+        memberId,
+        isPresent: params.isPresent,
+        isPunctual: true,
+        executor: params.executor,
+      });
+      if (res.success) count++;
+    }
+    return { success: true, count };
   }
 
   getTeamTransactions(teamId: string): ScoreTransaction[] {

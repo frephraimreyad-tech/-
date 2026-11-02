@@ -34,6 +34,7 @@ import {
   Moon,
   Clock,
   Zap,
+  Swords,
 } from "lucide-react";
 import type { CustomMember, ProcessedMeetingTeam } from "../types";
 import { meetingStore } from "../utils/meetingStore";
@@ -87,6 +88,7 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
   const [sortOrder, setSortOrder] = useState<"points-desc" | "points-asc">("points-desc");
   const [viewMode, setViewMode] = useState<"scoreboard" | "admin">("scoreboard");
   const [adminInitialTab, setAdminInitialTab] = useState<any>(undefined);
+  const [adminActiveTab, setAdminActiveTab] = useState<"teams" | "quick_points" | "attendance" | "duel" | "progression" | "security" | "history" | undefined>(undefined);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showUserSwitcher, setShowUserSwitcher] = useState(false);
   const [showProgressionModal, setShowProgressionModal] = useState<boolean>(false);
@@ -513,8 +515,10 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
       onBackToScoreboard={() => {
         setViewMode("scoreboard");
         setAdminInitialTab(undefined);
+        setAdminActiveTab(undefined);
       }} 
       initialPanelTab={adminInitialTab}
+      initialActiveTab={adminActiveTab}
     />;
   }
 
@@ -717,6 +721,44 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                     >
                       <Settings className="h-4 w-4 shrink-0 text-amber-500" />
                       <span>لوحة تحكم الخادم ⚙️</span>
+                    </button>
+
+                    {/* Quick Attendance & Friday Message Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playTap();
+                        setAdminActiveTab("attendance");
+                        setViewMode("admin");
+                      }}
+                      className={`h-9 px-3.5 rounded-xl text-xs font-black shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border-2 ${
+                        isLight
+                          ? "bg-teal-50 hover:bg-teal-100 text-teal-900 border-teal-400"
+                          : "bg-teal-950/80 hover:bg-teal-900/90 text-teal-300 border-teal-500/40"
+                      }`}
+                      title="سجل الحضور والغياب للخدام والمخدومين ورسالة تقرير الجمعة"
+                    >
+                      <CheckCircle className="h-4 w-4 shrink-0 text-teal-400" />
+                      <span>الحضور ورسالة الجمعة 📋</span>
+                    </button>
+
+                    {/* Live Duel Mode Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playTap();
+                        setAdminActiveTab("duel");
+                        setViewMode("admin");
+                      }}
+                      className={`h-9 px-3.5 rounded-xl text-xs font-black shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border-2 ${
+                        isLight
+                          ? "bg-rose-50 hover:bg-rose-100 text-rose-900 border-rose-400"
+                          : "bg-rose-950/80 hover:bg-rose-900/90 text-rose-300 border-rose-500/40"
+                      }`}
+                      title="وضع المبارزة المباشرة بين فريقين ومقارنة لحظية"
+                    >
+                      <Swords className="h-4 w-4 shrink-0 text-rose-400" />
+                      <span>المبارزة المباشرة ⚔️</span>
                     </button>
 
                     {/* Dedicated Teams Management Interface Button */}

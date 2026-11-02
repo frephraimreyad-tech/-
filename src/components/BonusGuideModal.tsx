@@ -260,12 +260,19 @@ export const BonusGuideModal: React.FC<BonusGuideModalProps> = ({
   // Edit / Add modal sub-state
   const [showItemEditModal, setShowItemEditModal] = useState<boolean>(false);
   const [editingItem, setEditingItem] = useState<BonusItem | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<BonusItem | null>(null);
+  const [toastNotice, setToastNotice] = useState<string | null>(null);
   const [formTitle, setFormTitle] = useState("");
   const [formPoints, setFormPoints] = useState<number>(30);
   const [formCategory, setFormCategory] = useState<"attendance" | "spiritual" | "activities" | "service">("spiritual");
   const [formIcon, setFormIcon] = useState("✨");
   const [formDescription, setFormDescription] = useState("");
   const [formHowToAward, setFormHowToAward] = useState("");
+
+  const showToast = (msg: string) => {
+    setToastNotice(msg);
+    setTimeout(() => setToastNotice(null), 3500);
+  };
 
   // Persist items
   const saveItemsList = (newList: BonusItem[]) => {
@@ -299,15 +306,23 @@ export const BonusGuideModal: React.FC<BonusGuideModalProps> = ({
     setShowItemEditModal(true);
   };
 
-  const handleDeleteItem = async (id: string, e?: React.MouseEvent) => {
+  const requestDeleteItem = (item: BonusItem, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     sounds.playTap();
-    if (window.confirm("هل أنت متأكد من حذف هذا النشاط/السبب من دليل النقاط؟")) {
-      const updated = items.filter((i) => i.id !== id);
-      saveItemsList(updated);
-      await meetingStore.deleteActivityReason(id).catch(() => {});
-      sounds.playVictory();
-    }
+    setItemToDelete(item);
+  };
+
+  const confirmDeleteItem = async () => {
+    if (!itemToDelete) return;
+    sounds.playTap();
+    const id = itemToDelete.id;
+    const title = itemToDelete.title;
+    const updated = items.filter((i) => i.id !== id);
+    saveItemsList(updated);
+    await meetingStore.deleteActivityReason(id).catch(() => {});
+    sounds.playVictory();
+    showToast(`تم مسح «${title}» من دليل النقاط بنجاح! 🗑️`);
+    setItemToDelete(null);
   };
 
   const handleSaveForm = async (e: React.FormEvent) => {
@@ -629,32 +644,47 @@ export const BonusGuideModal: React.FC<BonusGuideModalProps> = ({
                           </button>
                           <button
                             type="button"
-                            onClick={(e) => handleDeleteItem(item.id, e)}
-                            className={`p-1 rounded-lg text-xs transition-all cursor-pointer border-2 ${
+                            onClick={(e) => requestDeleteItem(item, e)}
+                            className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer border-2 flex items-center gap-1 active:scale-95 ${
                               isLight
                                 ? "bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-300"
                                 : "bg-rose-950/60 hover:bg-rose-900 text-rose-400 border-rose-800/40"
                             }`}
-                            title="حذف هذا السبب"
+                            title="مسح هذا السبب من دليل النقاط"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+                            <span>مسح 🗑️</span>
                           </button>
                         </div>
                       ) : (
-                        onSelectReason && (
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {onSelectReason && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                sounds.playTap();
+                                onSelectReason(item.title, item.points, item.categoryName);
+                                onClose();
+                              }}
+                              className="px-3 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-xs font-black transition-all cursor-pointer flex items-center gap-1 shadow-md shadow-amber-500/10 active:scale-95"
+                            >
+                              <Zap className="h-3 w-3" />
+                              <span>استخدام السبب ⚡</span>
+                            </button>
+                          )}
                           <button
                             type="button"
-                            onClick={() => {
-                              sounds.playTap();
-                              onSelectReason(item.title, item.points, item.categoryName);
-                              onClose();
-                            }}
-                            className="px-3 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-xs font-black transition-all cursor-pointer flex items-center gap-1 shrink-0 shadow-md shadow-amber-500/10 active:scale-95"
+                            onClick={(e) => requestDeleteItem(item, e)}
+                            className={`p-1.5 rounded-xl text-xs transition-all cursor-pointer border-2 active:scale-95 ${
+                              isLight
+                                ? "bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-300"
+                                : "bg-rose-950/40 hover:bg-rose-900 text-rose-400 border-rose-800/40"
+                            }`}
+                            title="مسح هذا السبب من دليل النقاط"
                           >
-                            <Zap className="h-3 w-3" />
-                            <span>استخدام هذا السبب والرصيد ⚡</span>
+                            <Trash2 className="h-3.5 w-3.5 text-rose-400" />
                           </button>
-                        )
+                        </div>
                       )}
                     </div>
                   </div>
@@ -842,23 +872,114 @@ export const BonusGuideModal: React.FC<BonusGuideModalProps> = ({
                 />
               </div>
 
-              <div className="pt-2 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowItemEditModal(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700"
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20"
-                >
-                  <Save className="h-3.5 w-3.5" />
-                  <span>{editingItem ? "حفظ التعديلات" : "إضافة النشاط للدليل"}</span>
-                </button>
+              <div className="pt-2 flex items-center justify-between gap-2">
+                {editingItem ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const toDel = editingItem;
+                      setShowItemEditModal(false);
+                      requestDeleteItem(toDel);
+                    }}
+                    className="px-3 py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-700/60 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                    title="مسح هذا السبب من دليل النقاط"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-rose-400" />
+                    <span>مسح هذا السبب 🗑️</span>
+                  </button>
+                ) : <div />}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowItemEditModal(false)}
+                    className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 cursor-pointer"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-95 cursor-pointer"
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    <span>{editingItem ? "حفظ التعديلات" : "إضافة النشاط للدليل"}</span>
+                  </button>
+                </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Toast Notification for Deletion / Operations */}
+      {toastNotice && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[320] px-4 py-2.5 rounded-2xl bg-slate-900 border-2 border-emerald-500/60 text-emerald-300 font-bold text-xs sm:text-sm shadow-2xl flex items-center gap-2 animate-bounce">
+          <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
+          <span>{toastNotice}</span>
+        </div>
+      )}
+
+      {/* Interactive Modal: Confirm Delete Reason from Points Guide */}
+      {itemToDelete && (
+        <div
+          className="fixed inset-0 z-[310] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
+          dir="rtl"
+          onClick={() => setItemToDelete(null)}
+        >
+          <div
+            className={`relative w-full max-w-md rounded-3xl border-2 p-6 shadow-2xl space-y-4 ${
+              isLight ? "bg-white border-rose-300 text-slate-900" : "bg-[#0B132B] border-rose-500/50 text-slate-100"
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-2xl bg-rose-500/20 text-rose-500 border border-rose-500/30 flex items-center justify-center shrink-0">
+                <Trash2 className="h-6 w-6 stroke-[2.5]" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-rose-500">
+                  تأكيد مسح السبب من دليل النقاط 🗑️
+                </h3>
+                <p className={`text-xs ${isLight ? "text-slate-600 font-bold" : "text-slate-400"}`}>
+                  لن يظهر هذا السبب في بنك النقاط أو خيارات الرصد السريع بعد الآن
+                </p>
+              </div>
+            </div>
+
+            <div className={`p-3.5 rounded-2xl border-2 flex items-center justify-between gap-3 ${
+              isLight ? "bg-slate-50 border-slate-200" : "bg-slate-900 border-slate-800"
+            }`}>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-2xl">{itemToDelete.icon}</span>
+                <div className="min-w-0">
+                  <div className="text-xs font-black truncate">{itemToDelete.title}</div>
+                  <div className="text-[10px] text-slate-400 font-bold">{itemToDelete.categoryName}</div>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40 text-xs font-black font-mono shrink-0">
+                +{itemToDelete.points} XP
+              </span>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setItemToDelete(null)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-black border-2 transition-all cursor-pointer ${
+                  isLight ? "bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200" : "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
+                }`}
+              >
+                إلغاء التراجع ✕
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteItem}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs transition-all cursor-pointer flex items-center gap-1.5 shadow-lg shadow-rose-600/30 active:scale-95"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>نعم، مسح السبب نهائياً 🗑️</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

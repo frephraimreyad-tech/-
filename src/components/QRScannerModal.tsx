@@ -17,6 +17,10 @@ import {
   Check,
   Zap,
   Award,
+  Calendar,
+  Copy,
+  ExternalLink,
+  Shield,
 } from "lucide-react";
 import type { CustomMember, EventSession, ProcessedMeetingTeam } from "../types";
 import { meetingStore } from "../utils/meetingStore";
@@ -42,8 +46,16 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   const [currentUser, setCurrentUser] = useState<SystemUser>(authStore.getCurrentUser());
   const data = meetingStore.getData();
 
-  const [scanMode, setScanMode] = useState<"camera" | "code_select">("camera");
-  const [selectedEventId, setSelectedEventId] = useState<string>(defaultEventId || "");
+  // Auto-bound Friday meeting session from device date
+  const autoFriday = React.useMemo(() => {
+    return meetingStore.ensureFridayMeetingEvent();
+  }, [data.events]);
+
+  const [scanMode, setScanMode] = useState<"camera" | "code_select" | "show_qr">("camera");
+  const [selectedEventId, setSelectedEventId] = useState<string>(
+    defaultEventId || autoFriday.id
+  );
+  const [copiedEventLink, setCopiedEventLink] = useState<boolean>(false);
   const [selectedMemberId, setSelectedMemberId] = useState<string>(defaultMemberId || "");
   const [manualCode, setManualCode] = useState<string>("");
   const [memberSearchQuery, setMemberSearchQuery] = useState<string>("");
@@ -84,21 +96,35 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     return data.members;
   }, [data.members, currentUser, defaultTeamId]);
 
-  // Auto-select the most recent active event if none provided
+  // Auto-select Friday meeting bound to current device date if none selected
   useEffect(() => {
-    if (!selectedEventId && data.events.length > 0) {
-      const activeEvents = data.events.filter((e) => e.isActive);
-      if (activeEvents.length > 0) {
-        const latest = [...activeEvents].sort(
-          (a, b) =>
-            new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-        )[0];
-        setSelectedEventId(latest.id);
-      } else {
+    if (!selectedEventId) {
+      const friday = meetingStore.ensureFridayMeetingEvent();
+      if (friday) {
+        setSelectedEventId(friday.id);
+      } else if (data.events.length > 0) {
         setSelectedEventId(data.events[0].id);
       }
     }
   }, [data.events, selectedEventId]);
+
+  // Servant role detection & servant members list
+  const isServantAccount =
+    currentUser.role === "servant" ||
+    currentUser.role === "admin" ||
+    currentUser.role === "priest" ||
+    currentUser.role === "leader" ||
+    currentUser.permissions?.canScanAttendance;
+
+  const servantsList = React.useMemo(() => {
+    return data.members.filter(
+      (m) =>
+        m.role === "servant" ||
+        m.role === "admin" ||
+        m.role === "priest" ||
+        m.role === "leader"
+    );
+  }, [data.members]);
 
   // Set default selected member if available and none selected yet
   useEffect(() => {
@@ -433,25 +459,125 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
               <QrCode className="h-5 w-5" />
             </span>
             <h3 className={`text-lg sm:text-xl font-black ${isLight ? "text-slate-900" : "text-white"}`}>
-              رصد الحضور وبونص الموعد 📱
+              رصد الحضور وبونص الموعد بالـ QR 📱
             </h3>
           </div>
           <p className={`text-xs ${isLight ? "text-slate-600 font-medium" : "text-slate-400"}`}>
-            المنفذ:{" "}
-            <span className={`font-bold ${isLight ? "text-amber-900" : "text-amber-300"}`}>
-              {currentUser.name} ({currentUser.roleLabel})
-            </span>
+            تسجيل حضور تلقائي وذكي مربوط بساعة وتاريخ جهازك مباشرة
           </p>
         </div>
 
-        {/* 1. Global Event Selector Card */}
+        {/* 1. AUTO-LINKED FRIDAY BANNER (DEVICE DATE) */}
+        <div className="p-3.5 rounded-2xl bg-gradient-to-r from-teal-500/20 via-emerald-500/15 to-teal-500/20 border-2 border-teal-500/50 space-y-2 shadow-md">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <span className="h-8 w-8 rounded-xl bg-teal-500 text-slate-950 flex items-center justify-center font-black text-base shadow-sm shrink-0 mt-0.5 animate-pulse">
+                ⚡
+              </span>
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs sm:text-sm font-black text-teal-300">
+                    مربوط تلقائياً بتاريخ جهازك:
+                  </span>
+                  <span className="px-2 py-0.5 rounded-lg bg-teal-500/30 text-teal-100 text-[11px] font-mono font-black border border-teal-400/40">
+                    {currentEvent?.date || autoFriday.date}
+                  </span>
+                </div>
+                <h4 className="text-xs sm:text-sm font-bold text-white leading-tight">
+                  {currentEvent?.title || autoFriday.title}
+                </h4>
+                <p className="text-[11px] text-teal-200/90">
+                  تم تحديد جلسة لقاء الجمعة تلقائياً من ساعة وتاريخ جهازك دون الحاجة للاختيار اليدوي.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                sounds.playTap();
+                const friday = meetingStore.ensureFridayMeetingEvent();
+                setSelectedEventId(friday.id);
+                setScanResult({
+                  type: "success",
+                  title: "تمت مزامنة تاريخ الجمعة ⚡",
+                  message: `تم ربط الجلسة بلقاء الجمعة (${friday.date}) وفق توقيت وتاريخ جهازك.`,
+                });
+              }}
+              className="px-2.5 py-1.5 rounded-xl bg-teal-500/25 hover:bg-teal-500 hover:text-slate-950 text-teal-200 text-[11px] font-bold border border-teal-400/40 transition-all cursor-pointer flex items-center gap-1 shrink-0 active:scale-95"
+              title="إعادة ضبط وربط بلقاء جمعة هذا الأسبوع"
+            >
+              <RefreshCw className="h-3 w-3" />
+              <span>مزامنة التاريخ</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 2. SERVANT ACCOUNT STATUS BAR */}
+        {isServantAccount ? (
+          <div className="px-3.5 py-2.5 rounded-2xl bg-slate-900/90 border border-amber-500/40 flex items-center justify-between gap-2 flex-wrap shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="h-6 w-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs shrink-0">
+                ✝️
+              </span>
+              <div className="text-xs">
+                <span className="text-slate-400">حساب الخادم المسجل: </span>
+                <span className="font-black text-amber-300">{currentUser.name}</span>
+                <span className="text-[11px] text-slate-400 mr-1.5 font-bold">
+                  ({currentUser.roleLabel || "خادم"})
+                </span>
+              </div>
+            </div>
+            <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-black border border-emerald-500/40">
+              صلاحية مسح QR ورصد البونص نشطة ✅
+            </span>
+          </div>
+        ) : (
+          <div className="p-3 rounded-2xl bg-amber-950/80 border-2 border-amber-500/60 text-amber-200 space-y-2">
+            <div className="flex items-center gap-2 font-black text-xs">
+              <AlertCircle className="h-4 w-4 text-amber-400 shrink-0" />
+              <span>تنبيه: أنت مسجل حالياً كـ ({currentUser.roleLabel}). لرصد الحضور، اختر حساب الخادم:</span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                onChange={(e) => {
+                  const sId = e.target.value;
+                  if (!sId) return;
+                  const servant = data.members.find((m) => m.id === sId);
+                  if (servant) {
+                    const loginRes = authStore.loginWithCode(servant.accessCode, data.members, data.teams);
+                    if (loginRes.success && loginRes.user) {
+                      setCurrentUser(loginRes.user);
+                    }
+                    sounds.playVictory();
+                    setScanResult({
+                      type: "success",
+                      title: "تم تسجيل الدخول كخادم! ✝️",
+                      message: `أهلاً بك يا خادم المسيح ${servant.name}، تم تفعيل صلاحيات مسح QR ورصد الحضور.`,
+                    });
+                  }
+                }}
+                className="px-3 py-1.5 rounded-xl bg-slate-900 border border-amber-400 text-xs text-white focus:outline-none cursor-pointer"
+              >
+                <option value="">-- اضغط هنا للتبديل لحساب الخادم --</option>
+                {servantsList.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.roleLabel || "خادم"})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* 3. Global Event Selector Card */}
         <div className={`rounded-2xl border-2 p-3.5 space-y-2 ${
           isLight ? "bg-white border-slate-300 text-slate-900 shadow-xs" : "border-teal-500/30 bg-slate-900/90"
         }`}>
           <div className="flex items-center justify-between">
             <label className={`text-xs font-black flex items-center gap-1.5 ${isLight ? "text-teal-900" : "text-teal-300"}`}>
               <QrCode className="h-4 w-4 text-teal-600" />
-              <span>الفعالية المستهدفة لتسجيل الحضور:</span>
+              <span>الفعالية أو اللقاء المستهدف:</span>
             </label>
             {currentEvent?.isActive ? (
               <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${
@@ -481,11 +607,14 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
                 : "bg-slate-950 border-slate-700 text-white focus:border-teal-400"
             }`}
           >
-            {data.events.map((evt) => (
-              <option key={evt.id} value={evt.id}>
-                {evt.title} ({evt.isActive ? "نشطة" : "مغلقة"})
-              </option>
-            ))}
+            {data.events.map((evt) => {
+              const isFridayCurrent = evt.id === autoFriday.id || evt.date === autoFriday.date;
+              return (
+                <option key={evt.id} value={evt.id}>
+                  {isFridayCurrent ? "⭐ " : ""}{evt.title} ({evt.date}) {isFridayCurrent ? "— [مربوط بجهازك]" : ""}
+                </option>
+              );
+            })}
           </select>
 
           {/* Event Metadata & Automatic Punctuality Bonus Details */}
@@ -620,7 +749,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         )}
 
         {/* Mode Switcher Tabs */}
-        <div className="flex items-center gap-2 bg-slate-900 p-1.5 rounded-2xl border border-slate-800">
+        <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-900 p-1.5 rounded-2xl border border-slate-800">
           <button
             type="button"
             onClick={() => {
@@ -628,14 +757,14 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
               stopLiveScanner();
               setScanMode("code_select");
             }}
-            className={`flex-1 py-2 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-2 text-[11px] sm:text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 ${
               scanMode === "code_select"
-                ? "bg-amber-500 text-slate-950 shadow-md"
+                ? "bg-amber-500 text-slate-950 shadow-md font-black"
                 : "text-slate-400 hover:text-white"
             }`}
           >
-            <Zap className="h-4 w-4" />
-            <span>اختيار العضو أو الكود 🎯</span>
+            <Zap className="h-3.5 w-3.5" />
+            <span>اختيار العضو / الكود 🎯</span>
           </button>
 
           <button
@@ -644,14 +773,31 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
               sounds.playTap();
               setScanMode("camera");
             }}
-            className={`flex-1 py-2 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-2 text-[11px] sm:text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 ${
               scanMode === "camera"
-                ? "bg-amber-500 text-slate-950 shadow-md"
+                ? "bg-amber-500 text-slate-950 shadow-md font-black"
                 : "text-slate-400 hover:text-white"
             }`}
           >
-            <Camera className="h-4 w-4" />
+            <Camera className="h-3.5 w-3.5" />
             <span>كاميرا الهاتف 📷</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              sounds.playTap();
+              stopLiveScanner();
+              setScanMode("show_qr");
+            }}
+            className={`flex-1 py-2 text-[11px] sm:text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 ${
+              scanMode === "show_qr"
+                ? "bg-amber-500 text-slate-950 shadow-md font-black"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <QrCode className="h-3.5 w-3.5" />
+            <span>عرض كود اللقاء 📲</span>
           </button>
         </div>
 
@@ -910,6 +1056,103 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
                 <p>{cameraError}</p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ---------------- SECTION 3: SHOW FRIDAY EVENT QR FOR MAKHDOUSTEEN ---------------- */}
+        {scanMode === "show_qr" && (
+          <div className="p-5 rounded-3xl bg-slate-900 border-2 border-teal-500/40 text-center space-y-4 shadow-xl animate-fadeIn">
+            <div className="space-y-1">
+              <span className="px-3 py-1 rounded-full bg-teal-500/20 text-teal-300 text-xs font-black border border-teal-500/40 inline-flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-teal-400" />
+                <span>كود لقاء الجمعة المعتمد للمخدومين</span>
+              </span>
+              <h4 className="text-base sm:text-lg font-black text-white pt-1">
+                {currentEvent?.title || autoFriday.title}
+              </h4>
+              <p className="text-xs text-slate-400">
+                امسك هاتفك واجعل الشباب والمخدومين يوجّهون كاميرات هواتفهم إلى هذا الرمز لتسجيل حضورهم فوراً
+              </p>
+            </div>
+
+            {/* QR Code Canvas / Image Display */}
+            <div className="flex flex-col items-center justify-center py-2">
+              <div className="p-4 rounded-3xl bg-white shadow-2xl border-4 border-teal-400 inline-block">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${encodeURIComponent(
+                    `${window.location.origin}/?code=${encodeURIComponent(currentEvent?.qrCode || autoFriday.qrCode)}`
+                  )}`}
+                  alt={`كود ${currentEvent?.title}`}
+                  className="w-52 h-52 object-contain"
+                  loading="lazy"
+                />
+              </div>
+
+              {/* Clean Event Code Badge */}
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-xs text-slate-400">رمز الفعالية:</span>
+                <span className="px-3 py-1 rounded-xl bg-slate-950 text-amber-300 font-mono font-black text-sm border border-slate-700 select-all">
+                  {currentEvent?.qrCode || autoFriday.qrCode}
+                </span>
+              </div>
+            </div>
+
+            {/* Attendance Rewards Summary */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="p-2.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-0.5">
+                <span className="text-slate-400 text-[11px]">نقاط الحضور:</span>
+                <p className="text-sm font-black text-emerald-400">
+                  +{currentEvent?.attendancePoints || 30} XP
+                </p>
+              </div>
+              <div className="p-2.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-0.5">
+                <span className="text-slate-400 text-[11px]">بونص الموعد:</span>
+                <p className="text-sm font-black text-amber-400">
+                  +{currentEvent?.punctualityBonusPoints || 15} XP
+                </p>
+              </div>
+            </div>
+
+            {/* Action Buttons: Copy link & WhatsApp */}
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  const link = `${window.location.origin}/?code=${encodeURIComponent(currentEvent?.qrCode || autoFriday.qrCode)}`;
+                  navigator.clipboard.writeText(link);
+                  setCopiedEventLink(true);
+                  sounds.playVictory();
+                  setTimeout(() => setCopiedEventLink(false), 3000);
+                }}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-black shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+              >
+                {copiedEventLink ? (
+                  <>
+                    <Check className="h-4 w-4 text-emerald-950" />
+                    <span>تم نسخ الرابط! 🎉</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" />
+                    <span>نسخ رابط الحضور 📋</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  const link = `${window.location.origin}/?code=${encodeURIComponent(currentEvent?.qrCode || autoFriday.qrCode)}`;
+                  const msg = `✝️ كود ورابط تسجيل الحضور في ${currentEvent?.title || autoFriday.title}:\n${link}`;
+                  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, "_blank");
+                }}
+                className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 text-xs font-bold border border-slate-700 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <span>واتساب 💬</span>
+              </button>
+            </div>
           </div>
         )}
 
