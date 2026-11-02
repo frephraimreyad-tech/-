@@ -62,6 +62,7 @@ export const PDFReportModal: React.FC<PDFReportModalProps> = ({ onClose }) => {
         quality: 0.98,
         cacheBust: true,
         pixelRatio: 2,
+        skipFonts: true,
       });
 
       const pdf = new jsPDF({
@@ -81,10 +82,8 @@ export const PDFReportModal: React.FC<PDFReportModalProps> = ({ onClose }) => {
       setToastMsg("تم تنزيل ملف التقرير PDF بنجاح! جاهز للمشاركة 📄");
       setTimeout(() => setToastMsg(null), 4000);
     } catch (err) {
-      console.error("PDF generation failed:", err);
-      sounds.playClose();
-      setToastMsg("تعذر توليد ملف PDF، حاول مرة أخرى.");
-      setTimeout(() => setToastMsg(null), 3000);
+      console.error("PDF generation failed, fallingback to print:", err);
+      window.print();
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -100,6 +99,7 @@ export const PDFReportModal: React.FC<PDFReportModalProps> = ({ onClose }) => {
         quality: 0.98,
         cacheBust: true,
         pixelRatio: 2,
+        skipFonts: true,
       });
 
       const link = document.createElement("a");
@@ -111,8 +111,8 @@ export const PDFReportModal: React.FC<PDFReportModalProps> = ({ onClose }) => {
       setToastMsg("تم حفظ التقرير كصورة عالية الجودة PNG 🖼️");
       setTimeout(() => setToastMsg(null), 4000);
     } catch (err) {
-      console.error("PNG export error:", err);
-      sounds.playClose();
+      console.error("PNG export error, fallingback to print:", err);
+      window.print();
     } finally {
       setIsGeneratingPng(false);
     }

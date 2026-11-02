@@ -367,7 +367,11 @@ class MeetingStore {
 
   async updateConfig(updates: Partial<MeetingConfig>): Promise<void> {
     this.data.config = { ...this.data.config, ...updates };
-    await updateDoc(doc(db, "config", "meeting"), updates);
+    try {
+      await setDoc(doc(db, "config", "meeting"), updates, { merge: true });
+    } catch (e) {
+      console.warn("Could not save config to Firestore:", e);
+    }
   }
 
   // --- Audit Log Logging ---
@@ -565,7 +569,11 @@ class MeetingStore {
         });
       }
 
-      await updateDoc(doc(db, "teams", teamId), updates);
+      try {
+        await setDoc(doc(db, "teams", teamId), updates, { merge: true });
+      } catch (e) {
+        console.warn("Could not save team updates to Firestore:", e);
+      }
       this.triggerAutoSync();
       return { success: true };
     }

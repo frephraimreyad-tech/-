@@ -95,6 +95,7 @@ export const MemberCard: React.FC<MemberCardProps> = ({ member, team, onClose })
         backgroundColor: '#FFFFFF',
         width: 350,
         height: 500,
+        skipFonts: true,
         style: {
            transform: 'scale(1)',
            transformOrigin: 'top left'
@@ -106,7 +107,8 @@ export const MemberCard: React.FC<MemberCardProps> = ({ member, team, onClose })
       link.href = dataUrl;
       link.click();
     } catch (err) {
-      console.error("Export failed:", err);
+      console.error("Export PNG failed, fallingback to print/PDF:", err);
+      window.print();
     } finally {
       setIsExporting(false);
     }

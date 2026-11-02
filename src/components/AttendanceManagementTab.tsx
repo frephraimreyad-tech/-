@@ -478,11 +478,11 @@ export const AttendanceManagementTab: React.FC<AttendanceManagementTabProps> = (
           </label>
           <div className="relative flex-1">
             <select
-              value={selectedEvent?.date || selectedEventId}
+              value={selectedEvent?.id || selectedEventId}
               onChange={(e) => {
                 const val = e.target.value;
-                if (val.startsWith("friday:")) {
-                  const dateStr = val.replace("friday:", "");
+                if (val.startsWith("evt-friday-")) {
+                  const dateStr = val.replace("evt-friday-", "");
                   handleSelectFridayDate(dateStr);
                 } else {
                   setSelectedEventId(val);
@@ -504,7 +504,7 @@ export const AttendanceManagementTab: React.FC<AttendanceManagementTabProps> = (
                     ? "(سابقة)"
                     : "(قادمة)";
                   return (
-                    <option key={f.id} value={`friday:${f.date}`}>
+                    <option key={f.id} value={f.id}>
                       {f.formattedArabicDate} {badge}
                     </option>
                   );
