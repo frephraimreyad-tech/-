@@ -856,7 +856,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {leadersList.map((member) => (
                             <div
-                              key={member.id}
+                              key={`leader-${member.id}`}
                               className="p-3 sm:p-4 rounded-2xl border transition-all shadow-sm flex items-center gap-3.5 border-amber-500/40 bg-gradient-to-l from-amber-950/30 via-slate-900/80 to-slate-900"
                             >
                               <div
@@ -985,7 +985,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {servantsList.map((member) => (
                             <div
-                              key={member.id}
+                              key={`servant-${member.id}`}
                               className="p-3 sm:p-4 rounded-2xl border transition-all shadow-sm flex items-center gap-3.5 border-purple-500/40 bg-gradient-to-l from-purple-950/30 via-slate-900/80 to-slate-900"
                             >
                               <div
@@ -1114,7 +1114,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {makhdoumeenList.map((member) => (
                             <div
-                              key={member.id}
+                              key={`makhdoum-${member.id}`}
                               className="p-3 sm:p-4 rounded-2xl border transition-all shadow-sm flex items-center gap-3.5 border-slate-800/80 bg-slate-900/60 hover:bg-slate-900/80"
                             >
                               <div
@@ -1209,7 +1209,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
 
                       return (
                         <div
-                          key={member.id}
+                          key={`grid-${member.id}`}
                           className={`p-3 sm:p-4 rounded-2xl border transition-all shadow-sm flex items-center gap-3.5 ${
                             isLeader
                               ? "border-amber-500/40 bg-gradient-to-l from-amber-950/30 via-slate-900/80 to-slate-900"
