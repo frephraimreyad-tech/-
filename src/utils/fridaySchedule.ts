@@ -123,3 +123,29 @@ export function getCurrentOrNearestFridayDate(): string {
   }
   return result.toISOString().slice(0, 10);
 }
+
+/**
+ * Returns the Date object of the upcoming Friday meeting at 19:00 (7:00 PM).
+ */
+export function getNextFridayMeetingDate(): Date {
+  const now = new Date();
+  const day = now.getDay(); // 0: Sun, 1: Mon, 2: Tue, 3: Wed, 4: Thu, 5: Fri, 6: Sat
+  const result = new Date(now);
+
+  if (day === 5) {
+    if (now.getHours() < 19) {
+      result.setHours(19, 0, 0, 0);
+      return result;
+    } else {
+      result.setDate(result.getDate() + 7);
+      result.setHours(19, 0, 0, 0);
+      return result;
+    }
+  }
+
+  let daysUntilFriday = (5 - day + 7) % 7;
+  if (daysUntilFriday === 0) daysUntilFriday = 7;
+  result.setDate(result.getDate() + daysUntilFriday);
+  result.setHours(19, 0, 0, 0);
+  return result;
+}

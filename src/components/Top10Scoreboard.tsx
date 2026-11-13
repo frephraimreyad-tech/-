@@ -35,12 +35,15 @@ import {
   Clock,
   Zap,
   Swords,
+  UserX,
+  Copy,
 } from "lucide-react";
 import type { CustomMember, ProcessedMeetingTeam } from "../types";
 import { meetingStore } from "../utils/meetingStore";
 import { sounds } from "../utils/soundEffects";
 import { authStore, type SystemUser } from "../utils/authStore";
 import { useTheme } from "../utils/themeStore";
+import { formatArabicTimestamp } from "../utils/dateFormatter";
 import { ConfettiCanvas, type ConfettiCanvasRef } from "./ConfettiCanvas";
 import { TeamModal } from "./TeamModal";
 import { TeamPhotoModal } from "./TeamPhotoModal";
@@ -155,11 +158,15 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
     const unsubAuth = authStore.subscribe(() => {
       setCurrentUser(authStore.getCurrentUser());
     });
+
+    // Auto-recalculate and sync team points using the new attendance formula on mount
+    meetingStore.recalculateTeamsByAttendanceOnly(currentUser).catch(() => {});
+
     return () => {
       unsubStore();
       unsubAuth();
     };
-  }, []);
+  }, [currentUser]);
 
   // Listen to fullscreen changes
   useEffect(() => {
@@ -742,6 +749,8 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                       <span>الحضور ورسالة الجمعة 📋</span>
                     </button>
 
+
+
                     {/* Live Duel Mode Button */}
                     <button
                       type="button"
@@ -861,6 +870,33 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                     <>
                       <Maximize2 className="h-4 w-4 shrink-0 animate-pulse" />
                       <span>ملء الشاشة للقاعات 📺</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Theme Toggle Switch (الوضع المظلم / الفاتح) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    setThemePreference(isLight ? "dark" : "light");
+                  }}
+                  className={`h-9 px-3.5 rounded-xl text-xs font-black shadow-md active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 border-2 shrink-0 ${
+                    isLight
+                      ? "bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-400"
+                      : "bg-slate-800 hover:bg-slate-700 text-amber-300 border-amber-500/40"
+                  }`}
+                  title={isLight ? "التبديل إلى الوضع المظلم (Dark Mode)" : "التبديل إلى الوضع الفاتح (Light Mode)"}
+                >
+                  {isLight ? (
+                    <>
+                      <Moon className="h-4 w-4 shrink-0 text-indigo-700" />
+                      <span>الوضع المظلم 🌙</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sun className="h-4 w-4 shrink-0 text-amber-400" />
+                      <span>الوضع الفاتح ☀️</span>
                     </>
                   )}
                 </button>
@@ -1015,6 +1051,8 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                 <TrendingDown className="h-3.5 w-3.5" />
                 <span>الأعلى نقاطاً ⚡</span>
               </button>
+
+
 
               <button
                 type="button"
@@ -1727,8 +1765,10 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                       </div>
                     </div>
 
-                    {/* Right: XP Score + Quick +50 XP trigger */}
-                    <div className="flex items-center gap-2.5 sm:gap-4 shrink-0 mr-1 sm:mr-3">
+                    {/* Right: Attendance Rate % + XP Score + Quick +50 XP trigger */}
+                    <div className="flex items-center gap-2 sm:gap-3 shrink-0 mr-1 sm:mr-3">
+
+
                       {/* Quick +50 button for fast in-game scoring (Admin only) */}
                       {!isPublicDisplayMode && currentUser.permissions.canAwardPoints && (
                         <button

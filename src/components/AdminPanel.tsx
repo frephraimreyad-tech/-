@@ -455,6 +455,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
     });
   };
 
+  const handleImportFridayLogs = async () => {
+    sounds.playTap();
+    const res = await meetingStore.importFridayLogs();
+    if (res.success) {
+      sounds.playVictory();
+      showFeedback(`تم استيراد ${res.count} سجل ومعاملة ليوم الجمعة بنجاح وتحديث اللوحة الكبرى! 🎉`);
+    } else {
+      sounds.playClose();
+      showFeedback(res.error || "فشل استيراد السجلات", "error");
+    }
+  };
+
   const handleResetToDefaults = () => {
     setConfirmDialog({
       title: "استعادة الفرق النموذجية الافتراضية",
@@ -571,6 +583,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
     URL.revokeObjectURL(url);
     sounds.playTap();
     showFeedback("تم تنزيل وتصدير ملف السجل التاريخي بنجاح 📄");
+  };
+
+  const handleImportTransactionsFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const content = event.target?.result as string;
+      const result = await meetingStore.importDataJson(content);
+      if (result.success) {
+        sounds.playVictory();
+        showFeedback("تم استيراد سجل المعاملات والتاريخ وتحديث اللوحة بنجاح! 📥");
+      } else {
+        showFeedback(result.error || "فشل استيراد الملف، تأكد من صحة تنسيق البيانات", "error");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
   };
 
   const handleClearLog = () => {
@@ -2423,6 +2453,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                     <span>تصدير السجل 📄</span>
                   </button>
 
+                  <label
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 font-bold text-xs border border-slate-700 shadow-sm transition-all cursor-pointer active:scale-95"
+                    title="استيراد سجل المعاملات والتاريخ"
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    <span>استيراد السجل 📥</span>
+                    <input type="file" accept=".json,.txt,.csv" onChange={handleImportTransactionsFile} className="hidden" />
+                  </label>
+
                   {data.transactions.length > 0 && (
                     <button
                       type="button"
@@ -2927,6 +2966,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
               <div className="pt-4 border-t border-slate-800 space-y-2">
                 <h4 className="text-xs font-bold text-rose-300">منطقة العمليات الحساسة:</h4>
                 <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleImportFridayLogs}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/60 font-black text-xs cursor-pointer transition-all shadow-md"
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    <span>استيراد سجل الجمعة من الصورة وتحديث اللوحة 📥</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={handleResetScoresOnly}

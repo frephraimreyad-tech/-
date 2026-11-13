@@ -4,7 +4,7 @@
  */
 
 import * as XLSX from "xlsx";
-import type { AttendanceRecord, CustomMember, CustomTeam, EventSession, MeetingConfig } from "../types";
+import type { AttendanceRecord, CustomMember, CustomTeam, EventSession, MeetingConfig, ScoreTransaction, VisitationRecord } from "../types";
 import { formatArabicTimestamp } from "./dateFormatter";
 
 interface ExportAttendanceParams {
@@ -187,6 +187,75 @@ export function exportAttendanceToExcel({
     ws3["!views"] = [{ RTL: true }];
     XLSX.utils.book_append_sheet(wb, ws3, "ملخص الاجتماع");
 
+    // ==========================================
+    // Dynamic Sheets for each Team / Family (الأسر والقطاعات)
+    // ==========================================
+    teams.forEach((team) => {
+      const teamMembers = members.filter((m) => m.teamId === team.id);
+      if (teamMembers.length > 0) {
+        const teamRows = teamMembers.map((member, idx) => {
+          const attRecord = attendanceMap.get(member.id);
+          const isPresent = !!attRecord;
+
+          let statusText = "غائب ❌";
+          let punctualText = "--";
+          let pointsAwarded = 0;
+          let scanTime = "--";
+          let scannedBy = "--";
+
+          if (isPresent && attRecord) {
+            statusText = "حاضر ✅";
+            punctualText = attRecord.isPunctual ? "في الموعد ⏰" : "متأخر ⏳";
+            pointsAwarded = attRecord.pointsAwarded || 0;
+            if (attRecord.scannedAt) {
+              const parsed = formatArabicTimestamp(attRecord.scannedAt);
+              scanTime = parsed.timeStr;
+            }
+            scannedBy = attRecord.scannedByUserName || "النظام";
+          }
+
+          let roleLabel = "مخدوم";
+          if (member.role === "admin") roleLabel = "مدير النظام";
+          else if (member.role === "priest") roleLabel = "أب كاهن";
+          else if (member.role === "servant") roleLabel = "خادم";
+          else if (member.role === "leader") roleLabel = "قائد مجموعة";
+
+          return {
+            "م": idx + 1,
+            "كود العضو": member.accessCode || "--",
+            "اسم العضو": member.name,
+            "الصفة / الدور": roleLabel,
+            "حالة الحضور": statusText,
+            "الالتزام بالموعد": punctualText,
+            "النقاط (XP)": pointsAwarded,
+            "وقت التسجيل": scanTime,
+            "مسؤول التسجيل": scannedBy,
+            "رقم الهاتف": member.phone || "--",
+            "ملاحظات": member.notes || "",
+          };
+        });
+
+        const wsTeam = XLSX.utils.json_to_sheet(teamRows);
+        wsTeam["!cols"] = [
+          { wch: 6 },
+          { wch: 12 },
+          { wch: 26 },
+          { wch: 16 },
+          { wch: 14 },
+          { wch: 16 },
+          { wch: 14 },
+          { wch: 14 },
+          { wch: 18 },
+          { wch: 16 },
+          { wch: 28 },
+        ];
+        wsTeam["!views"] = [{ RTL: true }];
+
+        const safeTeamName = (team.name || "أسرة").replace(/[\/\\\?\*\[\]:]/g, "").slice(0, 28);
+        XLSX.utils.book_append_sheet(wb, wsTeam, safeTeamName);
+      }
+    });
+
     // Clean filename
     const safeDate = event.date || new Date().toISOString().slice(0, 10);
     const fileName = `كشف_حضور_وغياب_اجتماع_الشباب_${safeDate}.xlsx`;
@@ -199,3 +268,97 @@ export function exportAttendanceToExcel({
     return false;
   }
 }
+
+interface ExportVisitationParams {
+  visitationHistory: VisitationRecord[];
+}
+
+export function exportVisitationHistoryToExcel({
+  visitationHistory,
+}: ExportVisitationParams): boolean {
+  try {
+    const wb = XLSX.utils.book_new();
+
+    const rows = visitationHistory.map((item, idx) => {
+      const parsedTime = formatArabicTimestamp(item.visitedAt);
+      return {
+        "م": idx + 1,
+        "اسم المخدوم": item.memberName,
+        "الفريق": item.teamName,
+        "تاريخ ووقت الافتقاد": `${parsedTime.dateStr} - ${parsedTime.timeStr}`,
+        "الخادم القائم بالافتقاد": item.servantName,
+        "ملاحظات الافتقاد": item.notes || "--",
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [
+      { wch: 6 },
+      { wch: 26 },
+      { wch: 22 },
+      { wch: 22 },
+      { wch: 24 },
+      { wch: 35 },
+    ];
+    ws["!views"] = [{ RTL: true }];
+    XLSX.utils.book_append_sheet(wb, ws, "سجل الافتقاد والزيارات");
+
+    XLSX.writeFile(wb, `سجل_الافتقاد_والزيارات_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    return true;
+  } catch (err) {
+    console.error("Visitation Excel export failed:", err);
+    return false;
+  }
+}
+
+interface ExportTransactionsParams {
+  transactions: ScoreTransaction[];
+}
+
+export function exportTransactionsToExcel({
+  transactions,
+}: ExportTransactionsParams): boolean {
+  try {
+    const wb = XLSX.utils.book_new();
+
+    const rows = transactions.map((tx, idx) => {
+      const parsedTime = formatArabicTimestamp(tx.timestamp);
+      return {
+        "م": idx + 1,
+        "التاريخ والوقت": `${parsedTime.dateStr} - ${parsedTime.timeStr}`,
+        "نوع المستهدف": tx.targetType === "team" ? "فريق 🛡️" : "عضو 👤",
+        "اسم المستهدف": tx.targetName || "--",
+        "الفريق": tx.teamName || "--",
+        "النقاط (XP)": tx.points,
+        "السبب / البيان": tx.reason || "--",
+        "التصنيف": tx.category || "عام",
+        "المسؤول المنفذ": tx.executorName || "النظام",
+        "دور المسؤول": tx.executorRole || "--",
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [
+      { wch: 6 },
+      { wch: 22 },
+      { wch: 14 },
+      { wch: 24 },
+      { wch: 20 },
+      { wch: 14 },
+      { wch: 36 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 14 },
+    ];
+    ws["!views"] = [{ RTL: true }];
+    XLSX.utils.book_append_sheet(wb, ws, "سجل المعاملات والأنشطة");
+
+    XLSX.writeFile(wb, `سجل_المعاملات_والتاريخ_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    return true;
+  } catch (err) {
+    console.error("Transactions Excel export function failed:", err);
+    return false;
+  }
+}
+
+

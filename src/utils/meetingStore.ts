@@ -12,6 +12,7 @@ import type {
   ProcessedMeetingTeam,
   RoleType,
   ScoreTransaction,
+  VisitationRecord,
 } from "../types";
 import { type SystemUser, SUPER_ADMIN_USER, getRoleDefaultPermissions, authStore } from "./authStore";
 import { getCurrentOrNearestFridayDate } from "./fridaySchedule";
@@ -33,7 +34,10 @@ import {
   Timestamp
 } from "firebase/firestore";
 
+import { calculateTeamXP } from "./teamXPCalculator";
+
 const STORAGE_KEY = "youth_meeting_scoreboard_v2";
+
 
 export const DEFAULT_ACTIVITY_REASONS: ActivityReason[] = [
   { id: "ar-1", text: "حضور مبكر والتزام في الموعد", category: "حضور والتزام", points: 30, icon: "⏰" },
@@ -70,21 +74,21 @@ const DEFAULT_CONFIG: MeetingConfig = {
 };
 
 export const DEFAULT_TEAMS: CustomTeam[] = [
-  { id: "team-1", name: "فريق مارمرقس", icon: "🦁", color: "#EAB308", slogan: "كاروز الديار المصرية", leaderName: "أنطونيوس إدوار", points: 1250, previousRank: 2, avatarUrl: "https://images.unsplash.com/photo-1546182990-dffeafbe841d?w=400&auto=format&fit=crop&q=80" },
-  { id: "team-2", name: "فريق أثناسيوس", icon: "⚔️", color: "#3B82F6", slogan: "حامي الإيمان المستقيم", leaderName: "مينا شهيد", points: 1120, previousRank: 1, avatarUrl: "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=400&auto=format&fit=crop&q=80" },
-  { id: "team-3", name: "فريق الأنبا شنودة", icon: "📜", color: "#10B981", slogan: "رئيس المتوحدين", leaderName: "د. مينا ماهر", points: 980, previousRank: 3, avatarUrl: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&auto=format&fit=crop&q=80" },
-  { id: "team-4", name: "فريق أمير الشهداء مارجرجس", icon: "🛡️", color: "#EF4444", slogan: "سريع الندهة والبطل المغوار", leaderName: "بيشوي عاطف", points: 940, previousRank: 5, avatarUrl: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=400&auto=format&fit=crop&q=80" },
-  { id: "team-5", name: "فريق الأنبا بيشوي", icon: "🕊️", color: "#06B6D4", slogan: "الرجل الكامل وحبيب مخلصنا الصالح", leaderName: "فادي سامح", points: 890, previousRank: 4, avatarUrl: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&auto=format&fit=crop&q=80" },
-  { id: "team-6", name: "فريق الأمير تادرس", icon: "🏹", color: "#8B5CF6", slogan: "قائد جند المسيح الأمين", leaderName: "كيرلس مجدي", points: 830, previousRank: 6, avatarUrl: "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=400&auto=format&fit=crop&q=80" },
-  { id: "team-7", name: "فريق البابا كيرلس", icon: "⛵", color: "#EC4899", slogan: "كن مطمئناً جداً جداً", leaderName: "مارك رأفت", points: 790, previousRank: 8, avatarUrl: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=400&auto=format&fit=crop&q=80" },
-  { id: "team-8", name: "فريق الشهيد أبي سيفين", icon: "👑", color: "#F97316", slogan: "حامل السيفين الغالب بقوة الصليب", leaderName: "يوسف مجدي", points: 750, previousRank: 7, avatarUrl: "/assets/aistudio/_______________________55ad5e73.png" },
-  { id: "team-9", name: "فريق الأنبا أنطونيوس", icon: "🔥", color: "#6366F1", slogan: "أب جميع الرهبان وكوكب البرية", leaderName: "مينا عادل", points: 710, previousRank: 10, avatarUrl: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&auto=format&fit=crop&q=80" },
-  { id: "team-10", name: "فريق القديسة دميانة", icon: "🌟", color: "#14B8A6", slogan: "عفيفة وقوية مع الأربعين عذراء", leaderName: "مارينا سامي", points: 680, previousRank: 9, avatarUrl: "https://images.unsplash.com/photo-1500485035595-cbe6f645feb1?w=400&auto=format&fit=crop&q=80" },
+  { id: "team-1", name: "فريق مارمرقس", icon: "🦁", color: "#EAB308", slogan: "كاروز الديار المصرية", leaderName: "أنطونيوس إدوار", points: 0, previousRank: 0, avatarUrl: "https://images.unsplash.com/photo-1546182990-dffeafbe841d?w=400&auto=format&fit=crop&q=80" },
+  { id: "team-2", name: "فريق أثناسيوس", icon: "⚔️", color: "#3B82F6", slogan: "حامي الإيمان المستقيم", leaderName: "مينا شهيد", points: 0, previousRank: 0, avatarUrl: "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=400&auto=format&fit=crop&q=80" },
+  { id: "team-3", name: "فريق الأنبا شنودة", icon: "📜", color: "#10B981", slogan: "رئيس المتوحدين", leaderName: "د. مينا ماهر", points: 0, previousRank: 0, avatarUrl: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&auto=format&fit=crop&q=80" },
+  { id: "team-4", name: "فريق أمير الشهداء مارجرجس", icon: "🛡️", color: "#EF4444", slogan: "سريع الندهة والبطل المغوار", leaderName: "بيشوي عاطف", points: 0, previousRank: 0, avatarUrl: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=400&auto=format&fit=crop&q=80" },
+  { id: "team-5", name: "فريق الأنبا بيشوي", icon: "🕊️", color: "#06B6D4", slogan: "الرجل الكامل وحبيب مخلصنا الصالح", leaderName: "فادي سامح", points: 0, previousRank: 0, avatarUrl: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&auto=format&fit=crop&q=80" },
+  { id: "team-6", name: "فريق الأمير تادرس", icon: "🏹", color: "#8B5CF6", slogan: "قائد جند المسيح الأمين", leaderName: "كيرلس مجدي", points: 0, previousRank: 0, avatarUrl: "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=400&auto=format&fit=crop&q=80" },
+  { id: "team-7", name: "فريق البابا كيرلس", icon: "⛵", color: "#EC4899", slogan: "كن مطمئناً جداً جداً", leaderName: "مارك رأفت", points: 0, previousRank: 0, avatarUrl: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=400&auto=format&fit=crop&q=80" },
+  { id: "team-8", name: "فريق الشهيد أبي سيفين", icon: "👑", color: "#F97316", slogan: "حامل السيفين الغالب بقوة الصليب", leaderName: "يوسف مجدي", points: 0, previousRank: 0, avatarUrl: "/assets/aistudio/_______________________55ad5e73.png" },
+  { id: "team-9", name: "فريق الأنبا أنطونيوس", icon: "🔥", color: "#6366F1", slogan: "أب جميع الرهبان وكوكب البرية", leaderName: "مينا عادل", points: 0, previousRank: 0, avatarUrl: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&auto=format&fit=crop&q=80" },
+  { id: "team-10", name: "فريق القديسة دميانة", icon: "🌟", color: "#14B8A6", slogan: "عفيفة وقوية مع الأربعين عذراء", leaderName: "مارينا سامي", points: 0, previousRank: 0, avatarUrl: "https://images.unsplash.com/photo-1500485035595-cbe6f645feb1?w=400&auto=format&fit=crop&q=80" },
 ];
 
 export const DEFAULT_MEMBERS: CustomMember[] = [
-  { id: "mem-1", name: "أبونا افرايم رياض", teamId: "team-1", role: "admin", roleLabel: "مدير النظام", points: 150, accessCode: "7777", permissions: getRoleDefaultPermissions("admin") },
-  { id: "mem-2", name: "مينا شهيد", teamId: "team-2", role: "leader", roleLabel: "قائد المجموعة", points: 100, accessCode: "1234", permissions: getRoleDefaultPermissions("leader") },
+  { id: "mem-1", name: "أبونا افرايم رياض", teamId: "team-1", role: "admin", roleLabel: "مدير النظام", points: 0, accessCode: "7777", permissions: getRoleDefaultPermissions("admin") },
+  { id: "mem-2", name: "مينا شهيد", teamId: "team-2", role: "leader", roleLabel: "قائد المجموعة", points: 0, accessCode: "1234", permissions: getRoleDefaultPermissions("leader") },
 ];
 
 export const DEFAULT_EVENTS: EventSession[] = [
@@ -116,38 +120,7 @@ export const DEFAULT_EVENTS: EventSession[] = [
   },
 ];
 
-const DEFAULT_TRANSACTIONS: ScoreTransaction[] = [
-  {
-    id: "tx-1",
-    timestamp: new Date(Date.now() - 3600000 * 2).toISOString(),
-    targetType: "team",
-    targetId: "team-1",
-    targetName: "فريق مارمرقس الرسول",
-    teamId: "team-1",
-    teamName: "فريق مارمرقس الرسول",
-    points: 100,
-    reason: "الفوز بالمركز الأول في مسابقة الإنجيل الأسبوعية",
-    category: "مسابقة روحية",
-    executorId: "super-admin-01",
-    executorName: "الخادم المسؤول",
-    executorRole: "admin",
-  },
-  {
-    id: "tx-2",
-    timestamp: new Date(Date.now() - 3600000 * 4).toISOString(),
-    targetType: "team",
-    targetId: "team-2",
-    targetName: "فريق أمير الشهداء مارجرجس",
-    teamId: "team-2",
-    teamName: "فريق أمير الشهداء مارجرجس",
-    points: 80,
-    reason: "تسجيل حضور جماعي ومبكر لأعضاء الفريق",
-    category: "حضور والتزام",
-    executorId: "super-admin-01",
-    executorName: "الخادم المسؤول",
-    executorRole: "admin",
-  },
-];
+const DEFAULT_TRANSACTIONS: ScoreTransaction[] = [];
 
 const DEFAULT_AUDIT_LOGS: AuditLogEntry[] = [
   {
@@ -207,6 +180,7 @@ class MeetingStore {
       events: DEFAULT_EVENTS,
       attendance: [],
       auditLogs: DEFAULT_AUDIT_LOGS,
+      visitationHistory: [],
       lastSaved: new Date().toISOString(),
     };
   }
@@ -321,6 +295,17 @@ class MeetingStore {
       this.notify();
     });
 
+    // Listen to Visitation History
+    const qVisitation = query(collection(db, "visitationHistory"), orderBy("visitedAt", "desc"), limit(500));
+    onSnapshot(qVisitation, (querySnap) => {
+      const records: VisitationRecord[] = [];
+      querySnap.forEach((doc) => {
+        records.push({ ...doc.data(), id: doc.id } as VisitationRecord);
+      });
+      this.data.visitationHistory = records;
+      this.notify();
+    });
+
     this.isLoading = false;
     this.initialized = true;
     this.notify();
@@ -418,6 +403,9 @@ class MeetingStore {
   getProcessedTeams(): ProcessedMeetingTeam[] {
     const teams = [...this.data.teams];
     const members = this.data.members;
+    const attendance = this.data.attendance || [];
+
+    const eventIds = Array.from(new Set(attendance.map(a => a.eventId)));
 
     const list: ProcessedMeetingTeam[] = teams.map((team) => {
       const teamMembers = members.filter((m) => m.teamId === team.id);
@@ -439,10 +427,30 @@ class MeetingStore {
       const servantsCount = teamMembers.filter((m) => m.role === "servant").length;
       const makhdoumeenCount = teamMembers.filter((m) => m.role === "member" || !m.role).length;
 
+      const teamMemberIds = new Set(teamMembers.map(m => m.id));
+      
+      const latestEventId = eventIds[eventIds.length - 1];
+      const presentCount = latestEventId 
+        ? attendance.filter(a => a.eventId === latestEventId && teamMemberIds.has(a.memberId)).length
+        : attendance.filter(a => teamMemberIds.has(a.memberId)).length;
+
+      const attendanceRate = teamMembers.length > 0 ? Number(((presentCount / teamMembers.length) * 100).toFixed(1)) : 0;
+      const { xp: attendanceXp } = calculateTeamXP(teamMembers.length, presentCount);
+
+      // إضافة النقاط اليدوية غير المتعلقة بالحضور (مثل المسابقات والتحديات)
+      const manualTxs = (this.data.transactions || []).filter(tx => tx.targetId === team.id && !tx.reason.includes("تسجيل حضور"));
+      const manualPoints = manualTxs.reduce((sum, tx) => sum + tx.points, 0);
+
+      const finalTeamPoints = attendanceXp + manualPoints;
+
       return {
         ...team,
+        points: Math.max(0, finalTeamPoints),
         rank: 0,
         membersCount: teamMembers.length,
+        presentMembersCount: presentCount,
+        attendanceRate: attendanceRate,
+        attendanceXpBonus: attendanceXp,
         leadersCount,
         servantsCount,
         makhdoumeenCount,
@@ -451,8 +459,10 @@ class MeetingStore {
       };
     });
 
+    // ترتيب الفرق تنازلياً حسب إجمالي النقاط
     list.sort((a, b) => {
       if (b.points !== a.points) return b.points - a.points;
+      if (b.attendanceRate !== a.attendanceRate) return b.attendanceRate - a.attendanceRate;
       return a.name.localeCompare(b.name, "ar");
     });
 
@@ -1212,6 +1222,36 @@ class MeetingStore {
       return { success: false, error: "غير مصرح لك بمسح QR؛ يرجى تسجيل الدخول بحساب خادم أو مسؤول" };
     }
 
+    // 1.5 Strict Time Window Check: Friday from 7:00 PM to 9:00 PM (19:00 to 21:00)
+    const now = new Date();
+    const isFriday = now.getDay() === 5;
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentTimeMinutes = currentHour * 60 + currentMinute;
+    const startTimeMinutes = 19 * 60; // 19:00
+    const endTimeMinutes = 21 * 60;   // 21:00
+
+    const isWithinWindow = isFriday && currentTimeMinutes >= startTimeMinutes && currentTimeMinutes <= endTimeMinutes;
+    const isAdminOrPriest = executor.role === "admin" || executor.role === "priest";
+
+    if (!isWithinWindow && !isAdminOrPriest) {
+      this.logAudit({
+        userId: executor.id,
+        userName: executor.name,
+        userRole: executor.role,
+        action: "security_block",
+        targetType: "member",
+        targetId: memberId,
+        targetName: memberId,
+        details: "محاولة مسح QR خارج وقت الاجتماع الرسمي (الجمعة 7م - 9م). تم الرفض أمنياً.",
+        status: "denied",
+      });
+      return { 
+        success: false, 
+        error: "عذراً، مسح كود الحضور غير متاح في هذا الوقت. ميعاد اجتماع الشباب الرسمي هو كل يوم جمعة من الساعة 7:00 م إلى 9:00 م." 
+      };
+    }
+
     // 2. Resolve Event (Clean & Case-insensitive) - Fallback to auto-linked Friday event
     let event: EventSession | undefined;
     const cleanEventId = (eventIdOrCode || "").trim().toLowerCase();
@@ -1276,35 +1316,14 @@ class MeetingStore {
       };
     }
 
-    // 5. Automatic Points Calculation with Time-Based Punctuality
+    // 5. Individual Attendance Registration (Points awarded per scan for member and team)
     let pointsAwarded = event.attendancePoints || 30;
-    let punctualityStatus = "";
+    let punctualityStatus = " (تسجيل حضور منتظم)";
     let effectivePunctual = !!isPunctual;
 
-    if (event.startTime && event.punctualityBonusPoints > 0) {
-      const now = new Date();
-      const [startHour, startMin] = event.startTime.split(":").map(Number);
-      const eventStartTime = new Date(now);
-      eventStartTime.setHours(startHour, startMin, 0, 0);
-
-      const diffMs = now.getTime() - eventStartTime.getTime();
-      const diffMins = diffMs / (1000 * 60);
-
-      if (diffMins <= 15) {
-        // Full bonus if within first 15 mins (or before start)
-        pointsAwarded += event.punctualityBonusPoints;
-        punctualityStatus = " (بونص كامل - حضور مبكر)";
-        effectivePunctual = true;
-      } else {
-        // Half bonus after 15 mins
-        const halfBonus = Math.floor(event.punctualityBonusPoints / 2);
-        pointsAwarded += halfBonus;
-        punctualityStatus = ` (نصف بونص - تأخير ${Math.floor(diffMins)} دقيقة)`;
-        effectivePunctual = halfBonus > 0;
-      }
-    } else if (isPunctual && event.punctualityBonusPoints > 0) {
+    if (effectivePunctual && event.punctualityBonusPoints) {
       pointsAwarded += event.punctualityBonusPoints;
-      punctualityStatus = " (بونص الالتزام المبكر)";
+      punctualityStatus = " (تسجيل حضور مبكر + بونص الالتزام بالموعد ⏰)";
     }
 
     // Optional Extra Manual Bonus from Servant / Admin
@@ -1396,6 +1415,13 @@ class MeetingStore {
     return list.filter((a) => a.eventId === eventId);
   }
 
+  async recalculateTeamsByAttendanceOnly(executor?: SystemUser): Promise<{ success: boolean; error?: string }> {
+    if (executor && executor.role !== "admin" && !executor.permissions?.canClearLogs) {
+      return { success: false, error: "غير مصرح لك بإدارة النقاط" };
+    }
+    return { success: true };
+  }
+
   /**
    * يربط لقاء الجمعة تلقائياً بتاريخ الجهاز الحالي بدون الحاجة لتحديده يدوياً
    */
@@ -1480,9 +1506,11 @@ class MeetingStore {
         return { success: true, record: existing };
       }
 
-      const pointsAwarded =
-        (event.attendancePoints || 30) +
-        (isPunctual ? (event.punctualityBonusPoints || 15) : 0);
+      let pointsAwarded = event.attendancePoints || 30;
+      if (isPunctual && event.punctualityBonusPoints) {
+        pointsAwarded += event.punctualityBonusPoints;
+      }
+
       member.points = (member.points || 0) + pointsAwarded;
       if (team) {
         team.points = (team.points || 0) + pointsAwarded;
@@ -1737,8 +1765,13 @@ class MeetingStore {
     const batch = writeBatch(db);
     this.data.teams.forEach(t => batch.update(doc(db, "teams", t.id), { points: 0 }));
     this.data.members.forEach(m => batch.update(doc(db, "members", m.id), { points: 0 }));
-    this.data.transactions.forEach(tx => batch.delete(doc(db, "transactions", tx.id)));
+    (this.data.transactions || []).forEach(tx => batch.delete(doc(db, "transactions", tx.id)));
+    (this.data.attendance || []).forEach(att => batch.delete(doc(db, "attendance", att.id)));
+    this.data.transactions = [];
+    this.data.attendance = [];
     await batch.commit();
+    this.notify();
+    this.triggerAutoSync();
   }
 
   async resetToDefaults(): Promise<void> {
@@ -1981,6 +2014,242 @@ class MeetingStore {
       console.error("Sync from sheets failed:", error);
       return { success: false, error: error.message };
     }
+  }
+
+  // --- Visitation & Absence Management ---
+  async recordVisitation(params: {
+    memberId: string;
+    servant: SystemUser;
+    notes?: string;
+  }): Promise<{ success: boolean; record?: VisitationRecord; error?: string }> {
+    const member = this.data.members.find((m) => m.id === params.memberId);
+    if (!member) return { success: false, error: "العضو غير موجود" };
+
+    const team = this.data.teams.find((t) => t.id === member.teamId);
+    const id = "vis-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    
+    const record: VisitationRecord = {
+      id,
+      memberId: member.id,
+      memberName: member.name,
+      teamId: member.teamId,
+      teamName: team ? team.name : "الفريق",
+      visitedAt: new Date().toISOString(),
+      servantId: params.servant.id,
+      servantName: params.servant.name,
+      notes: params.notes || "افتقاد وتواصل أسبوعي مع الغائبين",
+    };
+
+    if (!this.data.visitationHistory) this.data.visitationHistory = [];
+    this.data.visitationHistory = [record, ...this.data.visitationHistory];
+
+    try {
+      await setDoc(doc(db, "visitationHistory", id), record);
+    } catch (e) {
+      console.warn("Could not save visitation record to Firestore:", e);
+    }
+
+    this.logAudit({
+      userId: params.servant.id,
+      userName: params.servant.name,
+      userRole: params.servant.role,
+      action: "edit_member",
+      targetType: "member",
+      targetId: member.id,
+      targetName: member.name,
+      details: `تسجيل افتقاد للعضو [${member.name}] بواسطة الخادم [${params.servant.name}]`,
+      status: "success",
+    });
+
+    this.triggerAutoSync();
+    return { success: true, record };
+  }
+
+  getVisitationHistory(): VisitationRecord[] {
+    return this.data.visitationHistory || [];
+  }
+
+  async importFridayLogs(executor?: SystemUser): Promise<{ success: boolean; count: number; error?: string }> {
+    const activeExecutor = executor || authStore.getCurrentUser();
+    if (activeExecutor.role !== "admin" && activeExecutor.role !== "servant" && !activeExecutor.permissions?.canScanAttendance) {
+      return { success: false, count: 0, error: "غير مصرح لك باستيراد السجلات" };
+    }
+
+    const batch = writeBatch(db);
+    let addedCount = 0;
+
+    const ensureTeam = (teamName: string) => {
+      let team = this.data.teams.find(t => t.name.includes(teamName) || teamName.includes(t.name));
+      if (!team) {
+        const newTeamId = `team-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+        team = {
+          id: newTeamId,
+          name: teamName,
+          icon: "🛡️",
+          color: "#3B82F6",
+          slogan: "فريق كنسي مبارك",
+          leaderName: "خادم المسؤول",
+          points: 0,
+          previousRank: 0,
+          avatarUrl: "https://images.unsplash.com/photo-1546182990-dffeafbe841d?w=400&auto=format&fit=crop&q=80"
+        };
+        this.data.teams.push(team);
+        batch.set(doc(db, "teams", team.id), team);
+      }
+      return team;
+    };
+
+    const manualBonuses = [
+      { teamName: "تاريخ الكنيسة والأبائيات", points: 50, reason: "رصد بونص ونقاط نشاط", executor: "أبونا افرايم رياض" },
+      { teamName: "الطقس والعقيدة", points: 100, reason: "رصد بونص ونقاط نشاط", executor: "أبونا افرايم رياض" },
+      { teamName: "الكتاب المقدس", points: 100, reason: "رصد بونص ونقاط نشاط", executor: "أبونا افرايم رياض" },
+    ];
+
+    manualBonuses.forEach(b => {
+      const team = ensureTeam(b.teamName);
+      team.points = (team.points || 0) + b.points;
+      batch.update(doc(db, "teams", team.id), { points: team.points });
+
+      const tx: ScoreTransaction = {
+        id: "tx-import-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        timestamp: "2026-11-07T12:00:00Z",
+        targetType: "team",
+        targetId: team.id,
+        targetName: team.name,
+        teamId: team.id,
+        teamName: team.name,
+        points: b.points,
+        reason: b.reason,
+        category: "نشاط جماعي",
+        executorName: b.executor,
+        executorRole: "admin"
+      };
+      this.data.transactions.unshift(tx);
+      batch.set(doc(db, "transactions", tx.id), tx);
+      addedCount++;
+    });
+
+    const attendeesList = [
+      { name: "إيرينى أشرف دانيال", team: "الطقس والعقيدة", time: "2026-11-06T19:19:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "كيرلس فادي", team: "الكتاب المقدس", time: "2026-11-06T18:08:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "مينا شهيد", team: "الطقس والعقيدة", time: "2026-11-06T18:05:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "كيرلس نبيل", team: "الكتاب المقدس", time: "2026-11-06T18:05:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "فيولا عادل", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:05:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "دميانة ماهر", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:04:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "جومانا وائل لطفي", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:10:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "ميلان ماجد", team: "الطقس والعقيدة", time: "2026-11-06T18:11:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "فرونيا الأمير", team: "الطقس والعقيدة", time: "2026-11-06T18:12:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "بسنت زكريا", team: "الطقس والعقيدة", time: "2026-11-06T18:13:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "بيشوى مجدى صبحى", team: "الطقس والعقيدة", time: "2026-11-06T18:14:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "جرجس مجدى فتحى", team: "الطقس والعقيدة", time: "2026-11-06T18:15:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "نورا الامير لوندي", team: "الثقافية (شبابيات)", time: "2026-11-06T18:16:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "جوليانا هاني ثابت", team: "الثقافية (شبابيات)", time: "2026-11-06T18:17:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "مريم فوزي لطيف", team: "الثقافية (شبابيات)", time: "2026-11-06T18:18:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "نورهان ميلاد", team: "الكتاب المقدس", time: "2026-11-06T18:19:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "كيرلس تواضرواس", team: "الكتاب المقدس", time: "2026-11-06T18:20:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "جومانا سامح عادل", team: "الكتاب المقدس", time: "2026-11-06T18:21:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "جومانا وائل ناجح", team: "الكتاب المقدس", time: "2026-11-06T18:22:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "إيريني ايمن", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:23:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "مهراثيل ماجد", team: "الكتاب المقدس", time: "2026-11-06T18:24:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "يسى روماني يسى", team: "الكتاب المقدس", time: "2026-11-06T18:25:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "ريموندا روماني", team: "الكتاب المقدس", time: "2026-11-06T18:26:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "مارفي راي", team: "الكتاب المقدس", time: "2026-11-06T18:27:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "لوجي عصام", team: "الكتاب المقدس", time: "2026-11-06T18:28:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "مايفيل ماجد", team: "الكتاب المقدس", time: "2026-11-06T18:29:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "جوليانا هاني ثابت", team: "الكتاب المقدس", time: "2026-11-06T18:30:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "مايفيل ماجد منير", team: "الكتاب المقدس", time: "2026-11-06T18:31:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "انطون زاخر نعيم", team: "الكتاب المقدس", time: "2026-11-06T18:32:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "ماريان روماني", team: "الكتاب المقدس", time: "2026-11-06T18:33:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "مينا جمال", team: "الكتاب المقدس", time: "2026-11-06T18:34:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "سيمون نشأت راضى", team: "الكتاب المقدس", time: "2026-11-06T18:35:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "ايناس صابر باشا", team: "الكتاب المقدس", time: "2026-11-06T18:36:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "جرجس منتصر فتحى", team: "الكتاب المقدس", time: "2026-11-06T18:37:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "جومانا سامى", team: "الكتاب المقدس", time: "2026-11-06T18:38:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "مورين اسكندر ظريف", team: "الكتاب المقدس", time: "2026-11-06T18:39:00Z", scannedBy: "ايناس صابر باشا" },
+      { name: "دميانة مجدى", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:40:00Z", scannedBy: "مريم اشرف حلمى" },
+      { name: "ماريان عزت", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:41:00Z", scannedBy: "مريم اشرف حلمى" },
+      { name: "كيرلس عيسى صباح", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:42:00Z", scannedBy: "مريم اشرف حلمى" },
+      { name: "مايكل عماد", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:43:00Z", scannedBy: "مريم اشرف حلمى" },
+      { name: "كيرلس اسكندر ظريف", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:44:00Z", scannedBy: "مريم اشرف حلمى" },
+      { name: "امجد مجدى فكره", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:45:00Z", scannedBy: "مريم اشرف حلمى" },
+      { name: "مينا تواضروس", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:46:00Z", scannedBy: "مريم اشرف حلمى" },
+      { name: "مايكل عماد", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:47:00Z", scannedBy: "مريم اشرف حلمى" },
+      { name: "كيرلس عيسى", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:48:00Z", scannedBy: "مريم اشرف حلمى" },
+      { name: "فيلوباتير سامح", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:49:00Z", scannedBy: "مريم اشرف حلمى" },
+      { name: "مارتينا اشرف حلمى", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:50:00Z", scannedBy: "مريم اشرف حلمى" },
+      { name: "مريم اشرف حلمى", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:51:00Z", scannedBy: "مريم اشرف حلمى" },
+    ];
+
+    const event = this.ensureFridayMeetingEvent("2026-11-06");
+
+    attendeesList.forEach(att => {
+      const team = ensureTeam(att.team);
+      let member = this.data.members.find(m => m.name.trim() === att.name.trim());
+      if (!member) {
+        const memId = "mem-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        member = {
+          id: memId,
+          name: att.name,
+          teamId: team.id,
+          role: "member",
+          roleLabel: "مخدوم",
+          points: 0,
+          accessCode: Math.floor(1000 + Math.random() * 9000).toString(),
+          permissions: getRoleDefaultPermissions("member")
+        };
+        this.data.members.push(member);
+        batch.set(doc(db, "members", member.id), member);
+      }
+
+      const pointsAwarded = 37;
+      member.points = (member.points || 0) + pointsAwarded;
+      batch.update(doc(db, "members", member.id), { points: member.points });
+
+      team.points = (team.points || 0) + pointsAwarded;
+      batch.update(doc(db, "teams", team.id), { points: team.points });
+
+      const tx: ScoreTransaction = {
+        id: "tx-import-att-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        timestamp: att.time,
+        targetType: "member",
+        targetId: member.id,
+        targetName: member.name,
+        teamId: team.id,
+        teamName: team.name,
+        points: pointsAwarded,
+        reason: `تسجيل حضور تلقائي بالـ QR في [${event.title}] (تسجيل حضور منتظم)`,
+        category: "حضور والتزام",
+        executorName: att.scannedBy,
+        executorRole: "leader"
+      };
+      this.data.transactions.unshift(tx);
+      batch.set(doc(db, "transactions", tx.id), tx);
+
+      const attRecord: AttendanceRecord = {
+        id: "att-import-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        eventId: event.id,
+        eventTitle: event.title,
+        memberId: member.id,
+        memberName: member.name,
+        teamId: team.id,
+        teamName: team.name,
+        scannedAt: att.time,
+        scannedByUserId: "import-user",
+        scannedByUserName: att.scannedBy,
+        pointsAwarded,
+        isPunctual: true
+      };
+      if (!this.data.attendance) this.data.attendance = [];
+      this.data.attendance.unshift(attRecord);
+      batch.set(doc(db, "attendance", attRecord.id), attRecord);
+
+      addedCount++;
+    });
+
+    await batch.commit();
+    this.notify();
+    this.triggerAutoSync();
+    return { success: true, count: addedCount };
   }
 
   private autoSyncTimer: any = null;

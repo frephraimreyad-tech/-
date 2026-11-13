@@ -76,22 +76,60 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
   const activityReasons = useMemo(() => meetingStore.getActivityReasons(), [showQuickForm]);
   const teamTransactions = useMemo(() => (team ? meetingStore.getTeamTransactions(team.id) : []), [team, toastMsg]);
 
+  const attendanceBonusTotal = useMemo(() => {
+    if (!team) return 0;
+    const attendance = meetingStore.getData().attendance || [];
+    const eventIds = Array.from(new Set(attendance.map(a => a.eventId)));
+    const teamMembers = team.members || [];
+    const totalRegistered = teamMembers.length;
+    if (totalRegistered === 0) return 0;
+
+    const teamMemberIds = new Set(teamMembers.map(m => m.id));
+    let total = 0;
+    eventIds.forEach(eventId => {
+      const actualPresent = attendance.filter(a => a.eventId === eventId && teamMemberIds.has(a.memberId)).length;
+      const rate = (actualPresent / totalRegistered) * 100;
+      if (rate >= 60) {
+        total += 100;
+      } else {
+        total += Math.round(rate);
+      }
+    });
+    return total;
+  }, [team]);
+
+  const manualBonusTotal = useMemo(() => {
+    if (!team) return 0;
+    const manualTxs = teamTransactions.filter(tx => !tx.reason.includes("تسجيل حضور"));
+    return manualTxs.reduce((sum, tx) => sum + tx.points, 0);
+  }, [team, teamTransactions]);
+
+  const lastAttendanceDate = useMemo(() => {
+    if (!team) return "لا يوجد تسجيل حضور سابق";
+    const attendance = meetingStore.getData().attendance || [];
+    const teamMembers = team.members || [];
+    const teamMemberIds = new Set(teamMembers.map(m => m.id));
+    const teamAttendance = attendance.filter(a => teamMemberIds.has(a.memberId) || a.teamId === team.id);
+    if (teamAttendance.length === 0) return "لا يوجد تسجيل حضور سابق";
+    teamAttendance.sort((a, b) => new Date(b.scannedAt).getTime() - new Date(a.scannedAt).getTime());
+    return formatArabicTimestamp(teamAttendance[0].scannedAt).fullDate;
+  }, [team]);
+
   // Auto idle countdown timer
   useEffect(() => {
     if (!team) return;
     setIdleSeconds(50);
     const interval = setInterval(() => {
-      setIdleSeconds((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          onClose();
-          return 0;
-        }
-        return prev - 1;
-      });
+      setIdleSeconds((prev) => Math.max(0, prev - 1));
     }, 1000);
     return () => clearInterval(interval);
-  }, [team, onClose]);
+  }, [team]);
+
+  useEffect(() => {
+    if (idleSeconds === 0 && team) {
+      onClose();
+    }
+  }, [idleSeconds, team, onClose]);
 
   const resetTimer = () => {
     setIdleSeconds(50);
@@ -488,6 +526,58 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
 
           {/* Modal Body: Members List & Historical Log */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 space-y-5">
+            {/* Score Breakdown Banner */}
+            <div className="p-4 rounded-2xl bg-slate-900/90 border-2 border-amber-500/30 grid grid-cols-1 sm:grid-cols-3 gap-3 shadow-lg">
+              <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-center">
+                <div className="text-xs text-slate-400 font-bold">بونص الحضور التراكمي (%)</div>
+                <div className="text-base sm:text-lg font-black font-mono text-emerald-400 mt-1">
+                  +{attendanceBonusTotal} XP
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">وفقاً لنظام نسبة الحضور</div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/30 text-center">
+                <div className="text-xs text-slate-400 font-bold">نقاط التحديات والمسابقات</div>
+                <div className="text-base sm:text-lg font-black font-mono text-amber-400 mt-1">
+                  +{manualBonusTotal} XP
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">أنشطة ومسابقات يدوية</div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-sky-950/40 border border-sky-500/30 text-center">
+                <div className="text-xs text-slate-400 font-bold">إجمالي رصيد الفريق الكلي</div>
+                <div className="text-base sm:text-lg font-black font-mono text-sky-400 mt-1">
+                  {team.points} XP
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">المجموع النهائي</div>
+              </div>
+            </div>
+
+            {/* Attendance & Stats Summary Card */}
+            <div className="p-4 rounded-2xl bg-gradient-to-l from-slate-900 to-sky-950/40 border border-sky-500/30 grid grid-cols-1 sm:grid-cols-2 gap-3 text-center shadow-md">
+              <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                <div className="text-xs text-slate-400 font-bold flex items-center justify-center gap-1">
+                  <Users className="h-3.5 w-3.5 text-sky-400" />
+                  <span>الحاضرون مقابل الإجمالي</span>
+                </div>
+                <div className="text-lg font-black font-mono text-sky-400 mt-1">
+                  {team.presentMembersCount} <span className="text-xs text-slate-400">من</span> {team.membersCount}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">أعضاء الفريق المسجلين</div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                <div className="text-xs text-slate-400 font-bold flex items-center justify-center gap-1">
+                  <Calendar className="h-3.5 w-3.5 text-purple-400" />
+                  <span>تاريخ آخر حضور مسجل</span>
+                </div>
+                <div className="text-xs sm:text-sm font-black font-mono text-purple-300 mt-1.5 truncate">
+                  {lastAttendanceDate}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">آخر عملية تسجيل QR</div>
+              </div>
+            </div>
+
             {/* Modal Tabs Navigation: Members vs Activity History */}
             <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
               <button

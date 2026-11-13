@@ -18,6 +18,7 @@ import {
 import { sounds } from "../utils/soundEffects";
 import { meetingStore } from "../utils/meetingStore";
 import type { SystemUser } from "../utils/authStore";
+import { getNextFridayMeetingDate } from "../utils/fridaySchedule";
 
 interface MeetingCountdownTimerProps {
   endTime?: string;
@@ -36,11 +37,10 @@ export const MeetingCountdownTimer: React.FC<MeetingCountdownTimerProps> = ({
   onExpire,
   onCelebrateWinner,
 }) => {
-  // Determine effective target end time
+  // Determine effective target end time (Next Friday at 19:00 / 7 PM)
   const [targetDateStr, setTargetDateStr] = useState<string>(() => {
     if (endTime) return endTime;
-    // Default fallback: 2 hours and 30 minutes from now
-    return new Date(Date.now() + 2 * 60 * 60 * 1000 + 30 * 60 * 1000).toISOString();
+    return getNextFridayMeetingDate().toISOString();
   });
 
   // Start date for progress calculation
@@ -177,7 +177,8 @@ export const MeetingCountdownTimer: React.FC<MeetingCountdownTimerProps> = ({
   }, [startDateStr, targetDateStr]);
 
   // Urgency indicator
-  const isUrgent = !timeLeft.isExpired && timeLeft.totalMs < 10 * 60 * 1000; // < 10 mins
+  const isUrgent = !timeLeft.isExpired && timeLeft.totalMs < 10 * 60 * 1000; // < 1 mins
+  const isApproaching = !timeLeft.isExpired && timeLeft.totalMs < 60 * 60 * 1000; // < 1 hour
 
   return (
     <div
@@ -200,6 +201,13 @@ export const MeetingCountdownTimer: React.FC<MeetingCountdownTimerProps> = ({
       />
 
       <div className="p-3.5 sm:p-5 space-y-3.5">
+        {/* Approaching Start Warning Banner */}
+        {isApproaching && (
+          <div className="p-3 rounded-2xl bg-amber-500/20 border-2 border-amber-500/60 text-amber-300 flex items-center gap-2.5 animate-pulse text-xs sm:text-sm font-black shadow-lg">
+            <AlertCircle className="h-5 w-5 text-amber-400 shrink-0" />
+            <span>⚠️ تنبيه هام: اقترب موعد بدء اجتماع الشباب القادم (الجمعة 13 نوفمبر الساعة 7:00 م)! استعدوا لتسجيل الحضور بالـ QR.</span>
+          </div>
+        )}
         {/* Header Row */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2.5">
@@ -224,7 +232,9 @@ export const MeetingCountdownTimer: React.FC<MeetingCountdownTimerProps> = ({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-sm sm:text-base font-black tracking-tight flex items-center gap-1.5">
-                  <span>الوقت المتبقي على انتهاء اجتماع الشباب 2026</span>
+                  <span>
+                    الوقت المتبقي على اجتماع الجمعة القادم ({new Date(targetDateStr).toLocaleDateString("ar-EG", { weekday: "long", day: "numeric", month: "long" })} - 7:00 م)
+                  </span>
                   <span className="text-amber-400">⏳</span>
                 </h3>
 
@@ -397,8 +407,8 @@ export const MeetingCountdownTimer: React.FC<MeetingCountdownTimerProps> = ({
         {/* Detailed Digit Cards (When Expanded) */}
         {isExpanded && (
           <div className="space-y-3 pt-1">
-            <div className="grid grid-cols-4 gap-2 sm:gap-3.5 max-w-xl mx-auto">
-              {/* Days (if any) or Hours */}
+            <div className={`grid ${timeLeft.days > 0 ? "grid-cols-4" : "grid-cols-3"} gap-2 sm:gap-3.5 max-w-lg mx-auto`}>
+              {/* Days (if any) */}
               {timeLeft.days > 0 ? (
                 <div
                   className={`p-2.5 sm:p-3.5 rounded-2xl border-2 text-center transition-all ${
@@ -492,47 +502,6 @@ export const MeetingCountdownTimer: React.FC<MeetingCountdownTimerProps> = ({
                 <div className={`text-[10px] sm:text-xs font-black mt-1 ${isLight ? "text-amber-800" : "text-amber-500"}`}>
                   ثانية
                 </div>
-              </div>
-
-              {/* Status Badge */}
-              <div
-                className={`p-2.5 sm:p-3.5 rounded-2xl border-2 flex flex-col items-center justify-center text-center transition-all ${
-                  isLight
-                    ? "bg-white border-slate-300 shadow-sm"
-                    : "bg-slate-950/80 border-slate-800 shadow-inner"
-                }`}
-              >
-                <div className="text-xl sm:text-2xl">
-                  {timeLeft.isExpired ? "🏆" : isUrgent ? "⚡" : "🎯"}
-                </div>
-                <div className={`text-[9px] sm:text-[10px] font-black leading-tight mt-1 ${isLight ? "text-amber-800" : "text-amber-400"}`}>
-                  {timeLeft.isExpired ? "النهاية" : `${progressPercent}% انقضى`}
-                </div>
-              </div>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="space-y-1 max-w-xl mx-auto pt-1">
-              <div className={`w-full h-2.5 rounded-full overflow-hidden p-0.5 border ${
-                isLight ? "bg-slate-200 border-slate-300" : "bg-slate-800/80 border-slate-700/60"
-              }`}>
-                <div
-                  className={`h-full rounded-full transition-all duration-1000 ${
-                    timeLeft.isExpired
-                      ? "bg-emerald-500 w-full"
-                      : isUrgent
-                      ? "bg-gradient-to-r from-amber-400 to-rose-500 animate-pulse"
-                      : "bg-gradient-to-r from-amber-500 to-orange-400"
-                  }`}
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-              <div className={`flex justify-between items-center text-[10px] px-1 font-mono font-bold ${
-                isLight ? "text-slate-600" : "text-slate-400"
-              }`}>
-                <span>انطلاق الاجتماع 🏁</span>
-                <span>{progressPercent}% من وقت اللقاء</span>
-                <span>صافرة الختام 🏆</span>
               </div>
             </div>
           </div>

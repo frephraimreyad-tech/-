@@ -145,6 +145,19 @@ export interface MeetingConfig {
   meetingStartTime?: string; // ISO string for meeting start
 }
 
+export interface VisitationRecord {
+  id: string;
+  memberId: string;
+  memberName: string;
+  teamId: string;
+  teamName: string;
+  visitedAt: string; // ISO string
+  servantId: string;
+  servantName: string;
+  notes?: string;
+  absenceCount?: number;
+}
+
 export interface MeetingData {
   config: MeetingConfig;
   teams: CustomTeam[];
@@ -154,12 +167,16 @@ export interface MeetingData {
   events: EventSession[];
   attendance: AttendanceRecord[];
   auditLogs: AuditLogEntry[];
+  visitationHistory: VisitationRecord[];
   lastSaved?: string;
 }
 
 export interface ProcessedMeetingTeam extends CustomTeam {
   rank: number;
   membersCount: number;
+  presentMembersCount: number;
+  attendanceRate: number;
+  attendanceXpBonus: number;
   leadersCount: number;
   servantsCount?: number;
   makhdoumeenCount?: number;

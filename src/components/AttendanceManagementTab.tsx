@@ -33,7 +33,7 @@ import { meetingStore } from "../utils/meetingStore";
 import { authStore, type SystemUser } from "../utils/authStore";
 import { sounds } from "../utils/soundEffects";
 import { formatArabicTimestamp } from "../utils/dateFormatter";
-import { exportAttendanceToExcel } from "../utils/excelExporter";
+import { exportAttendanceToExcel, exportVisitationHistoryToExcel } from "../utils/excelExporter";
 import { generateSeasonFridays, type FridayMeetingInfo } from "../utils/fridaySchedule";
 
 interface AttendanceManagementTabProps {
@@ -72,6 +72,7 @@ export const AttendanceManagementTab: React.FC<AttendanceManagementTabProps> = (
   const [statusFilter, setStatusFilter] = useState<"all" | "present" | "absent">("all");
   const [teamFilter, setTeamFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeSubTab, setActiveSubTab] = useState<"attendance" | "visitation" | "reminder">("attendance");
 
   // Modals & Feedback
   const [showFridayMessageModal, setShowFridayMessageModal] = useState(false);
@@ -456,6 +457,26 @@ export const AttendanceManagementTab: React.FC<AttendanceManagementTabProps> = (
 
             <button
               type="button"
+              onClick={async () => {
+                sounds.playTap();
+                const res = await meetingStore.recalculateTeamsByAttendanceOnly(currentUser);
+                if (res.success) {
+                  sounds.playVictory();
+                  showToast("تم تصفية وإلغاء البونص الفردي القديم وإعادة حساب وترتيب الفرق بناءً على نظام النسبة المئوية للحضور الجديد بنجاح! 🏆");
+                } else {
+                  sounds.playClose();
+                  showToast(res.error || "فشل في إعادة الحساب", "error");
+                }
+              }}
+              className="px-3.5 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm shadow-md active:scale-95 transition-all cursor-pointer flex items-center gap-2 border border-amber-600/40"
+              title="تصفية البونص الفردي القديم وإعادة حساب نقاط الفرق وترتيبها بناءً على نسبة الحضور حصرياً"
+            >
+              <RotateCcw className="h-4 w-4" />
+              <span>تحديث وحساب السكور الجديد 🔄</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => {
                 sounds.playTap();
                 setShowFridayMessageModal(true);
@@ -467,6 +488,50 @@ export const AttendanceManagementTab: React.FC<AttendanceManagementTabProps> = (
             </button>
           </div>
         </div>
+
+      {/* Absentee Follow-up Notification Widget */}
+      {absentCount > 0 && (
+        <div className={`p-5 sm:p-6 rounded-3xl border-2 shadow-xl space-y-4 ${
+          isLight
+            ? "bg-rose-50/90 border-rose-300 text-slate-900"
+            : "bg-rose-950/30 border-rose-500/40 text-rose-100 backdrop-blur-md"
+        }`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
+                <AlertCircle className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-sm sm:text-base font-black flex items-center gap-2">
+                  <span>قائمة الغائبين وافتقاد الأعضاء</span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-mono text-xs font-bold border border-rose-500/30">
+                    {absentCount} غائب
+                  </span>
+                </h3>
+                <p className={`text-xs mt-0.5 ${isLight ? "text-slate-600" : "text-rose-300/80"}`}>
+                  تم إبراز أسماء الغائبين تلقائياً لهذا الاجتماع. يمكنك نسخ رسالة الافتقاد الجماعي وإرسالها عبر الواتساب فوراً.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                sounds.playTap();
+                const absentMembers = data.members.filter((m) => !attendanceMap.has(m.id));
+                const absentText = absentMembers.map((m, idx) => `${idx + 1}. ${m.name} (${data.teams.find(t => t.id === m.teamId)?.name || "فريق"})`).join("\n");
+                const msg = `✝️ *رسالة افتقاد وتواصل أسبوعي - اجتماع الشباب* ✝️\nكنيسة: ${data.config.churchName}\nاللقاء: ${selectedEvent?.title || "لقاء الجمعة"}\n\nأحبائنا الغائبين نبارك خدمتكم ونسأل عنكم بروح المحبة، وننتظر حضوركم ولقاءكم معنا في الاجتماع القادم:\n\n${absentText}\n\nربنا يبارك حياتكم ويعوض تعب محبتكم! 🙏`;
+                navigator.clipboard.writeText(msg);
+                showToast("تم نسخ رسالة الافتقاد الجماعي للغائبين بنجاح! 📱");
+              }}
+              className="px-4 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs sm:text-sm shadow-md transition-all cursor-pointer flex items-center gap-2 shrink-0 border border-rose-400/40"
+            >
+              <Copy className="h-4 w-4" />
+              <span>نسخ رسالة الافتقاد الجماعي للغائبين 📱</span>
+            </button>
+          </div>
+        </div>
+      )}
 
         {/* Session / Meeting Picker Dropdown with Automated Fridays */}
         <div className="pt-2 flex flex-col sm:flex-row sm:items-center gap-3 border-t border-slate-800/80">
@@ -622,10 +687,61 @@ export const AttendanceManagementTab: React.FC<AttendanceManagementTabProps> = (
         </div>
       </div>
 
-      {/* Filter Toolbar & Search */}
-      <div className={`p-4 rounded-3xl border-2 space-y-3 ${
-        isLight ? "bg-white border-slate-300 shadow-sm" : "bg-[#0B132B]/80 border-slate-800"
-      }`}>
+      {/* Sub-Tabs Navigation */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+        <button
+          type="button"
+          onClick={() => { sounds.playTap(); setActiveSubTab("attendance"); }}
+          className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center gap-2 border-2 ${
+            activeSubTab === "attendance"
+              ? "bg-teal-500 text-slate-950 border-teal-400 shadow-lg shadow-teal-500/20"
+              : isLight
+              ? "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+              : "bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800"
+          }`}
+        >
+          <CheckCheck className="h-4 w-4" />
+          <span>كشف الحضور والغياب الأسبوعي 📋</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { sounds.playTap(); setActiveSubTab("visitation"); }}
+          className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center gap-2 border-2 ${
+            activeSubTab === "visitation"
+              ? "bg-rose-500 text-slate-950 border-rose-400 shadow-lg shadow-rose-500/20"
+              : isLight
+              ? "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+              : "bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800"
+          }`}
+        >
+          <Phone className="h-4 w-4" />
+          <span>متابعة وافتقاد الغائبين (Visitation) 📞</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { sounds.playTap(); setActiveSubTab("reminder"); }}
+          className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center gap-2 border-2 ${
+            activeSubTab === "reminder"
+              ? "bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/20"
+              : isLight
+              ? "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+              : "bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800"
+          }`}
+        >
+          <Bell className="h-4 w-4" />
+          <span>تذكير الاجتماع القادم (Broadcast) 📲</span>
+        </button>
+      </div>
+
+      {/* SUB-TAB 1: ATTENDANCE */}
+      {activeSubTab === "attendance" && (
+        <>
+          {/* Filter Toolbar & Search */}
+          <div className={`p-4 rounded-3xl border-2 space-y-3 ${
+            isLight ? "bg-white border-slate-300 shadow-sm" : "bg-[#0B132B]/80 border-slate-800"
+          }`}>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* Role Filters */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
@@ -935,6 +1051,198 @@ export const AttendanceManagementTab: React.FC<AttendanceManagementTabProps> = (
           </div>
         )}
       </div>
+        </>
+      )}
+
+      {/* SUB-TAB 2: VISITATION MANAGEMENT */}
+      {activeSubTab === "visitation" && (
+        <div className={`p-6 rounded-3xl border-2 space-y-6 ${
+          isLight ? "bg-white border-slate-300 text-slate-900" : "bg-[#0B132B]/90 border-slate-800 text-slate-100"
+        }`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <h3 className="text-base sm:text-lg font-black text-rose-400 flex items-center gap-2">
+                <Phone className="h-5 w-5" />
+                <span>إدارة واستهداف الغائبين وافتقادهم الأسبوعي</span>
+              </h3>
+              <p className="text-xs text-slate-400">
+                إرسال رسائل افتقاد مباشرة عبر واتساب للغائبين وتسجيل تاريخ الافتقاد تلقائياً في سجل الأرشيف
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                sounds.playTap();
+                const history = meetingStore.getVisitationHistory();
+                const success = exportVisitationHistoryToExcel({ visitationHistory: history });
+                if (success) {
+                  sounds.playVictory();
+                  showToast("تم تصدير سجل الافتقاد والزيارات بصيغة إكسيل بنجاح! 📊");
+                } else {
+                  showToast("تعذر تصدير سجل الافتقاد", "error");
+                }
+              }}
+              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-black shadow-md flex items-center gap-2 cursor-pointer active:scale-95"
+            >
+              <Download className="h-4 w-4" />
+              <span>تصدير سجل الافتقاد إكسيل 📊</span>
+            </button>
+          </div>
+
+          {/* Absentees List for Current Meeting */}
+          <div className="space-y-3">
+            <h4 className="text-sm font-black text-white flex items-center gap-2">
+              <span>الغائبون عن لقاء ({selectedEvent?.title || "الاجتماع الحالي"}):</span>
+              <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 text-xs font-mono font-bold">
+                {absentCount} غائب
+              </span>
+            </h4>
+
+            {absentCount === 0 ? (
+              <div className="p-8 rounded-2xl bg-emerald-950/40 border-2 border-emerald-500/30 text-center space-y-2">
+                <span className="text-3xl">🎉</span>
+                <h5 className="font-bold text-emerald-300 text-sm">ممتاز! نسبة حضور كاملة 100%</h5>
+                <p className="text-xs text-slate-400">لا يوجد غائبون في هذا اللقاء للافتقاد.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {makhdoumeenList.filter((m) => !attendanceMap.has(m.id)).map((member) => {
+                  const team = data.teams.find((t) => t.id === member.teamId);
+                  return (
+                    <div key={member.id} className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center font-bold text-sm text-rose-400 border border-slate-700">
+                          {member.name.charAt(0)}
+                        </div>
+                        <div>
+                          <h5 className="text-xs sm:text-sm font-black text-white">{member.name}</h5>
+                          <p className="text-[11px] text-slate-400">
+                            {team ? team.name : "الفريق"} {member.phone ? `| 📞 ${member.phone}` : ""}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          sounds.playTap();
+                          await meetingStore.recordVisitation({
+                            memberId: member.id,
+                            servant: currentUser,
+                            notes: `رسالة افتقاد واطمئنان أسبوعية`,
+                          });
+                          const msg = `✝️ ازيك يا ${member.name}، وحشتنا في اجتماع الشباب النهاردة في ${data.config.churchName}! صلينا لأجلك ونلتقي الجمعة القادمة بمحبة المسيح 🙏✨`;
+                          const url = member.phone
+                            ? `https://api.whatsapp.com/send?phone=${member.phone}&text=${encodeURIComponent(msg)}`
+                            : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+                          window.open(url, "_blank");
+                          showToast(`تم تسجيل الافتقاد وإرسال رسالة الواتساب لـ (${member.name}) بنجاح! 📞`);
+                        }}
+                        className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        <span>رسالة افتقاد واتساب 💬</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Visitation Archive Log Table */}
+          <div className="space-y-3 pt-4 border-t border-slate-800">
+            <h4 className="text-sm font-black text-white">سجل الافتقادات والزيارات المسجلة (Visitation History):</h4>
+            {meetingStore.getVisitationHistory().length === 0 ? (
+              <p className="text-xs text-slate-400">لا توجد سجلات زيارات أو افتقاد مسجلة حتى الآن.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-2xl border border-slate-800">
+                <table className="w-full text-right text-xs">
+                  <thead className="bg-slate-900 text-slate-400 font-bold border-b border-slate-800">
+                    <tr>
+                      <th className="p-3">المخدوم</th>
+                      <th className="p-3">الفريق</th>
+                      <th className="p-3">تاريخ ووقت الافتقاد</th>
+                      <th className="p-3">الخادم المسؤول</th>
+                      <th className="p-3">ملاحظات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 bg-slate-950/60">
+                    {meetingStore.getVisitationHistory().map((item) => {
+                      const parsed = formatArabicTimestamp(item.visitedAt);
+                      return (
+                        <tr key={item.id} className="hover:bg-slate-900/50">
+                          <td className="p-3 font-bold text-white">{item.memberName}</td>
+                          <td className="p-3 text-slate-300">{item.teamName}</td>
+                          <td className="p-3 font-mono text-teal-300">{parsed.dateStr} - {parsed.timeStr}</td>
+                          <td className="p-3 text-amber-300">{item.servantName}</td>
+                          <td className="p-3 text-slate-300">{item.notes || "--"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* SUB-TAB 3: BROADCAST REMINDER */}
+      {activeSubTab === "reminder" && (
+        <div className={`p-6 rounded-3xl border-2 space-y-6 ${
+          isLight ? "bg-white border-slate-300 text-slate-900" : "bg-[#0B132B]/90 border-slate-800 text-slate-100"
+        }`}>
+          <div className="space-y-1">
+            <h3 className="text-base sm:text-lg font-black text-amber-400 flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              <span>تذكير بالاجتماع القادم (Broadcast Reminder) 📲</span>
+            </h3>
+            <p className="text-xs text-slate-400">
+              إرسال رسالة تذكير موحدة لجميع أعضاء أسرة الشباب قبل موعد لقاء الجمعة عبر واتساب أو تليجرام
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+            <label className="text-xs font-bold text-amber-300 block">نص رسالة التذكير الرسمية:</label>
+            <textarea
+              readOnly
+              rows={6}
+              value={`✝️ *تذكير باجتماع شباب جامعة المبارك - ${data.config.churchName}* ✝️\n\nأحبائي شباب وفتيات الأسرة المباركة،\nنتشرف بحضوركم لقاء الجمعة الروحي والدراسي القادم في تمام الساعة 6:30 مساءً بالكنيسة.\n\n✨ *موضوع اللقاء:* دراسة في إنجيل يوحنا والتسبيح والمسابقات الروحية الكبرى بين الفرق.\n\nلا تنسوا إحضار الكتاب المقدس وإعداد الكارنيه الخاص بكم لتسجيل الحضور السريع بالـ QR كود! ننتظركم بشوق 🙏❤️`}
+              className="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-xs font-medium text-slate-200 focus:outline-none"
+            />
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  const msg = `✝️ تذكير باجتماع شباب جامعة المبارك - ${data.config.churchName} ✝️\nنتشرف بحضوركم لقاء الجمعة الروحي والدراسي القادم في تمام الساعة 6:30 مساءً بالكنيسة. ننتظركم بشوق 🙏❤️`;
+                  navigator.clipboard.writeText(msg);
+                  sounds.playVictory();
+                  showToast("تم نسخ رسالة التذكير إلى الحافظة بنجاح! 📋");
+                }}
+                className="px-4 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-black shadow-md flex items-center gap-2 cursor-pointer active:scale-95"
+              >
+                <Copy className="h-4 w-4" />
+                <span>نسخ نص التذكير 📋</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  const msg = `✝️ تذكير باجتماع شباب جامعة المبارك - ${data.config.churchName} ✝️\nنتشرف بحضوركم لقاء الجمعة الروحي والدراسي القادم في تمام الساعة 6:30 مساءً بالكنيسة. ننتظركم بشوق 🙏❤️`;
+                  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, "_blank");
+                }}
+                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md flex items-center gap-2 cursor-pointer active:scale-95"
+              >
+                <Send className="h-4 w-4" />
+                <span>إرسال عبر واتساب للجميع 💬</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================= */}
       {/* FRIDAY REPORT MESSAGE MODAL (رسالة تقرير يوم الجمعة الأسبوعية) */}

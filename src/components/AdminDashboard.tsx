@@ -32,6 +32,7 @@ import {
   Sun,
   Moon,
   Swords,
+  Upload,
 } from "lucide-react";
 import type { CustomTeam, ProcessedMeetingTeam, ScoreTransaction } from "../types";
 import { meetingStore } from "../utils/meetingStore";
@@ -43,6 +44,7 @@ import { UserSwitcherModal } from "./UserSwitcherModal";
 import { AdminPanel } from "./AdminPanel";
 import { googleSheets } from "../utils/googleSheets";
 import { PDFReportModal } from "./PDFReportModal";
+import { exportTransactionsToExcel } from "../utils/excelExporter";
 import { AdminPhotoUploadModal } from "./AdminPhotoUploadModal";
 import { BonusGuideModal } from "./BonusGuideModal";
 import { TeamsProgressionChart } from "./TeamsProgressionChart";
@@ -216,6 +218,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
 
   // Predefined reasons
   const activityReasons = data.activityReasons || [];
+
+  const defaultMeetingEvent = useMemo(() => {
+    return meetingStore.ensureFridayMeetingEvent();
+  }, [data.events]);
+
+  const currentEventAttendanceMap = useMemo(() => {
+    const map = new Set<string>();
+    (data.attendance || [])
+      .filter((a) => a.eventId === defaultMeetingEvent.id)
+      .forEach((a) => map.add(a.memberId));
+    return map;
+  }, [data.attendance, defaultMeetingEvent]);
+
+  const absentMembersList = useMemo(() => {
+    return data.members.filter((m) => !currentEventAttendanceMap.has(m.id));
+  }, [data.members, currentEventAttendanceMap]);
+
+  const [showAbsenteeAlertModal, setShowAbsenteeAlertModal] = useState<boolean>(false);
 
   // ==========================================
   // Simple Security System Handlers
@@ -854,6 +874,135 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
             </button>
           </div>
         </header>
+
+        {/* Post-Meeting Absentee Alert Banner */}
+        {absentMembersList.length > 0 && (
+          <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-rose-950/85 via-slate-900 to-rose-950/85 border-2 border-rose-500/60 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4" dir="rtl">
+            <div className="flex items-center gap-3.5">
+              <div className="h-12 w-12 rounded-2xl bg-rose-500/20 border-2 border-rose-500/50 flex items-center justify-center text-rose-400 shrink-0 animate-pulse">
+                <AlertCircle className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm sm:text-base font-black text-rose-200">
+                    تنبيه انتهاء اجتماع الجمعة (الساعة 9:00 م) وتقرير الغائبين 🚨
+                  </h3>
+                  <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-mono text-xs font-black border border-rose-500/40">
+                    {absentMembersList.length} غائب
+                  </span>
+                </div>
+                <p className="text-xs text-rose-300/80 mt-0.5">
+                  تم تجهيز قائمة أسماء الغائبين فور انتهاء اللقاء. يمكنك مراجعتها وإرسال رسائل تذكير وافتقاد فورية للجميع.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                sounds.playTap();
+                setShowAbsenteeAlertModal(true);
+              }}
+              className="px-5 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs sm:text-sm shadow-lg shadow-rose-600/30 transition-all cursor-pointer flex items-center gap-2 shrink-0 border border-rose-400/40 active:scale-95"
+            >
+              <Users className="h-4 w-4" />
+              <span>عرض قائمة الغائبين ورسائل التذكير 📋📢</span>
+            </button>
+          </div>
+        )}
+
+        {/* Absentee Alert & Instant Reminder Modal */}
+        {showAbsenteeAlertModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md" dir="rtl">
+            <div className="w-full max-w-2xl rounded-3xl border-2 border-rose-500/50 bg-[#0B132B] p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto no-scrollbar">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400">
+                    <AlertCircle className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-black text-white">
+                      قائمة الغائبين ورسائل التذكير الفورية ({absentMembersList.length} عضو) 📋
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      {defaultMeetingEvent.title}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAbsenteeAlertModal(false)}
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="space-y-3">
+                <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 text-xs text-slate-300 space-y-1">
+                  <span className="font-bold text-teal-400">💡 نصيحة افتقاد وتواصل:</span>
+                  <p>يمكنك نسخ رسالة التذكير الجماعية الموحدة، أو التواصل الفردي مع كل غائب عبر زر الواتساب لإرسال تنبيه فوري.</p>
+                </div>
+
+                {/* Absent list */}
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                  {absentMembersList.map((m, idx) => {
+                    const team = data.teams.find((t) => t.id === m.teamId);
+                    return (
+                      <div key={m.id} className="flex items-center justify-between p-3 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs">
+                        <div className="flex items-center gap-2.5">
+                          <span className="font-mono text-slate-500">#{idx + 1}</span>
+                          <div>
+                            <span className="font-bold text-white block">{m.name}</span>
+                            <span className="text-[11px] text-teal-400">{team?.name || "فريق"} • {m.roleLabel || "مخدوم"}</span>
+                          </div>
+                        </div>
+                        {m.phone && (
+                          <a
+                            href={`https://wa.me/${m.phone.replace(/\D/g, "")}?text=${encodeURIComponent(`سلام المسيح مع تنبيه وافتقاد من اجتماع الشباب (${defaultMeetingEvent.title}). افتقدناك في اللقاء الأخير وننتظر حضورك معنا الجمعة القادمة! 🙏`)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 font-bold flex items-center gap-1.5 transition-all"
+                          >
+                            <Share2 className="h-3.5 w-3.5" />
+                            <span>إرسال واتساب 📲</span>
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    const absentText = absentMembersList.map((m, idx) => `${idx + 1}. ${m.name} (${data.teams.find(t => t.id === m.teamId)?.name || "فريق"})`).join("\n");
+                    const msg = `✝️ *رسالة افتقاد وتذكير أسبوعي - اجتماع الشباب* ✝️\nكنيسة: ${data.config.churchName}\nاللقاء: ${defaultMeetingEvent.title}\n\nأحبائنا الغائبين نسأل عنكم بروح المحبة، وننتظر حضوركم معنا في اجتماع الجمعة القادم:\n\n${absentText}\n\nربنا يبارك حياتكم! 🙏`;
+                    navigator.clipboard.writeText(msg);
+                    showFeedback("تم نسخ رسالة التذكير والافتقاد الجماعي بنجاح! 📱");
+                  }}
+                  className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-lg cursor-pointer flex items-center gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>نسخ رسالة التذكير والافتقاد الجماعي 📱</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAbsenteeAlertModal(false)}
+                  className="px-4 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer"
+                >
+                  إغلاق
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ========================================================= */}
         {/* STATS OVERVIEW CARDS */}
@@ -2208,9 +2357,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                 </p>
               </div>
 
-              <span className="px-3 py-1 rounded-full bg-slate-900 border border-slate-700 text-emerald-300 font-mono text-xs font-bold">
-                {data.transactions.length} معاملة مسجلة
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    exportTransactionsToExcel({ transactions: data.transactions });
+                    showFeedback("تم تصدير سجل المعاملات والتاريخ بنجاح إلى ملف Excel! 📊", "success");
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md shadow-emerald-600/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 border border-emerald-500/40"
+                  title="تصدير سجل المعاملات والتاريخ إلى Excel"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>تصدير السجل (Excel) 📊</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    sounds.playTap();
+                    const res = await meetingStore.importFridayLogs();
+                    if (res.success) {
+                      sounds.playVictory();
+                      showFeedback(`تم استيراد ${res.count} سجل ومعاملة ليوم الجمعة بنجاح وتحديث اللوحة الكبرى! 🎉`, "success");
+                    } else {
+                      sounds.playClose();
+                      showFeedback(res.error || "فشل استيراد السجلات", "error");
+                    }
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs shadow-md shadow-blue-600/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 border border-blue-500/40"
+                  title="استيراد سجل الجمعة من الصورة وتحديث اللوحة"
+                >
+                  <Upload className="h-4 w-4" />
+                  <span>استيراد سجل الجمعة 📥</span>
+                </button>
+
+                <span className="px-3 py-1 rounded-full bg-slate-900 border border-slate-700 text-emerald-300 font-mono text-xs font-bold">
+                  {data.transactions.length} معاملة مسجلة
+                </span>
+              </div>
             </div>
 
             {data.transactions.length === 0 ? (
