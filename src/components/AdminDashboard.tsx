@@ -33,6 +33,7 @@ import {
   Moon,
   Swords,
   Upload,
+  Menu,
 } from "lucide-react";
 import type { CustomTeam, ProcessedMeetingTeam, ScoreTransaction } from "../types";
 import { meetingStore } from "../utils/meetingStore";
@@ -105,6 +106,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
   const [showPdfReportModal, setShowPdfReportModal] = useState<boolean>(false);
   const [showAdminPhotoModal, setShowAdminPhotoModal] = useState<boolean>(false);
   const [showTeamsManagementModal, setShowTeamsManagementModal] = useState<boolean>(false);
+  const [showMobileDrawer, setShowMobileDrawer] = useState<boolean>(false);
 
   // Navigation Tabs in Admin Dashboard
   const [activeTab, setActiveTab] = useState<"teams" | "quick_points" | "attendance" | "duel" | "progression" | "security" | "history">(
@@ -623,48 +625,79 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
         <div className="absolute bottom-10 right-10 w-[450px] h-[350px] bg-emerald-500/10 blur-[140px] rounded-full" />
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
+      <div className="relative z-10 max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-28 md:pb-16 space-y-5 sm:space-y-6">
         {/* ========================================================= */}
         {/* TOP HEADER BAR */}
         {/* ========================================================= */}
-        <header className={`rounded-3xl border-2 p-5 shadow-xl transition-all duration-300 flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+        <header className={`rounded-3xl border-2 p-3.5 sm:p-5 shadow-xl transition-all duration-300 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 ${
           isLight
             ? "bg-white border-slate-300 text-slate-900 shadow-slate-200/60"
             : "border-slate-800 bg-[#0B132B]/90 backdrop-blur-xl shadow-2xl text-slate-100"
         }`}>
-          <div className="flex items-center gap-3.5">
-            <div className="h-12 w-12 rounded-2xl bg-white/95 border-2 border-amber-400 p-0.5 flex items-center justify-center text-slate-950 shadow-md shadow-amber-500/20 font-black overflow-hidden shrink-0">
-              <img
-                src={data.config.meetingLogoUrl || "/assets/aistudio/_______________________55ad5e73.png"}
-                alt="لوجو الاجتماع"
-                className="w-full h-full object-contain rounded-xl"
-              />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className={`text-xl sm:text-2xl font-black tracking-tight ${
-                  isLight ? "text-slate-900" : "text-white"
-                }`}>
-                  لوحة التحكم الإدارية (Admin Dashboard)
-                </h1>
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold font-mono border ${
-                  isLight
-                    ? "bg-amber-100 border-amber-300 text-amber-950"
-                    : "bg-amber-500/15 border-amber-500/30 text-amber-300"
-                }`}>
-                  v2.8 نظام متكامل
-                </span>
+          <div className="flex items-center justify-between md:justify-start gap-3 w-full md:w-auto">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-white/95 border-2 border-amber-400 p-0.5 flex items-center justify-center text-slate-950 shadow-md shadow-amber-500/20 font-black overflow-hidden shrink-0">
+                <img
+                  src={data.config.meetingLogoUrl || "/assets/aistudio/_______________________55ad5e73.png"}
+                  alt="لوجو الاجتماع"
+                  className="w-full h-full object-contain rounded-xl"
+                />
               </div>
-              <p className={`text-xs mt-0.5 font-medium ${
-                isLight ? "text-slate-600" : "text-slate-400"
-              }`}>
-                إضافة وتعديل الفرق، وتحديث النقاط المباشر، ونظام حماية وأمان ذكي بالرمز السري
-              </p>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className={`text-base sm:text-2xl font-black tracking-tight truncate ${
+                    isLight ? "text-slate-900" : "text-white"
+                  }`}>
+                    لوحة التحكم الإدارية
+                  </h1>
+                  <span className={`hidden sm:inline-block px-2.5 py-0.5 rounded-full text-xs font-bold font-mono border ${
+                    isLight
+                      ? "bg-amber-100 border-amber-300 text-amber-950"
+                      : "bg-amber-500/15 border-amber-500/30 text-amber-300"
+                  }`}>
+                    v2.8 نظام متكامل
+                  </span>
+                </div>
+                <p className={`text-[11px] sm:text-xs mt-0.5 font-medium truncate ${
+                  isLight ? "text-slate-600" : "text-slate-400"
+                }`}>
+                  {currentUser.name} ({currentUser.roleLabel}) • {isUnlocked ? "مفتوحة ومصرحة" : "مقفلة"}
+                </p>
+              </div>
+            </div>
+
+            {/* Mobile Quick Header Actions */}
+            <div className="flex md:hidden items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  onBackToScoreboard();
+                }}
+                className="h-11 px-3 rounded-2xl bg-amber-500 text-slate-950 text-xs font-black flex items-center gap-1 active:scale-95 cursor-pointer"
+                title="لوحة الشرف الكبرى"
+              >
+                <Trophy className="h-4 w-4" />
+                <span>الشرف</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  setShowMobileDrawer(true);
+                }}
+                className={`h-11 w-11 rounded-2xl border-2 flex items-center justify-center active:scale-95 cursor-pointer ${
+                  isLight ? "bg-slate-50 border-slate-300 text-slate-900" : "bg-slate-800 border-slate-700 text-amber-300"
+                }`}
+                aria-label="فتح قائمة الإدارة"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
             </div>
           </div>
 
-          {/* Quick Actions & Security Status */}
-          <div className="flex items-center gap-2 flex-wrap justify-end">
+          {/* Quick Actions & Security Status (Desktop Only) */}
+          <div className="hidden md:flex items-center gap-2 flex-wrap justify-end">
             {/* Simple Security Badge & Toggle */}
             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border-2 transition-all ${
               isLight
@@ -1133,9 +1166,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
         )}
 
         {/* ========================================================= */}
-        {/* TAB BUTTONS NAVIGATION */}
+        {/* TAB BUTTONS NAVIGATION (Desktop Horizontal Strip)         */}
         {/* ========================================================= */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+        <div className="hidden md:flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar touch-scroll-x">
           <button
             type="button"
             onClick={() => {
@@ -2403,55 +2436,101 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                 لا توجد معاملات مسجلة بعد. عند تحديث نقاط أي فريق ستظهر تفاصيلها هنا فوراً.
               </div>
             ) : (
-              <div className="rounded-2xl border border-slate-800 overflow-hidden bg-slate-900/60">
-                <div className="overflow-x-auto max-h-96">
-                  <table className="w-full text-right text-xs">
-                    <thead className="bg-slate-950 text-slate-400 text-[11px] font-bold border-b border-slate-800 sticky top-0">
-                      <tr>
-                        <th className="p-3">التاريخ والوقت</th>
-                        <th className="p-3">المستهدف</th>
-                        <th className="p-3">النقاط</th>
-                        <th className="p-3">النشاط / السبب</th>
-                        <th className="p-3">المسؤول المنفذ</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/80">
-                      {data.transactions.slice(0, 50).map((tx) => (
-                        <tr key={tx.id} className="hover:bg-slate-800/40 transition-colors">
-                          <td className="p-3 text-slate-400 font-mono whitespace-nowrap">
-                            {new Date(tx.timestamp).toLocaleString("ar-EG", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              day: "numeric",
-                              month: "short",
-                            })}
-                          </td>
-                          <td className="p-3 font-bold text-white whitespace-nowrap">
-                            {tx.targetName}
-                          </td>
-                          <td className="p-3 whitespace-nowrap">
-                            <span
-                              className={`px-2 py-0.5 rounded font-mono font-bold ${
-                                tx.points > 0
-                                  ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                                  : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
-                              }`}
-                            >
-                              {tx.points > 0 ? `+${tx.points}` : tx.points} XP
-                            </span>
-                          </td>
-                          <td className="p-3 text-slate-300 min-w-[180px]">
-                            {tx.reason}
-                          </td>
-                          <td className="p-3 text-slate-400 whitespace-nowrap">
-                            {tx.executorName || "المسؤول"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              <>
+                {/* Mobile Stacked Cards View (md:hidden) */}
+                <div className="md:hidden space-y-2.5 max-h-[60vh] overflow-y-auto pr-0.5">
+                  {data.transactions.slice(0, 50).map((tx) => (
+                    <div
+                      key={`mob-tx-${tx.id}`}
+                      className={`p-3.5 rounded-2xl border space-y-2 ${
+                        isLight
+                          ? "bg-white border-slate-200 shadow-xs"
+                          : "bg-slate-900/80 border-slate-800"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-sm font-black truncate ${isLight ? "text-slate-900" : "text-white"}`}>
+                          {tx.targetName}
+                        </span>
+                        <span
+                          className={`px-2.5 py-1 rounded-xl font-mono text-xs font-black shrink-0 ${
+                            tx.points > 0
+                              ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                              : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
+                          }`}
+                        >
+                          {tx.points > 0 ? `+${tx.points}` : tx.points} XP
+                        </span>
+                      </div>
+                      <p className={`text-xs leading-relaxed ${isLight ? "text-slate-700" : "text-slate-300"}`}>
+                        {tx.reason}
+                      </p>
+                      <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400 pt-1.5 border-t border-slate-800/40">
+                        <span>المنفذ: {tx.executorName || "المسؤول"}</span>
+                        <span className="font-mono">
+                          {new Date(tx.timestamp).toLocaleString("ar-EG", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            day: "numeric",
+                            month: "short",
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
+
+                {/* Desktop Table View (hidden md:block) */}
+                <div className="hidden md:block rounded-2xl border border-slate-800 overflow-hidden bg-slate-900/60">
+                  <div className="overflow-x-auto max-h-96">
+                    <table className="w-full text-right text-xs">
+                      <thead className="bg-slate-950 text-slate-400 text-[11px] font-bold border-b border-slate-800 sticky top-0">
+                        <tr>
+                          <th className="p-3">التاريخ والوقت</th>
+                          <th className="p-3">المستهدف</th>
+                          <th className="p-3">النقاط</th>
+                          <th className="p-3">النشاط / السبب</th>
+                          <th className="p-3">المسؤول المنفذ</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/80">
+                        {data.transactions.slice(0, 50).map((tx) => (
+                          <tr key={tx.id} className="hover:bg-slate-800/40 transition-colors">
+                            <td className="p-3 text-slate-400 font-mono whitespace-nowrap">
+                              {new Date(tx.timestamp).toLocaleString("ar-EG", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                day: "numeric",
+                                month: "short",
+                              })}
+                            </td>
+                            <td className="p-3 font-bold text-white whitespace-nowrap">
+                              {tx.targetName}
+                            </td>
+                            <td className="p-3 whitespace-nowrap">
+                              <span
+                                className={`px-2 py-0.5 rounded font-mono font-bold ${
+                                  tx.points > 0
+                                    ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                                    : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
+                                }`}
+                              >
+                                {tx.points > 0 ? `+${tx.points}` : tx.points} XP
+                              </span>
+                            </td>
+                            <td className="p-3 text-slate-300 min-w-[180px]">
+                              {tx.reason}
+                            </td>
+                            <td className="p-3 text-slate-400 whitespace-nowrap">
+                              {tx.executorName || "المسؤول"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         )}
@@ -3154,20 +3233,377 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
         />
       )}
 
-      {/* نافذة صغيرة جانبية في لوحة تحكم الإدارة تعرض آخر 5 عمليات إضافة أو تعديل للنقاط (Activity Log) */}
-      <AdminSideActivityWidget
-        transactions={data.transactions}
-        teams={data.teams}
-        isLight={isLight}
-        onViewAllHistory={() => setActiveTab("history")}
-        onUndoTransaction={async (txId) => {
-          const ok = await meetingStore.undoTransaction(txId);
-          if (ok) {
-            showFeedback("تم التراجع عن المعاملة وعكس النقاط بنجاح! ⚡", "success");
-          }
-          return ok;
-        }}
-      />
+      {/* نافذة صغيرة جانبية في لوحة تحكم الإدارة (Desktop only so mobile bottom nav stays clear) */}
+      <div className="hidden md:block">
+        <AdminSideActivityWidget
+          transactions={data.transactions}
+          teams={data.teams}
+          isLight={isLight}
+          onViewAllHistory={() => setActiveTab("history")}
+          onUndoTransaction={async (txId) => {
+            const ok = await meetingStore.undoTransaction(txId);
+            if (ok) {
+              showFeedback("تم التراجع عن المعاملة وعكس النقاط بنجاح! ⚡", "success");
+            }
+            return ok;
+          }}
+        />
+      </div>
+
+      {/* ========================================================= */}
+      {/* MOBILE FIXED BOTTOM NAVIGATION BAR (ADMIN DASHBOARD)      */}
+      {/* ========================================================= */}
+      <nav
+        aria-label="تنقل لوحة الإدارة للموبايل"
+        className={`md:hidden fixed bottom-0 inset-x-0 z-40 border-t-2 backdrop-blur-xl pb-safe ${
+          isLight
+            ? "bg-white/95 border-slate-200 shadow-[0_-8px_25px_rgba(15,23,42,0.08)]"
+            : "bg-[#070A1E]/95 border-slate-800 shadow-[0_-10px_30px_rgba(0,0,0,0.6)]"
+        }`}
+      >
+        <div className="grid grid-cols-5 h-16 max-w-md mx-auto px-1">
+          <button
+            type="button"
+            onClick={() => {
+              sounds.playTap();
+              setActiveTab("teams");
+            }}
+            className={`flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all cursor-pointer ${
+              activeTab === "teams"
+                ? isLight ? "text-blue-700 font-black" : "text-blue-400 font-black"
+                : isLight ? "text-slate-600" : "text-slate-400"
+            }`}
+          >
+            <Shield className="h-5 w-5" />
+            <span className="text-[10px] leading-none">الفرق</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              sounds.playTap();
+              setActiveTab("quick_points");
+            }}
+            className={`flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all cursor-pointer ${
+              activeTab === "quick_points"
+                ? isLight ? "text-amber-700 font-black" : "text-amber-400 font-black"
+                : isLight ? "text-slate-600" : "text-slate-400"
+            }`}
+          >
+            <Zap className="h-5 w-5" />
+            <span className="text-[10px] leading-none">نقاط</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              sounds.playTap();
+              setActiveTab("attendance");
+            }}
+            className={`flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all cursor-pointer ${
+              activeTab === "attendance"
+                ? isLight ? "text-emerald-700 font-black" : "text-emerald-400 font-black"
+                : isLight ? "text-slate-600" : "text-slate-400"
+            }`}
+          >
+            <CheckCircle className="h-5 w-5" />
+            <span className="text-[10px] leading-none">الافتقاد</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              sounds.playTap();
+              setActiveTab("history");
+            }}
+            className={`flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all cursor-pointer ${
+              activeTab === "history"
+                ? isLight ? "text-cyan-700 font-black" : "text-cyan-400 font-black"
+                : isLight ? "text-slate-600" : "text-slate-400"
+            }`}
+          >
+            <Clock className="h-5 w-5" />
+            <span className="text-[10px] leading-none">السجل</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              sounds.playTap();
+              setShowMobileDrawer(true);
+            }}
+            className={`flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all cursor-pointer ${
+              ["duel", "progression", "security"].includes(activeTab)
+                ? isLight ? "text-rose-700 font-black" : "text-rose-400 font-black"
+                : isLight ? "text-slate-600" : "text-slate-400"
+            }`}
+          >
+            <Menu className="h-5 w-5" />
+            <span className="text-[10px] leading-none">المزيد</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* ========================================================= */}
+      {/* MOBILE SLIDE-OVER ADMIN MENU DRAWER                       */}
+      {/* ========================================================= */}
+      {showMobileDrawer && (
+        <div className="md:hidden fixed inset-0 z-[120] flex justify-start" dir="rtl">
+          <div
+            onClick={() => setShowMobileDrawer(false)}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm"
+          />
+          <aside
+            className={`relative z-10 w-[85vw] max-w-xs h-full overflow-y-auto p-5 pb-safe flex flex-col gap-4 border-l-2 shadow-2xl ${
+              isLight
+                ? "bg-white border-slate-200 text-slate-900"
+                : "bg-[#0B132B] border-slate-800 text-slate-100"
+            }`}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-700/30">
+              <div>
+                <div className="text-sm font-black">قائمة لوحة الخادم</div>
+                <div className="text-[11px] text-slate-400">
+                  {currentUser.name} ({currentUser.roleLabel})
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMobileDrawer(false)}
+                className={`h-11 w-11 rounded-2xl flex items-center justify-center cursor-pointer ${
+                  isLight ? "bg-slate-100 text-slate-800" : "bg-slate-800 text-slate-200"
+                }`}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Extra Dashboard Tabs */}
+            <div className="space-y-2">
+              <div className="text-[11px] font-bold text-slate-400">أقسام الإدارة الإضافية</div>
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  setActiveTab("duel");
+                  setShowMobileDrawer(false);
+                }}
+                className={`w-full min-h-[46px] px-4 rounded-2xl border font-black text-sm flex items-center gap-3 cursor-pointer ${
+                  activeTab === "duel"
+                    ? "bg-rose-600 text-white border-rose-400"
+                    : "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                }`}
+              >
+                <Swords className="h-5 w-5 shrink-0" />
+                <span>المبارزة المباشرة ⚔️</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  setActiveTab("progression");
+                  setShowMobileDrawer(false);
+                }}
+                className={`w-full min-h-[46px] px-4 rounded-2xl border font-black text-sm flex items-center gap-3 cursor-pointer ${
+                  activeTab === "progression"
+                    ? "bg-teal-500 text-slate-950 border-teal-400"
+                    : "bg-teal-500/10 border-teal-500/30 text-teal-400"
+                }`}
+              >
+                <TrendingUp className="h-5 w-5 shrink-0" />
+                <span>منحنى تطور الفرق 📈</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  setActiveTab("security");
+                  setShowMobileDrawer(false);
+                }}
+                className={`w-full min-h-[46px] px-4 rounded-2xl border font-black text-sm flex items-center gap-3 cursor-pointer ${
+                  activeTab === "security"
+                    ? "bg-purple-600 text-white border-purple-400"
+                    : "bg-purple-500/10 border-purple-500/30 text-purple-400"
+                }`}
+              >
+                <Lock className="h-5 w-5 shrink-0" />
+                <span>نظام الحماية والـ PIN 🔒</span>
+              </button>
+            </div>
+
+            {/* Quick Tools */}
+            <div className="space-y-2 pt-2 border-t border-slate-700/30">
+              <div className="text-[11px] font-bold text-slate-400">الأدوات السريعة</div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  setShowMobileDrawer(false);
+                  setShowQRScanner(true);
+                }}
+                className="w-full min-h-[46px] px-4 rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 font-black text-sm flex items-center gap-3 cursor-pointer"
+              >
+                <Camera className="h-5 w-5 shrink-0" />
+                <span>مسح QR للحضور 📱</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  setShowMobileDrawer(false);
+                  setShowAdvancedPanel(true);
+                }}
+                className={`w-full min-h-[46px] px-4 rounded-2xl border font-bold text-sm flex items-center gap-3 cursor-pointer ${
+                  isLight ? "bg-slate-50 border-slate-300 text-slate-900" : "bg-slate-900 border-slate-700 text-slate-200"
+                }`}
+              >
+                <Settings className="h-5 w-5 shrink-0 text-amber-500" />
+                <span>إعدادات شاملة والأعضاء ⚙️</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  setShowMobileDrawer(false);
+                  setShowPdfReportModal(true);
+                }}
+                className="w-full min-h-[46px] px-4 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-400 font-black text-sm flex items-center gap-3 cursor-pointer"
+              >
+                <Download className="h-5 w-5 shrink-0" />
+                <span>تصدير تقرير PDF 📄</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  setShowMobileDrawer(false);
+                  setShowUserSwitcher(true);
+                }}
+                className={`w-full min-h-[46px] px-4 rounded-2xl border font-bold text-sm flex items-center gap-3 cursor-pointer ${
+                  isLight ? "bg-slate-50 border-slate-300 text-slate-900" : "bg-slate-900 border-slate-700 text-amber-300"
+                }`}
+              >
+                <KeyRound className="h-5 w-5 shrink-0 text-amber-500" />
+                <span>تبديل الحساب النشط</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  setShowMobileDrawer(false);
+                  setShowAdminPhotoModal(true);
+                }}
+                className={`w-full min-h-[46px] px-4 rounded-2xl border font-bold text-sm flex items-center gap-3 cursor-pointer ${
+                  isLight ? "bg-slate-50 border-slate-300 text-slate-900" : "bg-slate-900 border-slate-700 text-slate-200"
+                }`}
+              >
+                <Camera className="h-5 w-5 shrink-0 text-amber-400" />
+                <span>صورة مدير النظام 📷</span>
+              </button>
+
+              {isUnlocked ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleLockDashboard();
+                    setShowMobileDrawer(false);
+                  }}
+                  className="w-full min-h-[46px] px-4 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-400 font-black text-sm flex items-center gap-3 cursor-pointer"
+                >
+                  <Lock className="h-5 w-5 shrink-0" />
+                  <span>قفل اللوحة بالـ PIN 🔒</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("security");
+                    setShowMobileDrawer(false);
+                  }}
+                  className="w-full min-h-[46px] px-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 font-black text-sm flex items-center gap-3 cursor-pointer"
+                >
+                  <Unlock className="h-5 w-5 shrink-0" />
+                  <span>فك قفل اللوحة 🔑</span>
+                </button>
+              )}
+            </div>
+
+            {/* Theme Switcher */}
+            <div className="space-y-2 pt-2 border-t border-slate-700/30">
+              <div className="text-[11px] font-bold text-slate-400">مظهر التطبيق</div>
+              <div className="grid grid-cols-3 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    setThemePreference("auto");
+                  }}
+                  className={`min-h-[42px] rounded-xl text-xs font-black flex items-center justify-center gap-1 cursor-pointer border ${
+                    themePreference === "auto"
+                      ? "bg-amber-500 text-slate-950 border-amber-400"
+                      : isLight ? "bg-slate-100 text-slate-700 border-slate-200" : "bg-slate-900 text-slate-300 border-slate-700"
+                  }`}
+                >
+                  <Clock className="h-3.5 w-3.5" />
+                  <span>تلقائي</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    setThemePreference("light");
+                  }}
+                  className={`min-h-[42px] rounded-xl text-xs font-black flex items-center justify-center gap-1 cursor-pointer border ${
+                    themePreference === "light"
+                      ? "bg-amber-400 text-slate-950 border-amber-500"
+                      : isLight ? "bg-slate-100 text-slate-700 border-slate-200" : "bg-slate-900 text-slate-300 border-slate-700"
+                  }`}
+                >
+                  <Sun className="h-3.5 w-3.5" />
+                  <span>نهاري</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    setThemePreference("dark");
+                  }}
+                  className={`min-h-[42px] rounded-xl text-xs font-black flex items-center justify-center gap-1 cursor-pointer border ${
+                    themePreference === "dark"
+                      ? "bg-indigo-600 text-white border-indigo-500"
+                      : isLight ? "bg-slate-100 text-slate-700 border-slate-200" : "bg-slate-900 text-slate-300 border-slate-700"
+                  }`}
+                >
+                  <Moon className="h-3.5 w-3.5" />
+                  <span>ليلي</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-auto pt-3 border-t border-slate-700/30">
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  setShowMobileDrawer(false);
+                  onBackToScoreboard();
+                }}
+                className="w-full min-h-[46px] px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-sm flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>العودة للوحة الشرف الكبرى</span>
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
     </div>
   );
 };

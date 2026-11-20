@@ -37,6 +37,7 @@ import {
   Swords,
   UserX,
   Copy,
+  Menu,
 } from "lucide-react";
 import type { CustomMember, ProcessedMeetingTeam } from "../types";
 import { meetingStore } from "../utils/meetingStore";
@@ -96,6 +97,7 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
   const [showUserSwitcher, setShowUserSwitcher] = useState(false);
   const [showProgressionModal, setShowProgressionModal] = useState<boolean>(false);
   const [showTeamsManagement, setShowTeamsManagement] = useState<boolean>(false);
+  const [showMobileMenu, setShowMobileMenu] = useState<boolean>(false);
   const [topRankToast, setTopRankToast] = useState<TopRankChangeToast | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [toasts, setToasts] = useState<
@@ -550,19 +552,20 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
 
       <div className={`relative z-10 mx-auto flex flex-col min-h-screen transition-all duration-300 ${
         isTvMode || isFullscreen
-          ? "w-full max-w-[1800px] px-3 sm:px-6 lg:px-10 2xl:px-14 pt-3 pb-16"
-          : "max-w-6xl px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-16"
+          ? "w-full max-w-[1800px] px-3 sm:px-6 lg:px-10 2xl:px-14 pt-3 pb-24 md:pb-16"
+          : "max-w-6xl px-3 sm:px-6 lg:px-8 pt-3 sm:pt-6 pb-24 md:pb-16"
       }`}>
         {/* Top Header Card */}
-        <header className={`rounded-3xl border transition-all duration-300 p-4 sm:p-5 mb-5 ${
+        <header className={`rounded-3xl border transition-all duration-300 p-3.5 sm:p-5 mb-4 sm:mb-5 ${
           isLight
             ? "bg-white/95 border-2 border-slate-300 shadow-[0_10px_30px_rgba(0,0,0,0.06)] text-slate-900"
             : "border-slate-700/60 bg-slate-900/85 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] text-slate-100"
         }`}>
-          <div className="flex items-center justify-between gap-3 flex-wrap md:flex-nowrap">
+          <div className="flex items-start md:items-center justify-between gap-3 flex-wrap md:flex-nowrap">
             {/* Title & Brand */}
-            <div className="flex items-center gap-3">
-              <div className="relative flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-white/95 border-2 border-amber-400 shadow-md shadow-amber-500/20 shrink-0 overflow-hidden p-0.5">
+            <div className="flex items-center justify-between md:justify-start gap-2.5 sm:gap-3 w-full md:w-auto">
+              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              <div className="relative flex h-11 w-11 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-white/95 border-2 border-amber-400 shadow-md shadow-amber-500/20 shrink-0 overflow-hidden p-0.5">
                 <img
                   src={data.config.meetingLogoUrl || "/assets/aistudio/_______________________55ad5e73.png"}
                   alt="لوجو أسرة الشهيد العظيم أبي سيفين وتماف إيريني"
@@ -613,10 +616,56 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                   {data.config.subTitle} • المس أي فريق لعرض قائمة الأعضاء والنقاط
                 </p>
               </div>
+              </div>
+
+              {/* Mobile Hamburger Menu Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  setShowMobileMenu(true);
+                }}
+                className={`md:hidden h-11 w-11 rounded-2xl border-2 flex items-center justify-center shrink-0 active:scale-95 transition-all cursor-pointer ${
+                  isLight
+                    ? "bg-slate-50 border-slate-300 text-slate-900 hover:bg-amber-50"
+                    : "bg-slate-800/90 border-slate-700 text-amber-300 hover:bg-slate-700"
+                }`}
+                aria-label="فتح القائمة الجانبية"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
             </div>
 
-            {/* Emblem */}
-            <div className={`flex flex-col items-center justify-center px-4 py-2 rounded-2xl border-2 shrink-0 ${
+            {/* Mobile Compact Stats Row (md:hidden) */}
+            <div className="grid grid-cols-3 gap-2 w-full md:hidden">
+              <div className={`flex flex-col items-center justify-center rounded-2xl border px-2 py-2 ${
+                isLight ? "bg-amber-50/90 border-amber-300" : "bg-slate-950/70 border-amber-500/30"
+              }`}>
+                <span className={`text-[10px] font-bold ${isLight ? "text-amber-800" : "text-amber-400"}`}>النقاط</span>
+                <span className={`text-xs font-black font-mono ${isLight ? "text-slate-950" : "text-amber-300"}`}>
+                  {totalPoints.toLocaleString("en-US")}
+                </span>
+              </div>
+              <div className={`flex flex-col items-center justify-center rounded-2xl border px-2 py-2 ${
+                isLight ? "bg-sky-50/90 border-sky-300" : "bg-slate-950/70 border-sky-500/30"
+              }`}>
+                <span className={`text-[10px] font-bold ${isLight ? "text-sky-800" : "text-sky-400"}`}>الأعضاء</span>
+                <span className={`text-xs font-black font-mono ${isLight ? "text-slate-950" : "text-sky-300"}`}>
+                  {totalMembers} عضو
+                </span>
+              </div>
+              <div className={`flex flex-col items-center justify-center rounded-2xl border px-2 py-2 ${
+                isLight ? "bg-emerald-50/90 border-emerald-300" : "bg-slate-950/70 border-emerald-500/30"
+              }`}>
+                <span className={`text-[10px] font-bold ${isLight ? "text-emerald-800" : "text-emerald-400"}`}>القطاعات</span>
+                <span className={`text-xs font-black font-mono ${isLight ? "text-slate-950" : "text-emerald-300"}`}>
+                  TOP {totalTeams}
+                </span>
+              </div>
+            </div>
+
+            {/* Emblem (Desktop) */}
+            <div className={`hidden md:flex flex-col items-center justify-center px-4 py-2 rounded-2xl border-2 shrink-0 ${
               isLight
                 ? "bg-amber-50/90 border-amber-400 shadow-xs"
                 : "bg-slate-900/90 border-amber-500/30 shadow-inner"
@@ -633,8 +682,8 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
               </span>
             </div>
 
-            {/* Controls & Admin Access */}
-            <div className="flex flex-col gap-2 items-end shrink-0">
+            {/* Controls & Admin Access (Desktop Only - Mobile uses Bottom Nav + Drawer) */}
+            <div className="hidden md:flex flex-col gap-2 items-end shrink-0">
               <div className="flex items-center gap-2">
                 {/* Total points badge */}
                 <div className={`flex items-center gap-2 rounded-2xl border-2 px-3 py-1.5 ${
@@ -1001,7 +1050,7 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="ابحث عن اسم فريق أو قائد أو شعار بسرعة..."
-                className={`w-full h-10 sm:h-11 pr-10 pl-8 rounded-2xl border-2 text-xs sm:text-sm transition-colors shadow-xs focus:outline-none ${
+                className={`w-full min-h-[44px] h-11 pr-10 pl-10 rounded-2xl border-2 text-sm transition-colors shadow-xs focus:outline-none ${
                   isLight
                     ? "bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-amber-500"
                     : "bg-slate-950/80 border-slate-700/80 text-white placeholder:text-slate-500 focus:border-amber-400 shadow-inner"
@@ -1011,7 +1060,7 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                 <button
                   type="button"
                   onClick={() => setSearchQuery("")}
-                  className={`absolute left-2.5 top-1/2 -translate-y-1/2 text-xs px-2 py-0.5 rounded-lg cursor-pointer border ${
+                  className={`absolute left-2 top-1/2 -translate-y-1/2 text-xs px-2.5 py-1.5 rounded-xl cursor-pointer border ${
                     isLight
                       ? "bg-slate-200 hover:bg-slate-300 text-slate-700 border-slate-300"
                       : "bg-slate-800 text-slate-400 hover:text-white border-slate-700"
@@ -1039,7 +1088,7 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                   sounds.playTap();
                   setSortOrder("points-desc");
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                className={`flex-1 sm:flex-none justify-center min-h-[40px] sm:min-h-[36px] px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                   sortOrder === "points-desc"
                     ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black border border-amber-600/30"
                     : isLight
@@ -1052,15 +1101,13 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                 <span>الأعلى نقاطاً ⚡</span>
               </button>
 
-
-
               <button
                 type="button"
                 onClick={() => {
                   sounds.playTap();
                   setSortOrder("points-asc");
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                className={`flex-1 sm:flex-none justify-center min-h-[40px] sm:min-h-[36px] px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                   sortOrder === "points-asc"
                     ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black border border-amber-600/30"
                     : isLight
@@ -1450,10 +1497,10 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                     )}
 
                     {/* Left Info: Rank, Icon, Name, Slogan, Leaders */}
-                    <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 pl-2 sm:pl-3">
+                    <div className="flex items-center gap-2.5 sm:gap-4 min-w-0 flex-1 pl-1.5 sm:pl-3">
                       {/* Rank Badge */}
                       <div
-                        className={`relative flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-2xl font-black shadow-md border-2 ${
+                        className={`relative flex h-10 w-10 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-xl sm:rounded-2xl font-black shadow-md border-2 ${
                           isRank1
                             ? "bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 border-white shadow-amber-500/30"
                             : isRank2
@@ -1466,13 +1513,13 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                         }`}
                       >
                         <div className="flex flex-col items-center leading-none">
-                          <span className="text-[10px] sm:text-xs opacity-75">#</span>
+                          <span className="text-[9px] sm:text-xs opacity-75">#</span>
                           <motion.span
                             key={team.rank}
                             initial={{ scale: 1.35, y: hasShiftedUp ? 4 : hasShiftedDown ? -4 : 0 }}
                             animate={{ scale: 1, y: 0 }}
                             transition={{ type: "spring", stiffness: 450, damping: 18 }}
-                            className="text-base sm:text-xl font-black"
+                            className="text-sm sm:text-xl font-black"
                           >
                             {team.rank}
                           </motion.span>
@@ -1508,7 +1555,7 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                           sounds.playTap();
                           setPhotoUploadTeam(team);
                         }}
-                        className={`relative group/photo flex h-11 w-11 sm:h-13 sm:w-13 shrink-0 items-center justify-center rounded-2xl overflow-hidden border-2 shadow-md transition-all duration-300 hover:scale-105 cursor-pointer ${
+                        className={`relative group/photo flex h-10 w-10 sm:h-13 sm:w-13 shrink-0 items-center justify-center rounded-xl sm:rounded-2xl overflow-hidden border-2 shadow-md transition-all duration-300 hover:scale-105 cursor-pointer ${
                           isLight ? "ring-2 ring-slate-300" : "ring-1 ring-white/10"
                         }`}
                         style={{
@@ -1528,7 +1575,7 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                             }}
                           />
                         ) : (
-                          <span className="text-xl sm:text-2xl select-none transition-transform duration-300 group-hover/photo:scale-110">
+                          <span className="text-lg sm:text-2xl select-none transition-transform duration-300 group-hover/photo:scale-110">
                             {team.icon}
                           </span>
                         )}
@@ -1542,9 +1589,9 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
 
                       {/* Team Names and Metadata */}
                       <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                           <h3
-                            className={`font-black text-base sm:text-lg lg:text-xl tracking-tight transition-colors whitespace-nowrap ${
+                            className={`font-black text-sm sm:text-lg lg:text-xl tracking-tight transition-colors truncate max-w-full sm:whitespace-nowrap ${
                               isRank1
                                 ? isLight
                                   ? "text-amber-950"
@@ -1841,6 +1888,418 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
           </p>
         </footer>
       </div>
+
+      {/* ========================================================= */}
+      {/* MOBILE FIXED BOTTOM NAVIGATION BAR (1-HANDED THUMB ZONE) */}
+      {/* ========================================================= */}
+      {!isFullscreen && (
+        <nav
+          aria-label="التنقل السريع للموبايل"
+          className={`md:hidden fixed bottom-0 inset-x-0 z-40 border-t-2 backdrop-blur-xl pb-safe ${
+            isLight
+              ? "bg-white/95 border-slate-200 shadow-[0_-8px_25px_rgba(15,23,42,0.08)]"
+              : "bg-[#070A1E]/95 border-slate-800 shadow-[0_-10px_30px_rgba(0,0,0,0.6)]"
+          }`}
+        >
+          <div className="grid grid-cols-5 h-16 max-w-md mx-auto px-1">
+            {!isPublicDisplayMode ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className={`flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all cursor-pointer ${
+                    isLight ? "text-amber-700" : "text-amber-400"
+                  }`}
+                >
+                  <Trophy className="h-5 w-5" />
+                  <span className="text-[10px] font-black leading-none">الشرف</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    setAdminActiveTab("attendance");
+                    setViewMode("admin");
+                  }}
+                  className={`flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all cursor-pointer ${
+                    isLight ? "text-slate-600 hover:text-teal-700" : "text-slate-300 hover:text-teal-400"
+                  }`}
+                >
+                  <CheckCircle className="h-5 w-5" />
+                  <span className="text-[10px] font-bold leading-none">الافتقاد</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    setShowQRScanner(true);
+                  }}
+                  className="flex flex-col items-center justify-center -mt-4 active:scale-95 transition-all cursor-pointer"
+                >
+                  <span className="h-12 w-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/35 border-2 border-white/80">
+                    <QrCode className="h-6 w-6" />
+                  </span>
+                  <span className={`text-[10px] font-black mt-0.5 leading-none ${isLight ? "text-emerald-800" : "text-emerald-400"}`}>
+                    مسح QR
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    setAdminActiveTab("teams");
+                    setViewMode("admin");
+                  }}
+                  className={`flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all cursor-pointer ${
+                    isLight ? "text-slate-600 hover:text-amber-700" : "text-slate-300 hover:text-amber-300"
+                  }`}
+                >
+                  <Settings className="h-5 w-5" />
+                  <span className="text-[10px] font-bold leading-none">الخادم</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    setShowMobileMenu(true);
+                  }}
+                  className={`flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all cursor-pointer ${
+                    isLight ? "text-slate-600 hover:text-slate-900" : "text-slate-300 hover:text-white"
+                  }`}
+                >
+                  <Menu className="h-5 w-5" />
+                  <span className="text-[10px] font-bold leading-none">القائمة</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className={`flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all cursor-pointer ${
+                    isLight ? "text-amber-700" : "text-amber-400"
+                  }`}
+                >
+                  <Trophy className="h-5 w-5" />
+                  <span className="text-[10px] font-black leading-none">الشرف</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    setShowProgressionModal(true);
+                  }}
+                  className={`flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all cursor-pointer ${
+                    isLight ? "text-slate-600 hover:text-cyan-700" : "text-slate-300 hover:text-cyan-400"
+                  }`}
+                >
+                  <TrendingUp className="h-5 w-5" />
+                  <span className="text-[10px] font-bold leading-none">المنحنى</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={triggerCelebrate}
+                  className="flex flex-col items-center justify-center -mt-4 active:scale-95 transition-all cursor-pointer"
+                >
+                  <span className="h-12 w-12 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/35 border-2 border-white/80">
+                    <PartyPopper className="h-6 w-6" />
+                  </span>
+                  <span className={`text-[10px] font-black mt-0.5 leading-none ${isLight ? "text-amber-800" : "text-amber-400"}`}>
+                    احتفال
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    if (onReturnToWelcome) onReturnToWelcome();
+                    else setShowUserSwitcher(true);
+                  }}
+                  className={`flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all cursor-pointer ${
+                    isLight ? "text-slate-600 hover:text-amber-700" : "text-slate-300 hover:text-amber-300"
+                  }`}
+                >
+                  <KeyRound className="h-5 w-5" />
+                  <span className="text-[10px] font-bold leading-none">دخول</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    setShowMobileMenu(true);
+                  }}
+                  className={`flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all cursor-pointer ${
+                    isLight ? "text-slate-600 hover:text-slate-900" : "text-slate-300 hover:text-white"
+                  }`}
+                >
+                  <Menu className="h-5 w-5" />
+                  <span className="text-[10px] font-bold leading-none">القائمة</span>
+                </button>
+              </>
+            )}
+          </div>
+        </nav>
+      )}
+
+      {/* ========================================================= */}
+      {/* MOBILE SLIDE-OUT HAMBURGER DRAWER                         */}
+      {/* ========================================================= */}
+      <AnimatePresence>
+        {showMobileMenu && (
+          <div className="md:hidden fixed inset-0 z-[120] flex justify-start" dir="rtl">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowMobileMenu(false)}
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm"
+            />
+            <motion.aside
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", stiffness: 360, damping: 32 }}
+              className={`relative z-10 w-[84vw] max-w-xs h-full overflow-y-auto p-5 pb-safe flex flex-col gap-4 border-l-2 shadow-2xl ${
+                isLight
+                  ? "bg-white border-slate-200 text-slate-900"
+                  : "bg-[#0B132B] border-slate-800 text-slate-100"
+              }`}
+            >
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-700/30">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="h-10 w-10 rounded-xl bg-white border-2 border-amber-400 p-0.5 shrink-0 overflow-hidden">
+                    <img
+                      src={data.config.meetingLogoUrl || "/assets/aistudio/_______________________55ad5e73.png"}
+                      alt=""
+                      className="w-full h-full object-contain rounded-lg"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-black truncate">{data.config.meetingName}</div>
+                    <div className="text-[11px] text-slate-400 truncate">
+                      {!isPublicDisplayMode ? `${currentUser.name} (${currentUser.roleLabel})` : "شاشة العرض العامة"}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowMobileMenu(false)}
+                  className={`h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 cursor-pointer ${
+                    isLight ? "bg-slate-100 text-slate-800" : "bg-slate-800 text-slate-200"
+                  }`}
+                  aria-label="إغلاق القائمة"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Navigation & Actions */}
+              <div className="space-y-2">
+                {!isPublicDisplayMode ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playTap();
+                        setShowMobileMenu(false);
+                        setAdminActiveTab("duel");
+                        setViewMode("admin");
+                      }}
+                      className="w-full min-h-[46px] px-4 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-400 font-black text-sm flex items-center gap-3 active:scale-[0.98] cursor-pointer"
+                    >
+                      <Swords className="h-5 w-5 shrink-0" />
+                      <span>المبارزة المباشرة ⚔️</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playTap();
+                        setShowMobileMenu(false);
+                        setShowTeamsManagement(true);
+                      }}
+                      className="w-full min-h-[46px] px-4 rounded-2xl bg-blue-500/15 border border-blue-500/40 text-blue-400 font-black text-sm flex items-center gap-3 active:scale-[0.98] cursor-pointer"
+                    >
+                      <Shield className="h-5 w-5 shrink-0" />
+                      <span>إدارة الـ 10 فرق 🛡️</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playTap();
+                        setShowMobileMenu(false);
+                        setShowUserSwitcher(true);
+                      }}
+                      className={`w-full min-h-[46px] px-4 rounded-2xl border font-bold text-sm flex items-center gap-3 active:scale-[0.98] cursor-pointer ${
+                        isLight ? "bg-amber-50 border-amber-300 text-amber-900" : "bg-slate-900 border-amber-500/40 text-amber-300"
+                      }`}
+                    >
+                      <KeyRound className="h-5 w-5 shrink-0 text-amber-500" />
+                      <span>تبديل الحساب ({currentUser.name.split(" ")[0]})</span>
+                    </button>
+                  </>
+                ) : (
+                  onReturnToWelcome && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playTap();
+                        setShowMobileMenu(false);
+                        onReturnToWelcome();
+                      }}
+                      className="w-full min-h-[46px] px-4 rounded-2xl bg-amber-500 text-slate-950 font-black text-sm flex items-center gap-3 active:scale-[0.98] cursor-pointer"
+                    >
+                      <KeyRound className="h-5 w-5 shrink-0" />
+                      <span>صفحة الدخول والكود 🔑</span>
+                    </button>
+                  )
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    setShowMobileMenu(false);
+                    setShowProgressionModal(true);
+                  }}
+                  className="w-full min-h-[46px] px-4 rounded-2xl bg-cyan-500/15 border border-cyan-500/40 text-cyan-400 font-black text-sm flex items-center gap-3 active:scale-[0.98] cursor-pointer"
+                >
+                  <TrendingUp className="h-5 w-5 shrink-0" />
+                  <span>منحنى تطور الفرق 📈</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMobileMenu(false);
+                    triggerCelebrate();
+                  }}
+                  className="w-full min-h-[46px] px-4 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-400 font-black text-sm flex items-center gap-3 active:scale-[0.98] cursor-pointer"
+                >
+                  <PartyPopper className="h-5 w-5 shrink-0" />
+                  <span>احتفال بالمتصدر 🎉</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMobileMenu(false);
+                    toggleFullscreen();
+                  }}
+                  className="w-full min-h-[46px] px-4 rounded-2xl bg-indigo-500/15 border border-indigo-500/40 text-indigo-400 font-black text-sm flex items-center gap-3 active:scale-[0.98] cursor-pointer"
+                >
+                  {isFullscreen ? <Minimize2 className="h-5 w-5 shrink-0" /> : <Maximize2 className="h-5 w-5 shrink-0" />}
+                  <span>{isFullscreen ? "إلغاء ملء الشاشة" : "وضع ملء الشاشة للقاعات 📺"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={toggleMute}
+                  className={`w-full min-h-[46px] px-4 rounded-2xl border font-bold text-sm flex items-center justify-between active:scale-[0.98] cursor-pointer ${
+                    isLight ? "bg-slate-50 border-slate-300 text-slate-800" : "bg-slate-900 border-slate-700 text-slate-200"
+                  }`}
+                >
+                  <span className="flex items-center gap-3">
+                    {isMuted ? <VolumeX className="h-5 w-5 text-rose-500" /> : <Volume2 className="h-5 w-5 text-emerald-500" />}
+                    <span>المؤثرات الصوتية</span>
+                  </span>
+                  <span className="text-xs font-black">{isMuted ? "مكتوم" : "مفعل"}</span>
+                </button>
+              </div>
+
+              {/* Theme Selector */}
+              <div className="space-y-2 pt-2 border-t border-slate-700/30">
+                <div className="text-xs font-bold text-slate-400">مظهر التطبيق</div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playTap();
+                      setThemePreference("auto");
+                    }}
+                    className={`min-h-[42px] rounded-xl text-xs font-black flex items-center justify-center gap-1 cursor-pointer border ${
+                      themePreference === "auto"
+                        ? "bg-amber-500 text-slate-950 border-amber-400"
+                        : isLight ? "bg-slate-100 text-slate-700 border-slate-200" : "bg-slate-900 text-slate-300 border-slate-700"
+                    }`}
+                  >
+                    <Clock className="h-3.5 w-3.5" />
+                    <span>تلقائي</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playTap();
+                      setThemePreference("light");
+                    }}
+                    className={`min-h-[42px] rounded-xl text-xs font-black flex items-center justify-center gap-1 cursor-pointer border ${
+                      themePreference === "light"
+                        ? "bg-amber-400 text-slate-950 border-amber-500"
+                        : isLight ? "bg-slate-100 text-slate-700 border-slate-200" : "bg-slate-900 text-slate-300 border-slate-700"
+                    }`}
+                  >
+                    <Sun className="h-3.5 w-3.5" />
+                    <span>نهاري</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playTap();
+                      setThemePreference("dark");
+                    }}
+                    className={`min-h-[42px] rounded-xl text-xs font-black flex items-center justify-center gap-1 cursor-pointer border ${
+                      themePreference === "dark"
+                        ? "bg-indigo-600 text-white border-indigo-500"
+                        : isLight ? "bg-slate-100 text-slate-700 border-slate-200" : "bg-slate-900 text-slate-300 border-slate-700"
+                    }`}
+                  >
+                    <Moon className="h-3.5 w-3.5" />
+                    <span>ليلي</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Logout to Public Screen */}
+              {!isPublicDisplayMode && (
+                <div className="mt-auto pt-3 border-t border-slate-700/30">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playClose();
+                      setShowMobileMenu(false);
+                      authStore.logout();
+                      addToast({
+                        type: "info",
+                        title: "الشاشة العامة (المخدومين)",
+                        message: "تم تسجيل الخروج والعودة للشاشة العامة المقروءة فقط.",
+                      });
+                    }}
+                    className="w-full min-h-[46px] px-4 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-400 font-black text-sm flex items-center justify-center gap-2 active:scale-[0.98] cursor-pointer"
+                  >
+                    <span>🚪 خروج للشاشة العامة</span>
+                  </button>
+                </div>
+              )}
+            </motion.aside>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Active Team Modal */}
       {activeModalTeam && (

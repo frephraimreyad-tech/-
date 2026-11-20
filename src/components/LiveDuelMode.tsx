@@ -813,7 +813,68 @@ export const LiveDuelMode: React.FC<LiveDuelModeProps> = ({
           </span>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Mobile Stacked Metric Comparison Cards (md:hidden) */}
+        <div className="md:hidden p-3 space-y-2.5">
+          {metrics.map((m) => (
+            <div
+              key={`mob-metric-${m.id}`}
+              className={`p-3.5 rounded-2xl border space-y-2.5 ${
+                isLight ? "bg-slate-50 border-slate-200" : "bg-slate-950/70 border-slate-800"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className={`text-xs font-black flex items-center gap-1.5 ${isLight ? "text-slate-900" : "text-white"}`}>
+                  <span className="h-2 w-2 rounded-full bg-amber-400 shrink-0" />
+                  <span>{m.label}</span>
+                </span>
+                <span className="px-2 py-0.5 rounded-lg bg-slate-800/70 border border-slate-700 text-[10px] font-bold text-slate-300 shrink-0">
+                  {m.diff}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div
+                  className={`p-2.5 rounded-xl border text-center space-y-1 ${
+                    m.winner === "A"
+                      ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400"
+                      : isLight
+                      ? "bg-white border-slate-200 text-slate-800"
+                      : "bg-slate-900 border-slate-800 text-slate-200"
+                  }`}
+                >
+                  <div className="text-[10px] font-bold text-blue-400 truncate">
+                    {teamA.icon} {teamA.name}
+                  </div>
+                  <div className="text-sm font-black inline-flex items-center justify-center gap-1">
+                    {m.winner === "A" && <Crown className="h-3.5 w-3.5 text-amber-400" />}
+                    <span>{m.valA}</span>
+                  </div>
+                </div>
+
+                <div
+                  className={`p-2.5 rounded-xl border text-center space-y-1 ${
+                    m.winner === "B"
+                      ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400"
+                      : isLight
+                      ? "bg-white border-slate-200 text-slate-800"
+                      : "bg-slate-900 border-slate-800 text-slate-200"
+                  }`}
+                >
+                  <div className="text-[10px] font-bold text-rose-400 truncate">
+                    {teamB.icon} {teamB.name}
+                  </div>
+                  <div className="text-sm font-black inline-flex items-center justify-center gap-1">
+                    {m.winner === "B" && <Crown className="h-3.5 w-3.5 text-amber-400" />}
+                    <span>{m.valB}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop Table (hidden md:block) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-right border-collapse text-xs sm:text-sm">
             <thead>
               <tr className={`border-b text-xs font-black uppercase ${
@@ -876,13 +937,13 @@ export const LiveDuelMode: React.FC<LiveDuelModeProps> = ({
       </div>
 
       {/* ===================== ROSTERS SIDE-BY-SIDE ===================== */}
-      <div className={`p-5 rounded-3xl border-2 space-y-4 ${
+      <div className={`p-4 sm:p-5 rounded-3xl border-2 space-y-4 ${
         isLight ? "bg-white border-slate-300 shadow-sm" : "bg-slate-900/90 border-slate-800 shadow-xl"
       }`}>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-sky-400" />
-            <h3 className={`text-base font-black ${isLight ? "text-slate-950" : "text-white"}`}>
+            <h3 className={`text-sm sm:text-base font-black ${isLight ? "text-slate-950" : "text-white"}`}>
               كتيبة أبطال الفريقين (مقارنة الأعضاء جنباً إلى جنب)
             </h3>
           </div>
@@ -894,7 +955,7 @@ export const LiveDuelMode: React.FC<LiveDuelModeProps> = ({
               value={rosterSearch}
               onChange={(e) => setRosterSearch(e.target.value)}
               placeholder="بحث في أسماء الأعضاء..."
-              className={`w-full pr-9 pl-3 py-1.5 rounded-xl border text-xs font-bold ${
+              className={`w-full min-h-[44px] pr-9 pl-3 py-2 rounded-xl border text-sm sm:text-xs font-bold ${
                 isLight ? "bg-slate-50 border-slate-300 text-slate-900" : "bg-slate-950 border-slate-700 text-slate-200"
               }`}
             />

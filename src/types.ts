@@ -143,6 +143,10 @@ export interface MeetingConfig {
   meetingLogoUrl?: string;
   meetingEndTime?: string; // ISO string for meeting countdown
   meetingStartTime?: string; // ISO string for meeting start
+  qrScanOpenTime?: string; // e.g. "17:00"
+  qrScanCloseTime?: string; // e.g. "19:00"
+  isQrScanManuallyLocked?: boolean;
+  isQrScanManuallyOpened?: boolean;
 }
 
 export interface VisitationRecord {

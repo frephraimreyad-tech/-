@@ -57,28 +57,29 @@ export const UserSwitcherModal: React.FC<UserSwitcherModalProps> = ({ onClose })
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn font-arabic"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn font-arabic"
       dir="rtl"
     >
-      <div className="relative w-full max-w-xl rounded-3xl border border-slate-700 bg-[#0B132B] p-5 sm:p-7 shadow-2xl text-slate-100 space-y-5 max-h-[92vh] overflow-y-auto">
+      <div className="relative w-full max-w-xl rounded-t-3xl sm:rounded-3xl border border-slate-700 bg-[#0B132B] p-5 sm:p-7 pb-safe sm:pb-7 shadow-2xl text-slate-100 space-y-5 max-h-[92dvh] overflow-y-auto">
         {/* Close Button */}
         <button
           onClick={() => {
             sounds.playClose();
             onClose();
           }}
-          className="absolute top-4 left-4 p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer"
+          className="absolute top-4 left-4 h-11 w-11 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+          aria-label="إغلاق"
         >
           <X className="h-5 w-5" />
         </button>
 
         {/* Header */}
-        <div className="space-y-1 pr-6">
+        <div className="space-y-1 pl-12">
           <div className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400">
+            <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400 shrink-0">
               <KeyRound className="h-5 w-5" />
             </span>
-            <h3 className="text-xl font-black text-white">تسجيل الدخول وإدارة الصلاحيات</h3>
+            <h3 className="text-lg sm:text-xl font-black text-white">تسجيل الدخول وإدارة الصلاحيات</h3>
           </div>
           <p className="text-xs text-slate-400">
             أدخل كود الوصول الخاص بك لتفعيل مستوى الأمان والمهام المسموح لك بتنفيذها.

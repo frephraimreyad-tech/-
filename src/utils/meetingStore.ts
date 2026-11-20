@@ -71,6 +71,10 @@ const DEFAULT_CONFIG: MeetingConfig = {
   },
   meetingStartTime: new Date().toISOString(),
   meetingEndTime: new Date(Date.now() + 2 * 60 * 60 * 1000 + 30 * 60 * 1000).toISOString(),
+  qrScanOpenTime: "17:00",
+  qrScanCloseTime: "19:00",
+  isQrScanManuallyLocked: false,
+  isQrScanManuallyOpened: false,
 };
 
 export const DEFAULT_TEAMS: CustomTeam[] = [
@@ -190,12 +194,19 @@ class MeetingStore {
 
     console.log("Initializing Firestore listeners...");
 
-    // 1. Check if database needs seeding (once)
+    // 1. Check if database needs seeding or Friday import
     try {
       const configDoc = await getDocs(query(collection(db, "config"), limit(1)));
       if (configDoc.empty) {
         console.log("Database empty, seeding defaults...");
         await this.seedDatabase();
+        await this.importFridayLogs();
+      } else {
+        const txSnap = await getDocs(query(collection(db, "transactions"), limit(5)));
+        if (txSnap.empty) {
+          console.log("Auto-importing Friday logs to combine old and new scores...");
+          await this.importFridayLogs();
+        }
       }
     } catch (e) {
       console.error("Error checking database state:", e);
@@ -1222,19 +1233,11 @@ class MeetingStore {
       return { success: false, error: "غير مصرح لك بمسح QR؛ يرجى تسجيل الدخول بحساب خادم أو مسؤول" };
     }
 
-    // 1.5 Strict Time Window Check: Friday from 7:00 PM to 9:00 PM (19:00 to 21:00)
-    const now = new Date();
-    const isFriday = now.getDay() === 5;
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const currentTimeMinutes = currentHour * 60 + currentMinute;
-    const startTimeMinutes = 19 * 60; // 19:00
-    const endTimeMinutes = 21 * 60;   // 21:00
-
-    const isWithinWindow = isFriday && currentTimeMinutes >= startTimeMinutes && currentTimeMinutes <= endTimeMinutes;
+    // 1.5 Enhanced QR Scan Time Validation & Configurable Opening/Closing Windows
+    const config = this.data.config;
     const isAdminOrPriest = executor.role === "admin" || executor.role === "priest";
 
-    if (!isWithinWindow && !isAdminOrPriest) {
+    if (config.isQrScanManuallyLocked && !isAdminOrPriest) {
       this.logAudit({
         userId: executor.id,
         userName: executor.name,
@@ -1243,13 +1246,34 @@ class MeetingStore {
         targetType: "member",
         targetId: memberId,
         targetName: memberId,
-        details: "محاولة مسح QR خارج وقت الاجتماع الرسمي (الجمعة 7م - 9م). تم الرفض أمنياً.",
+        details: "محاولة مسح QR بينما النظام مقفل يدوياً من الإدارة",
         status: "denied",
       });
-      return { 
-        success: false, 
-        error: "عذراً، مسح كود الحضور غير متاح في هذا الوقت. ميعاد اجتماع الشباب الرسمي هو كل يوم جمعة من الساعة 7:00 م إلى 9:00 م." 
-      };
+      return { success: false, error: "تم إغلاق نظام مسح الـ QR يدوياً من الإدارة العامة." };
+    }
+
+    if (!config.isQrScanManuallyOpened && !isAdminOrPriest) {
+      const now = new Date();
+      const currentDay = now.getDay(); // 5 is Friday
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      const currentTimeMinutes = currentHour * 60 + currentMinute;
+
+      const openParts = (config.qrScanOpenTime || "17:00").split(":").map(Number);
+      const openMinutes = (openParts[0] || 17) * 60 + (openParts[1] || 0);
+
+      const closeParts = (config.qrScanCloseTime || "19:00").split(":").map(Number);
+      const closeMinutes = (closeParts[0] || 19) * 60 + (closeParts[1] || 0);
+
+      if (currentDay !== 5) {
+        return { success: false, error: "عذراً، مسح كود الحضور متاح فقط يوم الجمعة موعد الاجتماع الأسبوعي." };
+      }
+      if (currentTimeMinutes < openMinutes) {
+        return { success: false, error: `لم تبدأ فترة تسجيل الحضور بعد. موعد فتح المسح يبدأ في تمام الساعة ${config.qrScanOpenTime || "17:00"}.` };
+      }
+      if (currentTimeMinutes > closeMinutes) {
+        return { success: false, error: `فترة تسجيل الحضور قد انتهت. تم غلق المسح تلقائياً مع حلول ميعاد الاجتماع (الساعة ${config.qrScanCloseTime || "19:00"} مساءً).` };
+      }
     }
 
     // 2. Resolve Event (Clean & Case-insensitive) - Fallback to auto-linked Friday event

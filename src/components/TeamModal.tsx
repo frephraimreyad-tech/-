@@ -281,19 +281,19 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
   return (
     <AnimatePresence>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/85 backdrop-blur-xl overflow-y-auto selection:bg-amber-500/30"
+        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 bg-slate-950/85 backdrop-blur-xl overflow-y-auto selection:bg-amber-500/30"
         dir="rtl"
         onClick={handleClose}
         onTouchStart={resetTimer}
         onMouseMove={resetTimer}
       >
         <motion.div
-          initial={{ opacity: 0, scale: 0.93, y: 25 }}
+          initial={{ opacity: 0, scale: 0.96, y: 35 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.93, y: 25 }}
+          exit={{ opacity: 0, scale: 0.96, y: 35 }}
           transition={{ type: "spring", stiffness: 350, damping: 28 }}
           onClick={(e) => e.stopPropagation()}
-          className="relative w-full max-w-4xl max-h-[92vh] flex flex-col rounded-3xl bg-[#0B132B]/95 border border-slate-700/60 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8),0_0_40px_rgba(46,155,208,0.15)] text-slate-100 overflow-hidden font-arabic"
+          className="relative w-full max-w-4xl max-h-[92dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#0B132B]/95 border border-slate-700/60 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8),0_0_40px_rgba(46,155,208,0.15)] text-slate-100 overflow-hidden font-arabic pb-safe sm:pb-0"
         >
           {/* Top color ribbon */}
           <div
@@ -304,7 +304,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
           />
 
           {/* Modal Header */}
-          <div className="relative p-5 sm:p-7 border-b border-slate-800/80 bg-gradient-to-b from-slate-900/90 to-transparent shrink-0">
+          <div className="relative p-4 sm:p-7 border-b border-slate-800/80 bg-gradient-to-b from-slate-900/90 to-transparent shrink-0">
             {/* Idle countdown indicator */}
             <div className="absolute top-4 left-20 hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300 font-sans">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />

@@ -404,7 +404,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn"
       dir="rtl"
     >
       {/* Hidden container for file-based QR decoding */}
@@ -429,7 +429,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         onChange={handleScanImageFile}
       />
 
-      <div className={`relative w-full max-w-lg rounded-3xl border-2 p-4 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto ${
+      <div className={`relative w-full max-w-lg rounded-t-3xl sm:rounded-3xl border-2 p-4 sm:p-6 pb-safe sm:pb-6 shadow-2xl space-y-4 max-h-[92dvh] overflow-y-auto ${
         isLight
           ? "bg-slate-50 border-slate-300 text-slate-900 shadow-slate-200/90"
           : "bg-[#0B132B] border-slate-700 text-slate-100"
@@ -441,17 +441,18 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
             sounds.playClose();
             onClose();
           }}
-          className={`absolute top-4 left-4 p-2 rounded-full transition-all cursor-pointer z-10 ${
+          className={`absolute top-4 left-4 h-11 w-11 rounded-2xl flex items-center justify-center transition-all cursor-pointer z-10 ${
             isLight
               ? "bg-slate-200 hover:bg-slate-300 text-slate-800 border border-slate-300"
               : "bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
           }`}
+          aria-label="إغلاق"
         >
           <X className="h-5 w-5" />
         </button>
 
         {/* Header */}
-        <div className="space-y-1 pr-6">
+        <div className="space-y-1 pl-12">
           <div className="flex items-center gap-2">
             <span className={`flex h-9 w-9 items-center justify-center rounded-2xl border ${
               isLight ? "bg-amber-100 border-amber-300 text-amber-800" : "bg-amber-500/20 text-amber-400"

@@ -251,3 +251,38 @@ html.light ::-webkit-scrollbar-thumb {
   background: rgba(245, 178, 26, 0.6);
 }
 
+/* =========================================================
+   MOBILE-FIRST TOUCH ERGONOMICS & ANTI-ZOOM UTILITIES
+   ========================================================= */
+html,
+body {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+/* Prevent iOS Safari & Android Chrome annoying auto-zoom on form focus */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Safe area insets for notched mobile devices (iPhone Home Indicator / Android Gesture Bar) */
+.pb-safe {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+.mb-safe {
+  margin-bottom: env(safe-area-inset-bottom);
+}
+
+/* Smooth momentum horizontal scrolling on touch devices */
+.touch-scroll-x {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+

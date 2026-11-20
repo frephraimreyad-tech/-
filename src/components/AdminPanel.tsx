@@ -33,6 +33,7 @@ import {
   X,
   CreditCard,
   Link as LinkIcon,
+  Menu,
 } from "lucide-react";
 import type {
   ActivityReason,
@@ -103,6 +104,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
   const [showQRScanner, setShowQRScanner] = useState<boolean | string>(false);
   const [activeQRModalEvent, setActiveQRModalEvent] = useState<EventSession | null>(null);
   const [previewingCardMember, setPreviewingCardMember] = useState<CustomMember | null>(null);
+  const [showMobilePanelDrawer, setShowMobilePanelDrawer] = useState(false);
   const [photoTargetMember, setPhotoTargetMember] = useState<CustomMember | null>(null);
 
   // Store data
@@ -741,34 +743,49 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
   }, [data.auditLogs, auditFilterAction]);
 
   return (
-    <div className="min-h-screen bg-[#070A1E] text-slate-100 p-4 sm:p-6 lg:p-8 font-arabic" dir="rtl">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <div className="min-h-screen bg-[#070A1E] text-slate-100 p-3 sm:p-6 lg:p-8 pb-28 md:pb-12 font-arabic" dir="rtl">
+      <div className="max-w-5xl mx-auto space-y-5 sm:space-y-6">
         {/* Header Bar */}
-        <div className="rounded-3xl border border-slate-800 bg-[#0B132B]/90 backdrop-blur-xl p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                sounds.playClose();
-                onBackToScoreboard();
-              }}
-              className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs sm:text-sm border border-slate-700 shadow-sm active:scale-95 transition-all cursor-pointer"
-            >
-              <ArrowRight className="h-4 w-4" />
-              <span>العودة لشاشة العرض الكبرى 📺</span>
-            </button>
+        <div className="rounded-3xl border border-slate-800 bg-[#0B132B]/90 backdrop-blur-xl p-3.5 sm:p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center justify-between md:justify-start gap-2.5 sm:gap-3 w-full md:w-auto">
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              <button
+                onClick={() => {
+                  sounds.playClose();
+                  onBackToScoreboard();
+                }}
+                className="flex items-center justify-center gap-1.5 min-h-[44px] px-3 sm:px-4 py-2 rounded-2xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs sm:text-sm border border-slate-700 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
+              >
+                <ArrowRight className="h-4 w-4" />
+                <span className="hidden sm:inline">العودة لشاشة العرض الكبرى 📺</span>
+                <span className="sm:hidden">رجوع</span>
+              </button>
 
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black text-white">
-                لوحة تحكم وإدارة السكور بورد
-              </h1>
-              <p className="text-xs text-slate-400">
-                {data.config.meetingName} • {data.config.seasonName}
-              </p>
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-2xl font-black text-white truncate">
+                  الإعدادات الشاملة والإدارة
+                </h1>
+                <p className="text-[11px] sm:text-xs text-slate-400 truncate">
+                  {data.config.meetingName} • {data.config.seasonName}
+                </p>
+              </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                sounds.playTap();
+                setShowMobilePanelDrawer(true);
+              }}
+              className="md:hidden h-11 w-11 rounded-2xl bg-slate-800 border border-slate-700 text-amber-300 flex items-center justify-center shrink-0 active:scale-95 cursor-pointer"
+              aria-label="فتح قائمة الإعدادات"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
           </div>
 
-          {/* User Profile & Actions */}
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* User Profile & Actions (Desktop) */}
+          <div className="hidden md:flex items-center gap-2 flex-wrap">
             <button
               type="button"
               onClick={() => {
@@ -865,8 +882,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
           </div>
         )}
 
-        {/* Tab Navigation */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
+        {/* Tab Navigation (Desktop horizontal bar; mobile uses Bottom Nav + Drawer) */}
+        <div className="hidden md:flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar touch-scroll-x">
           <button
             onClick={() => {
               sounds.playTap();
@@ -2072,49 +2089,80 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                     لا يوجد حضور مسجل بعد. استخدم زر «مسح QR للحضور» لتسجيل الحضور وتوثيق النقاط تلقائياً!
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-slate-800 overflow-hidden bg-slate-900/60">
-                    <div className="overflow-x-auto max-h-80">
-                      <table className="w-full text-right text-xs">
-                        <thead className="bg-slate-950 text-slate-400 text-[11px] font-bold border-b border-slate-800 sticky top-0">
-                          <tr>
-                            <th className="p-3">العضو الحاضر</th>
-                            <th className="p-3">الفريق</th>
-                            <th className="p-3">الفعالية</th>
-                            <th className="p-3">تاريخ ووقت المسح</th>
-                            <th className="p-3">النقاط المرصودة</th>
-                            <th className="p-3">المسؤول عن المسح</th>
-                            <th className="p-3">حالة الأمان</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800/80">
-                          {data.attendance.map((rec) => {
-                            const timeObj = formatArabicTimestamp(rec.scannedAt);
-                            return (
-                              <tr key={rec.id} className="hover:bg-slate-800/50 transition-colors">
-                                <td className="p-3 font-bold text-white whitespace-nowrap">{rec.memberName}</td>
-                                <td className="p-3 text-slate-300 whitespace-nowrap">{rec.teamName}</td>
-                                <td className="p-3 text-teal-300 font-medium whitespace-nowrap">{rec.eventTitle}</td>
-                                <td className="p-3 text-slate-400 font-mono whitespace-nowrap">
-                                  {timeObj.dateStr} {timeObj.timeStr}
-                                </td>
-                                <td className="p-3 whitespace-nowrap">
-                                  <span className="px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold font-mono">
-                                    +{rec.pointsAwarded} XP
-                                  </span>
-                                </td>
-                                <td className="p-3 text-slate-400 whitespace-nowrap">{rec.scannedByUserName}</td>
-                                <td className="p-3 whitespace-nowrap">
-                                  <span className="px-2 py-0.5 rounded-full bg-emerald-950/60 border border-emerald-500/40 text-[10px] text-emerald-400 font-bold">
-                                    موثّق وغير مكرر ✓
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                  <>
+                    {/* Mobile Stacked Cards (md:hidden) */}
+                    <div className="md:hidden space-y-2.5 max-h-[60vh] overflow-y-auto">
+                      {data.attendance.map((rec) => {
+                        const timeObj = formatArabicTimestamp(rec.scannedAt);
+                        return (
+                          <div
+                            key={`mob-att-${rec.id}`}
+                            className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="text-sm font-black text-white truncate">{rec.memberName}</div>
+                                <div className="text-[11px] text-slate-400 truncate">{rec.teamName}</div>
+                              </div>
+                              <span className="px-2.5 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-black font-mono text-xs shrink-0">
+                                +{rec.pointsAwarded} XP
+                              </span>
+                            </div>
+                            <div className="text-xs text-teal-300 font-bold">{rec.eventTitle}</div>
+                            <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400 pt-1.5 border-t border-slate-800">
+                              <span>بواسطة: {rec.scannedByUserName}</span>
+                              <span className="font-mono">{timeObj.dateStr} {timeObj.timeStr}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  </div>
+
+                    {/* Desktop Table (hidden md:block) */}
+                    <div className="hidden md:block rounded-2xl border border-slate-800 overflow-hidden bg-slate-900/60">
+                      <div className="overflow-x-auto max-h-80">
+                        <table className="w-full text-right text-xs">
+                          <thead className="bg-slate-950 text-slate-400 text-[11px] font-bold border-b border-slate-800 sticky top-0">
+                            <tr>
+                              <th className="p-3">العضو الحاضر</th>
+                              <th className="p-3">الفريق</th>
+                              <th className="p-3">الفعالية</th>
+                              <th className="p-3">تاريخ ووقت المسح</th>
+                              <th className="p-3">النقاط المرصودة</th>
+                              <th className="p-3">المسؤول عن المسح</th>
+                              <th className="p-3">حالة الأمان</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/80">
+                            {data.attendance.map((rec) => {
+                              const timeObj = formatArabicTimestamp(rec.scannedAt);
+                              return (
+                                <tr key={rec.id} className="hover:bg-slate-800/50 transition-colors">
+                                  <td className="p-3 font-bold text-white whitespace-nowrap">{rec.memberName}</td>
+                                  <td className="p-3 text-slate-300 whitespace-nowrap">{rec.teamName}</td>
+                                  <td className="p-3 text-teal-300 font-medium whitespace-nowrap">{rec.eventTitle}</td>
+                                  <td className="p-3 text-slate-400 font-mono whitespace-nowrap">
+                                    {timeObj.dateStr} {timeObj.timeStr}
+                                  </td>
+                                  <td className="p-3 whitespace-nowrap">
+                                    <span className="px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold font-mono">
+                                      +{rec.pointsAwarded} XP
+                                    </span>
+                                  </td>
+                                  <td className="p-3 text-slate-400 whitespace-nowrap">{rec.scannedByUserName}</td>
+                                  <td className="p-3 whitespace-nowrap">
+                                    <span className="px-2 py-0.5 rounded-full bg-emerald-950/60 border border-emerald-500/40 text-[10px] text-emerald-400 font-bold">
+                                      موثّق وغير مكرر ✓
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -2163,7 +2211,58 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                   </span>
                 </div>
 
-                <div className="rounded-2xl border border-slate-800 overflow-hidden bg-slate-900/60">
+                {/* Mobile Stacked Cards for Member Permissions (md:hidden) */}
+                <div className="md:hidden space-y-2.5 max-h-[60vh] overflow-y-auto">
+                  {data.members.map((m) => {
+                    const team = data.teams.find((t) => t.id === m.teamId);
+                    const perms = m.permissions || getRoleDefaultPermissions(m.role);
+                    return (
+                      <div
+                        key={`mob-perm-${m.id}`}
+                        className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-sm font-black text-white truncate">{m.name}</div>
+                            <div className="text-[11px] text-slate-400 truncate">{team?.name || "بدون فريق"}</div>
+                          </div>
+                          <span className="font-mono px-2.5 py-1 rounded-xl bg-slate-950 border border-slate-800 text-amber-300 font-black text-xs shrink-0">
+                            PIN: {m.accessCode || "1234"}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
+                          <span className={`px-2 py-0.5 rounded-lg border ${
+                            perms.canAwardPoints ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300" : "bg-slate-800 border-slate-700 text-slate-500"
+                          }`}>
+                            {perms.canAwardPoints ? "✓" : "🔒"} رصد نقاط
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-lg border ${
+                            perms.canScanAttendance ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300" : "bg-slate-800 border-slate-700 text-slate-500"
+                          }`}>
+                            {perms.canScanAttendance ? "✓" : "🔒"} مسح QR
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-lg border ${
+                            perms.canEditTeams ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300" : "bg-slate-800 border-slate-700 text-slate-500"
+                          }`}>
+                            {perms.canEditTeams ? "✓" : "🔒"} تعديل الفرق
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditMemberPerms(m)}
+                          className="w-full min-h-[42px] rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-300 border border-amber-500/30 text-xs font-black transition-all cursor-pointer"
+                        >
+                          تعديل الكود والصلاحيات 🔑
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop Table (hidden md:block) */}
+                <div className="hidden md:block rounded-2xl border border-slate-800 overflow-hidden bg-slate-900/60">
                   <div className="overflow-x-auto max-h-96">
                     <table className="w-full text-right text-xs">
                       <thead className="bg-slate-950 text-slate-400 text-[11px] font-bold border-b border-slate-800 sticky top-0">
@@ -2336,82 +2435,122 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                     لا توجد سجلات مطابقة للفلتر المحدد.
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-slate-800 overflow-hidden bg-slate-900/60">
-                    <div className="overflow-x-auto max-h-80">
-                      <table className="w-full text-right text-xs">
-                        <thead className="bg-slate-950 text-slate-400 text-[11px] font-bold border-b border-slate-800 sticky top-0">
-                          <tr>
-                            <th className="p-3">التاريخ والوقت</th>
-                            <th className="p-3">المستخدم المنفذ</th>
-                            <th className="p-3">نوع العملية</th>
-                            <th className="p-3">المستهدف</th>
-                            <th className="p-3">تفاصيل العملية</th>
-                            <th className="p-3">حالة العملية</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800/80">
-                          {filteredAuditLogs.map((log) => {
-                            const timeObj = formatArabicTimestamp(log.timestamp);
-                            const isDenied = log.status === "denied";
-                            return (
-                              <tr
-                                key={log.id}
-                                className={`transition-colors ${
-                                  isDenied ? "bg-rose-950/20 hover:bg-rose-950/30" : "hover:bg-slate-800/40"
+                  <>
+                    {/* Mobile Stacked Cards for Audit Logs (md:hidden) */}
+                    <div className="md:hidden space-y-2.5 max-h-[60vh] overflow-y-auto">
+                      {filteredAuditLogs.map((log) => {
+                        const timeObj = formatArabicTimestamp(log.timestamp);
+                        const isDenied = log.status === "denied";
+                        return (
+                          <div
+                            key={`mob-audit-${log.id}`}
+                            className={`p-3.5 rounded-2xl border space-y-2 ${
+                              isDenied
+                                ? "bg-rose-950/30 border-rose-500/40"
+                                : "bg-slate-900/90 border-slate-800"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm font-black text-white truncate">{log.userName}</span>
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-black border shrink-0 ${
+                                  isDenied
+                                    ? "bg-rose-500/20 border-rose-500/40 text-rose-400"
+                                    : "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
                                 }`}
                               >
-                                <td className="p-3 text-slate-400 font-mono whitespace-nowrap">
-                                  {timeObj.dateStr} {timeObj.timeStr}
-                                </td>
-                                <td className="p-3 font-bold text-white whitespace-nowrap">
-                                  {log.userName}
-                                  <span className="text-[10px] text-slate-400 block font-normal">
-                                    {log.userRole === "admin" ? "مدير نظام" : log.userRole === "leader" ? "قائد مجموعة" : "عضو"}
-                                  </span>
-                                </td>
-                                <td className="p-3 whitespace-nowrap">
-                                  <span
-                                    className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                                      log.action === "award_points"
-                                        ? "bg-amber-500/15 border-amber-500/30 text-amber-300"
-                                        : log.action === "attendance_scan"
-                                        ? "bg-teal-500/15 border-teal-500/30 text-teal-300"
-                                        : log.action === "security_block"
-                                        ? "bg-rose-500/20 border-rose-500/40 text-rose-300 font-black"
-                                        : "bg-slate-800 border-slate-700 text-slate-300"
-                                    }`}
-                                  >
-                                    {log.action === "award_points"
-                                      ? "رصد نقاط"
-                                      : log.action === "attendance_scan"
-                                      ? "حضور QR"
-                                      : log.action === "security_block"
-                                      ? "حظر أمني"
-                                      : log.action === "permission_change"
-                                      ? "تعديل صلاحيات"
-                                      : log.action}
-                                  </span>
-                                </td>
-                                <td className="p-3 text-slate-300 whitespace-nowrap">{log.targetName}</td>
-                                <td className="p-3 text-slate-300 min-w-[200px]">{log.details}</td>
-                                <td className="p-3 whitespace-nowrap">
-                                  <span
-                                    className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${
-                                      isDenied
-                                        ? "bg-rose-500/20 border-rose-500/40 text-rose-400"
-                                        : "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
-                                    }`}
-                                  >
-                                    {isDenied ? "مرفوضة أمنياً ✕" : "ناجحة مصرح بها ✓"}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                                {isDenied ? "مرفوضة ✕" : "ناجحة ✓"}
+                              </span>
+                            </div>
+                            <div className="text-xs font-bold text-amber-300">{log.targetName}</div>
+                            <p className="text-xs text-slate-300 leading-relaxed">{log.details}</p>
+                            <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1.5 border-t border-slate-800/70">
+                              <span>{log.action}</span>
+                              <span className="font-mono">{timeObj.dateStr} {timeObj.timeStr}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  </div>
+
+                    {/* Desktop Audit Table (hidden md:block) */}
+                    <div className="hidden md:block rounded-2xl border border-slate-800 overflow-hidden bg-slate-900/60">
+                      <div className="overflow-x-auto max-h-80">
+                        <table className="w-full text-right text-xs">
+                          <thead className="bg-slate-950 text-slate-400 text-[11px] font-bold border-b border-slate-800 sticky top-0">
+                            <tr>
+                              <th className="p-3">التاريخ والوقت</th>
+                              <th className="p-3">المستخدم المنفذ</th>
+                              <th className="p-3">نوع العملية</th>
+                              <th className="p-3">المستهدف</th>
+                              <th className="p-3">تفاصيل العملية</th>
+                              <th className="p-3">حالة العملية</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/80">
+                            {filteredAuditLogs.map((log) => {
+                              const timeObj = formatArabicTimestamp(log.timestamp);
+                              const isDenied = log.status === "denied";
+                              return (
+                                <tr
+                                  key={log.id}
+                                  className={`transition-colors ${
+                                    isDenied ? "bg-rose-950/20 hover:bg-rose-950/30" : "hover:bg-slate-800/40"
+                                  }`}
+                                >
+                                  <td className="p-3 text-slate-400 font-mono whitespace-nowrap">
+                                    {timeObj.dateStr} {timeObj.timeStr}
+                                  </td>
+                                  <td className="p-3 font-bold text-white whitespace-nowrap">
+                                    {log.userName}
+                                    <span className="text-[10px] text-slate-400 block font-normal">
+                                      {log.userRole === "admin" ? "مدير نظام" : log.userRole === "leader" ? "قائد مجموعة" : "عضو"}
+                                    </span>
+                                  </td>
+                                  <td className="p-3 whitespace-nowrap">
+                                    <span
+                                      className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                        log.action === "award_points"
+                                          ? "bg-amber-500/15 border-amber-500/30 text-amber-300"
+                                          : log.action === "attendance_scan"
+                                          ? "bg-teal-500/15 border-teal-500/30 text-teal-300"
+                                          : log.action === "security_block"
+                                          ? "bg-rose-500/20 border-rose-500/40 text-rose-300 font-black"
+                                          : "bg-slate-800 border-slate-700 text-slate-300"
+                                      }`}
+                                    >
+                                      {log.action === "award_points"
+                                        ? "رصد نقاط"
+                                        : log.action === "attendance_scan"
+                                        ? "حضور QR"
+                                        : log.action === "security_block"
+                                        ? "حظر أمني"
+                                        : log.action === "permission_change"
+                                        ? "تعديل صلاحيات"
+                                        : log.action}
+                                    </span>
+                                  </td>
+                                  <td className="p-3 text-slate-300 whitespace-nowrap">{log.targetName}</td>
+                                  <td className="p-3 text-slate-300 min-w-[200px]">{log.details}</td>
+                                  <td className="p-3 whitespace-nowrap">
+                                    <span
+                                      className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${
+                                        isDenied
+                                          ? "bg-rose-500/20 border-rose-500/40 text-rose-400"
+                                          : "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
+                                      }`}
+                                    >
+                                      {isDenied ? "مرفوضة أمنياً ✕" : "ناجحة مصرح بها ✓"}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -2878,6 +3017,73 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
               </form>
             </div>
 
+            {/* QR Scan Time Controls & Admin Lock/Open */}
+            <div className="rounded-3xl border border-slate-800 bg-[#0B132B]/80 p-5 sm:p-7 shadow-xl space-y-4">
+              <h3 className="text-base font-bold text-teal-300 flex items-center gap-2">
+                <Camera className="h-5 w-5 text-teal-400" />
+                <span>إدارة ومراقبة مواعيد مسح كود الحضور (QR Code)</span>
+              </h3>
+              <p className="text-xs text-slate-400">
+                تحكم كامل في مواعيد فتح وغلق نافذة تسجيل الحضور تلقائياً (الافتتاحي: يوم الجمعة من 5 م حتى غلقها تلقائياً الساعة 7 م).
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-300 block">موعد فتح مسح الـ QR (افتتاحي يوم الجمعة):</label>
+                  <input
+                    type="time"
+                    value={meetingConfig.qrScanOpenTime || "17:00"}
+                    onChange={(e) => setMeetingConfig({ ...meetingConfig, qrScanOpenTime: e.target.value })}
+                    className="w-full h-11 px-4 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-teal-400 font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-300 block">موعد غلق مسح الـ QR تلقائياً (الجمعة 7:00 م):</label>
+                  <input
+                    type="time"
+                    value={meetingConfig.qrScanCloseTime || "19:00"}
+                    onChange={(e) => setMeetingConfig({ ...meetingConfig, qrScanCloseTime: e.target.value })}
+                    className="w-full h-11 px-4 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-teal-400 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-4 pt-2">
+                <label className="flex items-center gap-2 cursor-pointer bg-slate-900 px-4 py-2.5 rounded-xl border border-slate-700 text-xs text-white font-bold">
+                  <input
+                    type="checkbox"
+                    checked={!!meetingConfig.isQrScanManuallyLocked}
+                    onChange={(e) => setMeetingConfig({ ...meetingConfig, isQrScanManuallyLocked: e.target.checked, isQrScanManuallyOpened: e.target.checked ? false : meetingConfig.isQrScanManuallyOpened })}
+                    className="rounded accent-rose-500 w-4 h-4"
+                  />
+                  <span>إغلاق المسح يدوياً طوارئ (Lock QR)</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer bg-slate-900 px-4 py-2.5 rounded-xl border border-slate-700 text-xs text-white font-bold">
+                  <input
+                    type="checkbox"
+                    checked={!!meetingConfig.isQrScanManuallyOpened}
+                    onChange={(e) => setMeetingConfig({ ...meetingConfig, isQrScanManuallyOpened: e.target.checked, isQrScanManuallyLocked: e.target.checked ? false : meetingConfig.isQrScanManuallyLocked })}
+                    className="rounded accent-emerald-500 w-4 h-4"
+                  />
+                  <span>فتح المسح استثناءً بغض النظر عن الوقت (Force Open)</span>
+                </label>
+              </div>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  await meetingStore.updateConfig(meetingConfig);
+                  sounds.playVictory();
+                  showFeedback("تم حفظ إعدادات مواعيد مسح الـ QR بنجاح! ⚡");
+                }}
+                className="px-6 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-sm transition-all cursor-pointer shadow-md"
+              >
+                حفظ إعدادات مواعيد الـ QR 💾
+              </button>
+            </div>
+
             {/* Backup & Tools */}
             <div className="rounded-3xl border border-slate-800 bg-[#0B132B]/80 p-5 sm:p-7 shadow-xl space-y-4">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -3284,6 +3490,201 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
             setPhotoTargetMember(null);
           }}
         />
+      )}
+
+      {/* ========================================================= */}
+      {/* MOBILE FIXED BOTTOM NAVIGATION BAR (ADVANCED PANEL)       */}
+      {/* ========================================================= */}
+      <nav
+        aria-label="تنقل الإعدادات الشاملة للموبايل"
+        className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t-2 border-slate-800 bg-[#070A1E]/95 backdrop-blur-xl pb-safe shadow-[0_-10px_30px_rgba(0,0,0,0.6)]"
+      >
+        <div className="grid grid-cols-5 h-16 max-w-md mx-auto px-1">
+          <button
+            type="button"
+            onClick={() => {
+              sounds.playTap();
+              setActiveTab("quick_score");
+            }}
+            className={`flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+              activeTab === "quick_score" ? "text-amber-400 font-black" : "text-slate-400"
+            }`}
+          >
+            <Zap className="h-5 w-5" />
+            <span className="text-[10px] leading-none">نقاط</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              sounds.playTap();
+              setActiveTab("members");
+            }}
+            className={`flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+              activeTab === "members" ? "text-sky-400 font-black" : "text-slate-400"
+            }`}
+          >
+            <Users className="h-5 w-5" />
+            <span className="text-[10px] leading-none">الأعضاء</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              sounds.playTap();
+              setActiveTab("events");
+            }}
+            className={`flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+              activeTab === "events" ? "text-teal-400 font-black" : "text-slate-400"
+            }`}
+          >
+            <QrCode className="h-5 w-5" />
+            <span className="text-[10px] leading-none">الفعاليات</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              sounds.playTap();
+              setActiveTab("settings");
+            }}
+            className={`flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+              activeTab === "settings" ? "text-emerald-400 font-black" : "text-slate-400"
+            }`}
+          >
+            <Settings className="h-5 w-5" />
+            <span className="text-[10px] leading-none">إعدادات</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              sounds.playTap();
+              setShowMobilePanelDrawer(true);
+            }}
+            className={`flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+              ["teams", "permissions", "log"].includes(activeTab) ? "text-purple-400 font-black" : "text-slate-400"
+            }`}
+          >
+            <Menu className="h-5 w-5" />
+            <span className="text-[10px] leading-none">المزيد</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* ========================================================= */}
+      {/* MOBILE SLIDE-OVER DRAWER FOR ADVANCED ADMIN PANEL         */}
+      {/* ========================================================= */}
+      {showMobilePanelDrawer && (
+        <div className="md:hidden fixed inset-0 z-[120] flex justify-start" dir="rtl">
+          <div
+            onClick={() => setShowMobilePanelDrawer(false)}
+            className="fixed inset-0 bg-black/75 backdrop-blur-sm"
+          />
+          <aside className="relative z-10 w-[85vw] max-w-xs h-full overflow-y-auto p-5 pb-safe bg-[#0B132B] border-l-2 border-slate-800 text-slate-100 flex flex-col gap-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <div className="text-sm font-black text-white">أقسام الإدارة الشاملة</div>
+                <div className="text-[11px] text-slate-400">{currentUser.name} ({currentUser.roleLabel})</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMobilePanelDrawer(false)}
+                className="h-11 w-11 rounded-2xl bg-slate-800 text-slate-200 flex items-center justify-center cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  setActiveTab("teams");
+                  setShowMobilePanelDrawer(false);
+                }}
+                className={`w-full min-h-[46px] px-4 rounded-2xl border font-bold text-sm flex items-center gap-3 cursor-pointer ${
+                  activeTab === "teams" ? "bg-amber-500 text-slate-950 border-amber-400 font-black" : "bg-slate-900 border-slate-800 text-slate-200"
+                }`}
+              >
+                <Shield className="h-5 w-5 shrink-0" />
+                <span>إدارة الفرق ({data.teams.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  setActiveTab("permissions");
+                  setShowMobilePanelDrawer(false);
+                }}
+                className={`w-full min-h-[46px] px-4 rounded-2xl border font-bold text-sm flex items-center gap-3 cursor-pointer ${
+                  activeTab === "permissions" ? "bg-purple-600 text-white border-purple-400 font-black" : "bg-slate-900 border-slate-800 text-slate-200"
+                }`}
+              >
+                <ShieldCheck className="h-5 w-5 shrink-0" />
+                <span>الصلاحيات والأمان والـ PIN</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  setActiveTab("log");
+                  setShowMobilePanelDrawer(false);
+                }}
+                className={`w-full min-h-[46px] px-4 rounded-2xl border font-bold text-sm flex items-center gap-3 cursor-pointer ${
+                  activeTab === "log" ? "bg-cyan-500 text-slate-950 border-cyan-400 font-black" : "bg-slate-900 border-slate-800 text-slate-200"
+                }`}
+              >
+                <Clock className="h-5 w-5 shrink-0" />
+                <span>سجل المعاملات ({data.transactions.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  setShowMobilePanelDrawer(false);
+                  setShowQRScanner(true);
+                }}
+                className="w-full min-h-[46px] px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black text-sm flex items-center gap-3 cursor-pointer"
+              >
+                <Camera className="h-5 w-5 shrink-0" />
+                <span>مسح QR للحضور 📱</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playTap();
+                  setShowMobilePanelDrawer(false);
+                  setShowUserSwitcher(true);
+                }}
+                className="w-full min-h-[46px] px-4 rounded-2xl bg-slate-900 border border-amber-500/40 text-amber-300 font-bold text-sm flex items-center gap-3 cursor-pointer"
+              >
+                <KeyRound className="h-5 w-5 shrink-0" />
+                <span>تبديل المستخدم النشط 🔑</span>
+              </button>
+            </div>
+
+            <div className="mt-auto pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playClose();
+                  setShowMobilePanelDrawer(false);
+                  onBackToScoreboard();
+                }}
+                className="w-full min-h-[46px] px-4 rounded-2xl bg-amber-500 text-slate-950 font-black text-sm flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <ArrowRight className="h-4 w-4" />
+                <span>العودة للوحة الرئيسية</span>
+              </button>
+            </div>
+          </aside>
+        </div>
       )}
     </div>
   );
