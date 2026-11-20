@@ -56,6 +56,7 @@ import { DailyChallengeBanner } from "./DailyChallengeBanner";
 import { TeamsProgressionChart } from "./TeamsProgressionChart";
 import { MeetingCountdownTimer } from "./MeetingCountdownTimer";
 import { TeamsManagementModal } from "./TeamsManagementModal";
+import { MemberTransactionsModal } from "./MemberTransactionsModal";
 
 export interface TopRankChangeToast {
   id: string;
@@ -82,6 +83,7 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
   const [isLoading, setIsLoading] = useState(meetingStore.getIsLoading());
   const [currentUser, setCurrentUser] = useState<SystemUser>(authStore.getCurrentUser());
   const [selectedTeam, setSelectedTeam] = useState<ProcessedMeetingTeam | null>(null);
+  const [statementMember, setStatementMember] = useState<CustomMember | null>(null);
   const [photoUploadTeam, setPhotoUploadTeam] = useState<ProcessedMeetingTeam | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -1049,7 +1051,7 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="ابحث عن اسم فريق أو قائد أو شعار بسرعة..."
+                placeholder="ابحث عن فريق أو اسم عضو (مثلاً: مايكل عماد) لمعرفة تفاصيل نقاطه..."
                 className={`w-full min-h-[44px] h-11 pr-10 pl-10 rounded-2xl border-2 text-sm transition-colors shadow-xs focus:outline-none ${
                   isLight
                     ? "bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-amber-500"
@@ -1121,6 +1123,62 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
               </button>
             </div>
           </div>
+
+          {/* Instant Member Search Results Strip (Direct access to any member's XP statement) */}
+          {searchQuery.trim().length > 0 && (() => {
+            const q = searchQuery.trim().toLowerCase();
+            const matchedMembers = data.members
+              .filter((m) => m.name.toLowerCase().includes(q))
+              .sort((a, b) => b.points - a.points)
+              .slice(0, 6);
+
+            if (matchedMembers.length === 0) return null;
+
+            return (
+              <div className={`mt-3 pt-3 border-t space-y-2 ${isLight ? "border-slate-200" : "border-slate-800/80"}`}>
+                <div className="flex items-center justify-between gap-2 text-[11px] font-black">
+                  <span className={isLight ? "text-amber-700" : "text-amber-300"}>
+                    👤 أعضاء مطابقون للبحث ({matchedMembers.length}) — اضغط على أي اسم لمعرفة كشف نقاطه:
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {matchedMembers.map((m) => {
+                    const mTeam = data.teams.find((t) => t.id === m.teamId);
+                    return (
+                      <button
+                        key={`search-member-${m.id}`}
+                        type="button"
+                        onClick={() => {
+                          sounds.playOpen();
+                          setStatementMember(m);
+                        }}
+                        className={`min-h-[46px] px-3 py-2 rounded-2xl border flex items-center justify-between gap-2 text-right transition-all cursor-pointer active:scale-[0.98] ${
+                          isLight
+                            ? "bg-amber-50/70 hover:bg-amber-100 border-amber-300 text-slate-900"
+                            : "bg-slate-900/90 hover:bg-amber-500/15 border-amber-500/30 hover:border-amber-400 text-white"
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className="text-xs sm:text-sm font-black truncate">{m.name}</div>
+                          <div className={`text-[10px] truncate ${isLight ? "text-slate-600" : "text-slate-400"}`}>
+                            {mTeam ? `${mTeam.icon} ${mTeam.name}` : "عضو"}
+                          </div>
+                        </div>
+                        <div className="shrink-0 flex items-center gap-1.5">
+                          <span className="px-2 py-0.5 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-400 font-mono text-xs font-black">
+                            {m.points} XP
+                          </span>
+                          <span className={`text-[10px] font-black ${isLight ? "text-sky-700" : "text-sky-400"}`}>
+                            كشف ↗
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
         </header>
 
         {/* Meeting Countdown Timer (الوقت المتبقي على انتهاء اجتماع الشباب 2026) ⏳ */}
@@ -2592,6 +2650,15 @@ export const Top10Scoreboard: React.FC<Top10ScoreboardProps> = ({ onReturnToWelc
           ))}
         </AnimatePresence>
       </div>
+
+      {/* Individual Member Point Breakdown Modal */}
+      {statementMember && (
+        <MemberTransactionsModal
+          member={statementMember}
+          team={data.teams.find((t) => t.id === statementMember.teamId)}
+          onClose={() => setStatementMember(null)}
+        />
+      )}
     </div>
   );
 };

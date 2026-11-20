@@ -29,13 +29,14 @@ import { authStore, type SystemUser } from "../utils/authStore";
 import { QRScannerModal } from "./QRScannerModal";
 import { TeamPhotoModal } from "./TeamPhotoModal";
 import { AdminPhotoUploadModal } from "./AdminPhotoUploadModal";
+import { MemberTransactionsModal } from "./MemberTransactionsModal";
 
 interface TeamModalProps {
   team: ProcessedMeetingTeam | null;
   onClose: () => void;
 }
 
-export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
+export const TeamModal: React.FC<TeamModalProps> = ({ team: teamProp, onClose }) => {
   const [currentUser, setCurrentUser] = useState<SystemUser>(authStore.getCurrentUser());
 
   const isPublicDisplayMode = useMemo(() => {
@@ -63,57 +64,58 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
   const [showAddMemberForm, setShowAddMemberForm] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [photoTargetMember, setPhotoTargetMember] = useState<CustomMember | null>(null);
+  const [statementMember, setStatementMember] = useState<CustomMember | null>(null);
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberRole, setNewMemberRole] = useState<RoleType>("member");
 
+  const [storeTick, setStoreTick] = useState(0);
+
   useEffect(() => {
-    const unsub = authStore.subscribe(() => {
+    const unsubAuth = authStore.subscribe(() => {
       setCurrentUser(authStore.getCurrentUser());
     });
-    return unsub;
+    const unsubStore = meetingStore.subscribe(() => {
+      setStoreTick((t) => t + 1);
+    });
+    return () => {
+      unsubAuth();
+      unsubStore();
+    };
   }, []);
 
-  const activityReasons = useMemo(() => meetingStore.getActivityReasons(), [showQuickForm]);
-  const teamTransactions = useMemo(() => (team ? meetingStore.getTeamTransactions(team.id) : []), [team, toastMsg]);
+  const team = useMemo(() => {
+    if (!teamProp) return null;
+    return meetingStore.getProcessedTeams().find((t) => t.id === teamProp.id) || teamProp;
+  }, [teamProp, storeTick]);
 
-  const attendanceBonusTotal = useMemo(() => {
-    if (!team) return 0;
-    const attendance = meetingStore.getData().attendance || [];
-    const eventIds = Array.from(new Set(attendance.map(a => a.eventId)));
-    const teamMembers = team.members || [];
-    const totalRegistered = teamMembers.length;
-    if (totalRegistered === 0) return 0;
+  const activityReasons = useMemo(() => meetingStore.getActivityReasons(), [showQuickForm, storeTick]);
+  const teamTransactions = useMemo(
+    () => (team ? meetingStore.getTeamTransactions(team.id) : []),
+    [team, toastMsg, storeTick]
+  );
 
-    const teamMemberIds = new Set(teamMembers.map(m => m.id));
-    let total = 0;
-    eventIds.forEach(eventId => {
-      const actualPresent = attendance.filter(a => a.eventId === eventId && teamMemberIds.has(a.memberId)).length;
-      const rate = (actualPresent / totalRegistered) * 100;
-      if (rate >= 60) {
-        total += 100;
-      } else {
-        total += Math.round(rate);
-      }
-    });
-    return total;
-  }, [team]);
+  const attendanceBonusTotal = team?.attendanceXpBonus ?? 0;
 
   const manualBonusTotal = useMemo(() => {
     if (!team) return 0;
-    const manualTxs = teamTransactions.filter(tx => !tx.reason.includes("تسجيل حضور"));
-    return manualTxs.reduce((sum, tx) => sum + tx.points, 0);
+    const manualTxs = teamTransactions.filter(
+      (tx) =>
+        !tx.reason.includes("تسجيل حضور") &&
+        !(tx.category === "حضور والتزام" && tx.targetType === "member" && tx.reason.includes("حضور"))
+    );
+    return manualTxs.reduce((sum, tx) => sum + (Number(tx.points) || 0), 0);
   }, [team, teamTransactions]);
 
   const lastAttendanceDate = useMemo(() => {
     if (!team) return "لا يوجد تسجيل حضور سابق";
     const attendance = meetingStore.getData().attendance || [];
     const teamMembers = team.members || [];
-    const teamMemberIds = new Set(teamMembers.map(m => m.id));
-    const teamAttendance = attendance.filter(a => teamMemberIds.has(a.memberId) || a.teamId === team.id);
+    const teamMemberIds = new Set(teamMembers.map((m) => m.id));
+    const teamAttendance = attendance.filter((a) => teamMemberIds.has(a.memberId) || a.teamId === team.id);
     if (teamAttendance.length === 0) return "لا يوجد تسجيل حضور سابق";
     teamAttendance.sort((a, b) => new Date(b.scannedAt).getTime() - new Date(a.scannedAt).getTime());
     return formatArabicTimestamp(teamAttendance[0].scannedAt).fullDate;
-  }, [team]);
+  }, [team, storeTick]);
 
   // Auto idle countdown timer
   useEffect(() => {
@@ -904,15 +906,27 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                               </div>
 
                               <div className="flex items-center gap-2 shrink-0">
-                                <div className="text-left" dir="ltr">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    sounds.playOpen();
+                                    setStatementMember(member);
+                                  }}
+                                  className="text-left px-2.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 hover:border-amber-400 transition-all cursor-pointer active:scale-95 group/xp"
+                                  dir="ltr"
+                                  title={`عرض كشف معاملات وتفاصيل نقاط ${member.name}`}
+                                >
                                   <div className="flex items-center gap-1 text-amber-400">
                                     <span className="text-[10px] font-bold text-amber-500/70 font-arabic">XP</span>
                                     <span className="text-sm sm:text-base font-black font-mono leading-none">
                                       {member.points.toLocaleString("en-US")}
                                     </span>
                                   </div>
-                                  <div className="text-[8px] text-slate-500 font-bold text-right" dir="rtl">نقاط القائد</div>
-                                </div>
+                                  <div className="text-[9px] text-amber-300/90 group-hover/xp:text-amber-200 font-bold text-right flex items-center justify-end gap-0.5 mt-0.5" dir="rtl">
+                                    <History className="h-2.5 w-2.5" />
+                                    <span>التفاصيل</span>
+                                  </div>
+                                </button>
 
                                 {!isPublicDisplayMode && currentUser.permissions.canAwardPoints && (
                                   <button
@@ -1033,15 +1047,27 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                               </div>
 
                               <div className="flex items-center gap-2 shrink-0">
-                                <div className="text-left" dir="ltr">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    sounds.playOpen();
+                                    setStatementMember(member);
+                                  }}
+                                  className="text-left px-2.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 hover:border-amber-400 transition-all cursor-pointer active:scale-95 group/xp"
+                                  dir="ltr"
+                                  title={`عرض كشف معاملات وتفاصيل نقاط ${member.name}`}
+                                >
                                   <div className="flex items-center gap-1 text-amber-400">
                                     <span className="text-[10px] font-bold text-amber-500/70 font-arabic">XP</span>
                                     <span className="text-sm sm:text-base font-black font-mono leading-none">
                                       {member.points.toLocaleString("en-US")}
                                     </span>
                                   </div>
-                                  <div className="text-[8px] text-slate-500 font-bold text-right" dir="rtl">نقاط الخادم</div>
-                                </div>
+                                  <div className="text-[9px] text-amber-300/90 group-hover/xp:text-amber-200 font-bold text-right flex items-center justify-end gap-0.5 mt-0.5" dir="rtl">
+                                    <History className="h-2.5 w-2.5" />
+                                    <span>التفاصيل</span>
+                                  </div>
+                                </button>
 
                                 {!isPublicDisplayMode && currentUser.permissions.canAwardPoints && (
                                   <button
@@ -1159,15 +1185,27 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                               </div>
 
                               <div className="flex items-center gap-2 shrink-0">
-                                <div className="text-left" dir="ltr">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    sounds.playOpen();
+                                    setStatementMember(member);
+                                  }}
+                                  className="text-left px-2.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 hover:border-amber-400 transition-all cursor-pointer active:scale-95 group/xp"
+                                  dir="ltr"
+                                  title={`عرض كشف معاملات وتفاصيل نقاط ${member.name}`}
+                                >
                                   <div className="flex items-center gap-1 text-amber-400">
                                     <span className="text-[10px] font-bold text-amber-500/70 font-arabic">XP</span>
                                     <span className="text-sm sm:text-base font-black font-mono leading-none">
                                       {member.points.toLocaleString("en-US")}
                                     </span>
                                   </div>
-                                  <div className="text-[8px] text-slate-500 font-bold text-right" dir="rtl">نقاط العضو</div>
-                                </div>
+                                  <div className="text-[9px] text-amber-300/90 group-hover/xp:text-amber-200 font-bold text-right flex items-center justify-end gap-0.5 mt-0.5" dir="rtl">
+                                    <History className="h-2.5 w-2.5" />
+                                    <span>التفاصيل</span>
+                                  </div>
+                                </button>
 
                                 {!isPublicDisplayMode && currentUser.permissions.canAwardPoints && (
                                   <button
@@ -1285,15 +1323,27 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0">
-                            <div className="text-left" dir="ltr">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                sounds.playOpen();
+                                setStatementMember(member);
+                              }}
+                              className="text-left px-2.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 hover:border-amber-400 transition-all cursor-pointer active:scale-95 group/xp"
+                              dir="ltr"
+                              title={`عرض كشف معاملات وتفاصيل نقاط ${member.name}`}
+                            >
                               <div className="flex items-center gap-1 text-amber-400">
                                 <span className="text-[10px] font-bold text-amber-500/70 font-arabic">XP</span>
                                 <span className="text-sm sm:text-base font-black font-mono leading-none">
                                   {member.points.toLocaleString("en-US")}
                                 </span>
                               </div>
-                              <div className="text-[8px] text-slate-500 font-bold text-right" dir="rtl">نقاط العضو</div>
-                            </div>
+                              <div className="text-[9px] text-amber-300/90 group-hover/xp:text-amber-200 font-bold text-right flex items-center justify-end gap-0.5 mt-0.5" dir="rtl">
+                                <History className="h-2.5 w-2.5" />
+                                <span>التفاصيل</span>
+                              </div>
+                            </button>
 
                             {!isPublicDisplayMode && currentUser.permissions.canAwardPoints && (
                               <button
@@ -1365,15 +1415,28 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
                         >
                           <div className="space-y-1 min-w-0 flex-1">
                             <div className="flex items-center gap-2 flex-wrap text-xs">
-                              <span
-                                className={`px-2 py-0.5 rounded-md font-bold text-[11px] ${
-                                  isTeamTarget
-                                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                                    : "bg-sky-500/20 text-sky-300 border border-sky-500/30"
-                                }`}
-                              >
-                                {isTeamTarget ? "🏆 الفريق بالكامل" : `👤 ${tx.targetName}`}
-                              </span>
+                              {isTeamTarget ? (
+                                <span className="px-2 py-0.5 rounded-md font-bold text-[11px] bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                  🏆 الفريق بالكامل
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const targetMember =
+                                      team.members.find((m) => m.id === tx.targetId) ||
+                                      meetingStore.getData().members.find((m) => m.id === tx.targetId);
+                                    if (targetMember) {
+                                      sounds.playOpen();
+                                      setStatementMember(targetMember);
+                                    }
+                                  }}
+                                  className="px-2 py-0.5 rounded-md font-bold text-[11px] bg-sky-500/20 hover:bg-sky-500/35 text-sky-300 border border-sky-500/30 cursor-pointer transition-colors"
+                                  title="اضغط لعرض كشف معاملات هذا العضو بالكامل"
+                                >
+                                  👤 {tx.targetName} ↗
+                                </button>
+                              )}
 
                               <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-purple-300 border border-purple-500/20">
                                 {tx.category || "عام"}
@@ -1458,6 +1521,15 @@ export const TeamModal: React.FC<TeamModalProps> = ({ team, onClose }) => {
               setTimeout(() => setToastMsg(null), 3500);
               setPhotoTargetMember(null);
             }}
+          />
+        )}
+
+        {/* Member Itemized Transactions Statement Modal */}
+        {statementMember && (
+          <MemberTransactionsModal
+            member={statementMember}
+            team={team}
+            onClose={() => setStatementMember(null)}
           />
         )}
       </div>

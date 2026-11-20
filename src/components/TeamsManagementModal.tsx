@@ -267,41 +267,6 @@ export const TeamsManagementModal: React.FC<TeamsManagementModalProps> = ({
     }
   };
 
-  // Populate standard 10 teams if less than 10
-  const handlePopulateStandard10 = async () => {
-    setIsSubmitting(true);
-    try {
-      const standard10 = [
-        { name: "فريق مارمرقس", icon: "🦁", color: "#EAB308", slogan: "كاروز الديار المصرية", leaderName: "أنطونيوس إدوار", initialPoints: 1250 },
-        { name: "فريق أثناسيوس", icon: "⚔️", color: "#3B82F6", slogan: "حامي الإيمان المستقيم", leaderName: "مينا شهيد", initialPoints: 1120 },
-        { name: "فريق الأنبا شنودة", icon: "📜", color: "#10B981", slogan: "رئيس المتوحدين", leaderName: "د. مينا ماهر", initialPoints: 980 },
-        { name: "فريق أمير الشهداء مارجرجس", icon: "🛡️", color: "#EF4444", slogan: "سريع الندهة والبطل المغوار", leaderName: "بيشوي عاطف", initialPoints: 940 },
-        { name: "فريق الأنبا بيشوي", icon: "🕊️", color: "#06B6D4", slogan: "الرجل الكامل وحبيب مخلصنا الصالح", leaderName: "فادي سامح", initialPoints: 890 },
-        { name: "فريق الأمير تادرس", icon: "🏹", color: "#8B5CF6", slogan: "قائد جند المسيح الأمين", leaderName: "كيرلس مجدي", initialPoints: 830 },
-        { name: "فريق البابا كيرلس", icon: "⛵", color: "#EC4899", slogan: "كن مطمئناً جداً جداً", leaderName: "مارك رأفت", initialPoints: 790 },
-        { name: "فريق الشهيد أبي سيفين", icon: "👑", color: "#F97316", slogan: "حامل السيفين الغالب بالصليب", leaderName: "يوسف مجدي", initialPoints: 750 },
-        { name: "فريق الأنبا أنطونيوس", icon: "🔥", color: "#6366F1", slogan: "أب جميع الرهبان وكوكب البرية", leaderName: "مينا عادل", initialPoints: 710 },
-        { name: "فريق القديسة دميانة", icon: "🌟", color: "#14B8A6", slogan: "عفيفة وقوية مع الأربعين عذراء", leaderName: "مارينا سامي", initialPoints: 680 },
-      ];
-
-      let added = 0;
-      for (const t of standard10) {
-        if (!data.teams.some((existing) => existing.name.includes(t.name) || t.name.includes(existing.name))) {
-          if (data.teams.length + added < 10) {
-            await meetingStore.addTeam(t, currentUser);
-            added++;
-          }
-        }
-      }
-      sounds.playVictory();
-      showToast(`تم استكمال الـ 10 فرق النموذجية بنجاح! تم إضافة ${added} فرق جديدة. 🏆`, "success");
-    } catch {
-      showToast("تعذر استكمال الفرق", "error");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   return (
     <div
       className="fixed inset-0 z-[220] flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-md overflow-y-auto"
@@ -388,19 +353,6 @@ export const TeamsManagementModal: React.FC<TeamsManagementModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            {totalTeamsCount < 10 && (
-              <button
-                type="button"
-                onClick={handlePopulateStandard10}
-                disabled={isSubmitting}
-                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 font-black text-xs shadow-md shadow-teal-500/20 hover:from-teal-400 hover:to-emerald-400 transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
-                title="إضافة الفرق المتبقية لتكتمل الـ 10 فرق النموذجية بأسماء القديسين"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>استكمال الـ 10 فرق تلقائياً</span>
-              </button>
-            )}
-
             <button
               type="button"
               onClick={handleOpenAdd}

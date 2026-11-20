@@ -1,19 +1,15 @@
-import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  onAuthStateChanged, 
-  User
-} from 'firebase/auth';
-import firebaseConfig from '../../firebase-applet-config.json';
+import {
+  signInWithPopup,
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  User,
+} from "firebase/auth";
+import { auth } from "./firebase";
 import type { CustomMember, MemberPermissions, RoleType } from "../types";
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
-googleProvider.addScope('https://www.googleapis.com/auth/spreadsheets');
-googleProvider.addScope('https://www.googleapis.com/auth/drive.file');
+googleProvider.addScope("https://www.googleapis.com/auth/spreadsheets");
+googleProvider.addScope("https://www.googleapis.com/auth/drive.file");
 
 export interface SystemUser {
   id: string;

@@ -21,6 +21,7 @@ import {
   Copy,
   ExternalLink,
   Shield,
+  Lock,
 } from "lucide-react";
 import type { CustomMember, EventSession, ProcessedMeetingTeam } from "../types";
 import { meetingStore } from "../utils/meetingStore";
@@ -44,7 +45,40 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
 }) => {
   const { isLight } = useTheme();
   const [currentUser, setCurrentUser] = useState<SystemUser>(authStore.getCurrentUser());
-  const data = meetingStore.getData();
+  const [data, setData] = useState(meetingStore.getData());
+  const [now, setNow] = useState<Date>(() => new Date());
+
+  // Subscribe to store updates (so Firestore schedule/lock toggles reflect live)
+  useEffect(() => {
+    const unsub = meetingStore.subscribe(() => {
+      setData(meetingStore.getData());
+    });
+    return unsub;
+  }, []);
+
+  // Tick every second to automatically open at Friday 5:00 PM and lock at Friday 7:00 PM sharp
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(new Date());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const qrStatus = React.useMemo(() => {
+    return meetingStore.getQRScanStatus(now);
+  }, [now, data.config]);
+
+  const countdownInfo = React.useMemo(() => {
+    const targetMs = qrStatus.isOpen && qrStatus.closeDate
+      ? qrStatus.closeDate.getTime()
+      : qrStatus.nextOpenDate.getTime();
+    const diffSec = Math.max(0, Math.floor((targetMs - now.getTime()) / 1000));
+    const days = Math.floor(diffSec / 86400);
+    const hours = Math.floor((diffSec % 86400) / 3600);
+    const minutes = Math.floor((diffSec % 3600) / 60);
+    const seconds = diffSec % 60;
+    return { days, hours, minutes, seconds };
+  }, [now, qrStatus]);
 
   // Auto-bound Friday meeting session from device date
   const autoFriday = React.useMemo(() => {
@@ -188,7 +222,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   }, []);
 
   useEffect(() => {
-    if (scanMode === "camera") {
+    if (scanMode === "camera" && qrStatus.isOpen) {
       const timer = setTimeout(() => {
         startLiveScanner();
       }, 300);
@@ -196,7 +230,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     } else {
       stopLiveScanner();
     }
-  }, [scanMode]);
+  }, [scanMode, qrStatus.isOpen]);
 
   // Start Live Camera QR Stream
   const startLiveScanner = async () => {
@@ -468,6 +502,99 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
           </p>
         </div>
 
+        {/* 0. STRICT FRIDAY 5 PM - 7 PM SCHEDULE STATUS BANNER */}
+        {qrStatus.isOpen ? (
+          <div className="p-3.5 rounded-2xl bg-emerald-950/75 border-2 border-emerald-500/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-md">
+            <div className="flex items-start gap-2.5">
+              <span className="h-8 w-8 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black shrink-0 mt-0.5">
+                <CheckCircle className="h-5 w-5" />
+              </span>
+              <div className="space-y-0.5">
+                <div className="text-xs sm:text-sm font-black text-emerald-300 flex items-center gap-1.5 flex-wrap">
+                  <span>🟢 {qrStatus.title}</span>
+                  <span className="px-2 py-0.5 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-[10px] font-mono text-emerald-200">
+                    كل جمعة {qrStatus.openTimeAr} – {qrStatus.closeTimeAr}
+                  </span>
+                </div>
+                <p className="text-[11px] text-emerald-100/90 leading-relaxed">
+                  {qrStatus.message}
+                </p>
+              </div>
+            </div>
+            {qrStatus.reason === "open_scheduled" && qrStatus.closeDate && (
+              <div className="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-emerald-500/40 text-center shrink-0">
+                <div className="text-[10px] text-emerald-300 font-bold">يُغلق تلقائياً خلال</div>
+                <div className="font-mono text-sm font-black text-white" dir="ltr">
+                  {String(countdownInfo.hours).padStart(2, "0")}:{String(countdownInfo.minutes).padStart(2, "0")}:{String(countdownInfo.seconds).padStart(2, "0")}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-5 rounded-3xl bg-gradient-to-b from-rose-950/90 via-slate-900 to-slate-950 border-2 border-rose-500/60 text-center space-y-4 shadow-2xl">
+            <div className="mx-auto h-16 w-16 rounded-2xl bg-rose-500/20 border-2 border-rose-500/50 flex items-center justify-center text-rose-400 shadow-lg shadow-rose-500/20">
+              <Lock className="h-8 w-8" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h4 className="text-lg sm:text-xl font-black text-white">
+                🔒 {qrStatus.title}
+              </h4>
+              <p className="text-xs sm:text-sm text-rose-200/95 leading-relaxed max-w-md mx-auto">
+                {qrStatus.message}
+              </p>
+            </div>
+
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-amber-500/15 border border-amber-400/40 text-amber-300 text-xs font-black">
+              <Clock className="h-4 w-4 shrink-0" />
+              <span>مواعيد المسح: كل يوم جمعة من {qrStatus.openTimeAr} إلى {qrStatus.closeTimeAr} فقط</span>
+            </div>
+
+            {qrStatus.reason !== "closed_manual" && (
+              <div className="space-y-1.5 pt-1">
+                <div className="text-[11px] font-bold text-slate-400">
+                  الوقت المتبقي على فتح مسح الـ QR (الجمعة القادمة الساعة {qrStatus.openTimeAr}):
+                </div>
+                <div className="grid grid-cols-4 gap-2 max-w-xs mx-auto" dir="ltr">
+                  {[
+                    { label: "يوم", val: countdownInfo.days },
+                    { label: "ساعة", val: countdownInfo.hours },
+                    { label: "دقيقة", val: countdownInfo.minutes },
+                    { label: "ثانية", val: countdownInfo.seconds },
+                  ].map((unit) => (
+                    <div
+                      key={unit.label}
+                      className="p-2 rounded-xl bg-slate-950/90 border border-slate-800 flex flex-col items-center"
+                    >
+                      <span className="font-mono text-base sm:text-lg font-black text-amber-300">
+                        {String(unit.val).padStart(2, "0")}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-bold" dir="rtl">
+                        {unit.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                stopLiveScanner();
+                sounds.playClose();
+                onClose();
+              }}
+              className="w-full min-h-[46px] rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-black text-sm border border-slate-700 transition-all cursor-pointer active:scale-95"
+            >
+              حسناً، إغلاق النافذة
+            </button>
+          </div>
+        )}
+
+        {/* Active Scanner Content (Only rendered when QR Scan Window is OPEN) */}
+        {qrStatus.isOpen && (
+          <>
         {/* 1. AUTO-LINKED FRIDAY BANNER (DEVICE DATE) */}
         <div className="p-3.5 rounded-2xl bg-gradient-to-r from-teal-500/20 via-emerald-500/15 to-teal-500/20 border-2 border-teal-500/50 space-y-2 shadow-md">
           <div className="flex items-start justify-between gap-3">
@@ -1164,6 +1291,8 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
             يتم التحقق تلقائياً من منع تكرار الحضور للعضو في نفس الفعالية، واحتساب النقاط فورياً.
           </span>
         </div>
+          </>
+        )}
 
         {/* Bonus Guide Modal */}
         {showBonusGuide && (

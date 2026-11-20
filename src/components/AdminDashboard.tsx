@@ -35,7 +35,7 @@ import {
   Upload,
   Menu,
 } from "lucide-react";
-import type { CustomTeam, ProcessedMeetingTeam, ScoreTransaction } from "../types";
+import type { CustomMember, CustomTeam, ProcessedMeetingTeam, ScoreTransaction } from "../types";
 import { meetingStore } from "../utils/meetingStore";
 import { authStore, SUPER_ADMIN_USER, type SystemUser } from "../utils/authStore";
 import { sounds } from "../utils/soundEffects";
@@ -53,6 +53,7 @@ import { TeamsManagementModal } from "./TeamsManagementModal";
 import { AdminSideActivityWidget } from "./AdminSideActivityWidget";
 import { AttendanceManagementTab } from "./AttendanceManagementTab";
 import { LiveDuelMode } from "./LiveDuelMode";
+import { MemberTransactionsModal } from "./MemberTransactionsModal";
 
 interface AdminDashboardProps {
   onBackToScoreboard: () => void;
@@ -107,6 +108,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
   const [showAdminPhotoModal, setShowAdminPhotoModal] = useState<boolean>(false);
   const [showTeamsManagementModal, setShowTeamsManagementModal] = useState<boolean>(false);
   const [showMobileDrawer, setShowMobileDrawer] = useState<boolean>(false);
+  const [selectedStatementMember, setSelectedStatementMember] = useState<CustomMember | null>(null);
+  const [historyMemberQuery, setHistoryMemberQuery] = useState<string>("");
 
   // Navigation Tabs in Admin Dashboard
   const [activeTab, setActiveTab] = useState<"teams" | "quick_points" | "attendance" | "duel" | "progression" | "security" | "history">(
@@ -211,10 +214,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
   }, [processedTeams, teamSearch]);
 
   // Statistics
-  const totalTeams = data.teams.length;
+  const totalTeams = processedTeams.length;
   const totalPoints = useMemo(() => {
-    return data.teams.reduce((acc, t) => acc + (t.points || 0), 0);
-  }, [data.teams]);
+    return processedTeams.reduce((acc, t) => acc + (t.points || 0), 0);
+  }, [processedTeams]);
   const topTeam = processedTeams[0];
   const avgPoints = totalTeams > 0 ? Math.round(totalPoints / totalTeams) : 0;
 
@@ -2431,6 +2434,91 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
               </div>
             </div>
 
+            {/* Individual Member Point Statement Finder */}
+            <div className="p-4 rounded-2xl bg-gradient-to-l from-amber-500/10 via-slate-900/90 to-slate-900 border border-amber-500/30 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-sm font-black text-amber-300 flex items-center gap-2">
+                    <Search className="h-4 w-4 text-amber-400" />
+                    <span>كشف معاملات فرد معين (اعرف كل نقطة جت منين)</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    ابحث باسم أي عضو (مثل: مايكل عماد) واضغط عليه لعرض كشف تفصيلي لمصدر كل نقطة (حضور QR + فردي + حصة الفريق)
+                  </p>
+                </div>
+                {historyMemberQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setHistoryMemberQuery("")}
+                    className="self-start sm:self-center text-xs px-2.5 py-1 rounded-xl bg-slate-800 text-slate-300 hover:text-white border border-slate-700 cursor-pointer"
+                  >
+                    مسح البحث
+                  </button>
+                )}
+              </div>
+
+              <div className="relative">
+                <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={historyMemberQuery}
+                  onChange={(e) => setHistoryMemberQuery(e.target.value)}
+                  placeholder="اكتب اسم العضو أو القائد هنا للبحث السريع..."
+                  className="w-full min-h-[44px] pr-10 pl-4 rounded-xl bg-slate-950/90 border border-slate-700 focus:border-amber-400 text-white text-sm outline-none"
+                />
+              </div>
+
+              {(() => {
+                const q = historyMemberQuery.trim().toLowerCase();
+                const matchingMembers = [...data.members]
+                  .filter((m) => !q || m.name.toLowerCase().includes(q))
+                  .sort((a, b) => b.points - a.points)
+                  .slice(0, q ? 12 : 6);
+
+                if (matchingMembers.length === 0) {
+                  return (
+                    <div className="text-xs text-slate-400 py-2 text-center">
+                      لا يوجد عضو بهذا الاسم "{historyMemberQuery}".
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {matchingMembers.map((member) => {
+                      const memberTeam = data.teams.find((t) => t.id === member.teamId);
+                      return (
+                        <button
+                          key={`lookup-${member.id}`}
+                          type="button"
+                          onClick={() => {
+                            sounds.playOpen();
+                            setSelectedStatementMember(member);
+                          }}
+                          className="min-h-[48px] p-2.5 rounded-xl bg-slate-950/80 hover:bg-amber-500/15 border border-slate-800 hover:border-amber-400/60 flex items-center justify-between gap-2 text-right transition-all cursor-pointer active:scale-[0.98]"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-xs sm:text-sm font-black text-white truncate">
+                              {member.name}
+                            </div>
+                            <div className="text-[10px] text-slate-400 truncate">
+                              {memberTeam ? `${memberTeam.icon} ${memberTeam.name}` : "بدون فريق"}
+                            </div>
+                          </div>
+                          <div className="shrink-0 flex items-center gap-1.5">
+                            <span className="px-2 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 font-mono text-xs font-black">
+                              {member.points} XP
+                            </span>
+                            <span className="text-[10px] font-bold text-sky-400">كشف ↗</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
             {data.transactions.length === 0 ? (
               <div className="py-12 text-center text-slate-400 text-xs">
                 لا توجد معاملات مسجلة بعد. عند تحديث نقاط أي فريق ستظهر تفاصيلها هنا فوراً.
@@ -2439,45 +2527,66 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
               <>
                 {/* Mobile Stacked Cards View (md:hidden) */}
                 <div className="md:hidden space-y-2.5 max-h-[60vh] overflow-y-auto pr-0.5">
-                  {data.transactions.slice(0, 50).map((tx) => (
-                    <div
-                      key={`mob-tx-${tx.id}`}
-                      className={`p-3.5 rounded-2xl border space-y-2 ${
-                        isLight
-                          ? "bg-white border-slate-200 shadow-xs"
-                          : "bg-slate-900/80 border-slate-800"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className={`text-sm font-black truncate ${isLight ? "text-slate-900" : "text-white"}`}>
-                          {tx.targetName}
-                        </span>
-                        <span
-                          className={`px-2.5 py-1 rounded-xl font-mono text-xs font-black shrink-0 ${
-                            tx.points > 0
-                              ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                              : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
-                          }`}
-                        >
-                          {tx.points > 0 ? `+${tx.points}` : tx.points} XP
-                        </span>
+                  {data.transactions.slice(0, 50).map((tx) => {
+                    const matchedMember =
+                      tx.targetType === "member"
+                        ? data.members.find((m) => m.id === tx.targetId)
+                        : undefined;
+                    return (
+                      <div
+                        key={`mob-tx-${tx.id}`}
+                        className={`p-3.5 rounded-2xl border space-y-2 ${
+                          isLight
+                            ? "bg-white border-slate-200 shadow-xs"
+                            : "bg-slate-900/80 border-slate-800"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          {matchedMember ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                sounds.playOpen();
+                                setSelectedStatementMember(matchedMember);
+                              }}
+                              className={`text-sm font-black truncate underline decoration-amber-400/60 underline-offset-4 cursor-pointer text-right ${
+                                isLight ? "text-amber-700" : "text-amber-300"
+                              }`}
+                            >
+                              👤 {tx.targetName} ↗
+                            </button>
+                          ) : (
+                            <span className={`text-sm font-black truncate ${isLight ? "text-slate-900" : "text-white"}`}>
+                              {tx.targetName}
+                            </span>
+                          )}
+                          <span
+                            className={`px-2.5 py-1 rounded-xl font-mono text-xs font-black shrink-0 ${
+                              tx.points > 0
+                                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                                : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
+                            }`}
+                          >
+                            {tx.points > 0 ? `+${tx.points}` : tx.points} XP
+                          </span>
+                        </div>
+                        <p className={`text-xs leading-relaxed ${isLight ? "text-slate-700" : "text-slate-300"}`}>
+                          {tx.reason}
+                        </p>
+                        <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400 pt-1.5 border-t border-slate-800/40">
+                          <span>المنفذ: {tx.executorName || "المسؤول"}</span>
+                          <span className="font-mono">
+                            {new Date(tx.timestamp).toLocaleString("ar-EG", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              day: "numeric",
+                              month: "short",
+                            })}
+                          </span>
+                        </div>
                       </div>
-                      <p className={`text-xs leading-relaxed ${isLight ? "text-slate-700" : "text-slate-300"}`}>
-                        {tx.reason}
-                      </p>
-                      <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400 pt-1.5 border-t border-slate-800/40">
-                        <span>المنفذ: {tx.executorName || "المسؤول"}</span>
-                        <span className="font-mono">
-                          {new Date(tx.timestamp).toLocaleString("ar-EG", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            day: "numeric",
-                            month: "short",
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Desktop Table View (hidden md:block) */}
@@ -2494,38 +2603,58 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/80">
-                        {data.transactions.slice(0, 50).map((tx) => (
-                          <tr key={tx.id} className="hover:bg-slate-800/40 transition-colors">
-                            <td className="p-3 text-slate-400 font-mono whitespace-nowrap">
-                              {new Date(tx.timestamp).toLocaleString("ar-EG", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                                day: "numeric",
-                                month: "short",
-                              })}
-                            </td>
-                            <td className="p-3 font-bold text-white whitespace-nowrap">
-                              {tx.targetName}
-                            </td>
-                            <td className="p-3 whitespace-nowrap">
-                              <span
-                                className={`px-2 py-0.5 rounded font-mono font-bold ${
-                                  tx.points > 0
-                                    ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                                    : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
-                                }`}
-                              >
-                                {tx.points > 0 ? `+${tx.points}` : tx.points} XP
-                              </span>
-                            </td>
-                            <td className="p-3 text-slate-300 min-w-[180px]">
-                              {tx.reason}
-                            </td>
-                            <td className="p-3 text-slate-400 whitespace-nowrap">
-                              {tx.executorName || "المسؤول"}
-                            </td>
-                          </tr>
-                        ))}
+                        {data.transactions.slice(0, 50).map((tx) => {
+                          const matchedMember =
+                            tx.targetType === "member"
+                              ? data.members.find((m) => m.id === tx.targetId)
+                              : undefined;
+                          return (
+                            <tr key={tx.id} className="hover:bg-slate-800/40 transition-colors">
+                              <td className="p-3 text-slate-400 font-mono whitespace-nowrap">
+                                {new Date(tx.timestamp).toLocaleString("ar-EG", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  day: "numeric",
+                                  month: "short",
+                                })}
+                              </td>
+                              <td className="p-3 font-bold text-white whitespace-nowrap">
+                                {matchedMember ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      sounds.playOpen();
+                                      setSelectedStatementMember(matchedMember);
+                                    }}
+                                    className="text-amber-300 hover:text-amber-200 underline decoration-amber-400/60 underline-offset-4 cursor-pointer"
+                                    title={`عرض كشف معاملات ${tx.targetName}`}
+                                  >
+                                    👤 {tx.targetName} ↗
+                                  </button>
+                                ) : (
+                                  tx.targetName
+                                )}
+                              </td>
+                              <td className="p-3 whitespace-nowrap">
+                                <span
+                                  className={`px-2 py-0.5 rounded font-mono font-bold ${
+                                    tx.points > 0
+                                      ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                                      : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
+                                  }`}
+                                >
+                                  {tx.points > 0 ? `+${tx.points}` : tx.points} XP
+                                </span>
+                              </td>
+                              <td className="p-3 text-slate-300 min-w-[180px]">
+                                {tx.reason}
+                              </td>
+                              <td className="p-3 text-slate-400 whitespace-nowrap">
+                                {tx.executorName || "المسؤول"}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -3603,6 +3732,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
             </div>
           </aside>
         </div>
+      )}
+
+      {/* Member Itemized Transactions Statement Modal */}
+      {selectedStatementMember && (
+        <MemberTransactionsModal
+          member={selectedStatementMember}
+          team={data.teams.find((t) => t.id === selectedStatementMember.teamId)}
+          onClose={() => setSelectedStatementMember(null)}
+        />
       )}
     </div>
   );

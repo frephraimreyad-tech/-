@@ -20,16 +20,26 @@ export interface FridayMeetingInfo {
 }
 
 /**
+ * Formats a Date into local YYYY-MM-DD (prevents UTC midnight date shifts in Cairo/Egypt timezone)
+ */
+export function formatLocalDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/**
  * Generates all Friday dates for a given year (defaults to 2026)
  */
 export function generateSeasonFridays(year = 2026): FridayMeetingInfo[] {
   const fridays: FridayMeetingInfo[] = [];
   const now = new Date();
-  const todayStr = now.toISOString().slice(0, 10);
+  const todayStr = formatLocalDate(now);
 
   // Find start of current week's Friday
   const currentWeekFriday = getFridayOfWeek(now);
-  const currentWeekFridayStr = currentWeekFriday.toISOString().slice(0, 10);
+  const currentWeekFridayStr = formatLocalDate(currentWeekFriday);
 
   // Iterate from Jan 1st to Dec 31st
   const d = new Date(year, 0, 1);
@@ -38,7 +48,7 @@ export function generateSeasonFridays(year = 2026): FridayMeetingInfo[] {
   while (d.getFullYear() === year) {
     if (d.getDay() === 5) {
       // 5 = Friday
-      const dateStr = d.toISOString().slice(0, 10);
+      const dateStr = formatLocalDate(d);
       const isToday = dateStr === todayStr;
       const isCurrentWeek = dateStr === currentWeekFridayStr;
       const isPast = dateStr < todayStr;
@@ -105,14 +115,14 @@ export function getFridayOfWeek(date: Date = new Date()): Date {
 }
 
 /**
- * Returns the nearest Friday (today if Friday, else upcoming Friday)
+ * Returns the nearest Friday (today if Friday, else upcoming Friday) using local timezone
  */
 export function getCurrentOrNearestFridayDate(): string {
   const now = new Date();
   const day = now.getDay(); // 0: Sun, 1: Mon, 2: Tue, 3: Wed, 4: Thu, 5: Fri, 6: Sat
   const result = new Date(now);
   if (day === 5) {
-    return result.toISOString().slice(0, 10);
+    return formatLocalDate(result);
   }
   if (day < 5) {
     // Sun to Thu: Friday of this week
@@ -121,7 +131,7 @@ export function getCurrentOrNearestFridayDate(): string {
     // Saturday (6): Friday of next week (+6 days)
     result.setDate(result.getDate() + 6);
   }
-  return result.toISOString().slice(0, 10);
+  return formatLocalDate(result);
 }
 
 /**

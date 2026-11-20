@@ -56,6 +56,7 @@ import { QRScannerModal } from "./QRScannerModal";
 import { UserSwitcherModal } from "./UserSwitcherModal";
 import { MemberCard } from "./MemberCard";
 import { AdminPhotoUploadModal } from "./AdminPhotoUploadModal";
+import { MemberTransactionsModal } from "./MemberTransactionsModal";
 import { compressImageFile } from "../utils/imageCompressor";
 
 interface AdminPanelProps {
@@ -106,6 +107,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
   const [previewingCardMember, setPreviewingCardMember] = useState<CustomMember | null>(null);
   const [showMobilePanelDrawer, setShowMobilePanelDrawer] = useState(false);
   const [photoTargetMember, setPhotoTargetMember] = useState<CustomMember | null>(null);
+  const [statementTargetMember, setStatementTargetMember] = useState<CustomMember | null>(null);
 
   // Store data
   const [data, setData] = useState(meetingStore.getData());
@@ -1767,10 +1769,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                       </div>
 
                       <div className="flex flex-col items-end gap-1.5 shrink-0">
-                          <span className="text-xs font-black font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
-                            {m.points} XP
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sounds.playOpen();
+                              setStatementTargetMember(m);
+                            }}
+                            className="text-xs font-black font-mono text-amber-300 bg-amber-500/15 hover:bg-amber-500/25 px-2.5 py-1 rounded-lg border border-amber-500/35 hover:border-amber-400 transition-all cursor-pointer active:scale-95 flex items-center gap-1"
+                            title={`عرض كشف معاملات ونقاط ${m.name}`}
+                          >
+                            <span>{m.points} XP</span>
+                            <span className="text-[10px] font-sans text-amber-200/90">↗</span>
+                          </button>
                           <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                sounds.playOpen();
+                                setStatementTargetMember(m);
+                              }}
+                              className="p-1.5 rounded-lg bg-slate-800/90 hover:bg-indigo-500 hover:text-white text-indigo-300 border border-indigo-400/30 transition-all cursor-pointer shadow-xs active:scale-90"
+                              title="كشف معاملات ونقاط العضو بالتفصيل"
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                            </button>
                             <button
                               type="button"
                               onClick={() => {
@@ -3019,17 +3041,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
 
             {/* QR Scan Time Controls & Admin Lock/Open */}
             <div className="rounded-3xl border border-slate-800 bg-[#0B132B]/80 p-5 sm:p-7 shadow-xl space-y-4">
-              <h3 className="text-base font-bold text-teal-300 flex items-center gap-2">
-                <Camera className="h-5 w-5 text-teal-400" />
-                <span>إدارة ومراقبة مواعيد مسح كود الحضور (QR Code)</span>
-              </h3>
-              <p className="text-xs text-slate-400">
-                تحكم كامل في مواعيد فتح وغلق نافذة تسجيل الحضور تلقائياً (الافتتاحي: يوم الجمعة من 5 م حتى غلقها تلقائياً الساعة 7 م).
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <h3 className="text-base font-bold text-teal-300 flex items-center gap-2">
+                  <Camera className="h-5 w-5 text-teal-400" />
+                  <span>إدارة ومراقبة مواعيد مسح كود الحضور (QR Code)</span>
+                </h3>
+                {(() => {
+                  const status = meetingStore.getQRScanStatus();
+                  return (
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-black border self-start sm:self-auto ${
+                        status.isOpen
+                          ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300"
+                          : "bg-rose-500/20 border-rose-500/50 text-rose-300"
+                      }`}
+                    >
+                      {status.isOpen ? "🟢 مفتوح الآن" : "🔒 مغلق حالياً"}
+                    </span>
+                  );
+                })()}
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                القاعدة الرسمية: يفتح مسح الـ QR تلقائياً أثناء وقت الاجتماع <strong className="text-teal-300">كل يوم جمعة من الساعة 5:00 م إلى 7:00 م</strong>، وغير ذلك يكون مغلقاً تلقائياً أمام الجميع.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-300 block">موعد فتح مسح الـ QR (افتتاحي يوم الجمعة):</label>
+                  <label className="text-xs font-bold text-slate-300 block">موعد فتح مسح الـ QR (كل جمعة 5:00 م):</label>
                   <input
                     type="time"
                     value={meetingConfig.qrScanOpenTime || "17:00"}
@@ -3039,7 +3077,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-300 block">موعد غلق مسح الـ QR تلقائياً (الجمعة 7:00 م):</label>
+                  <label className="text-xs font-bold text-slate-300 block">موعد غلق مسح الـ QR تلقائياً (كل جمعة 7:00 م):</label>
                   <input
                     type="time"
                     value={meetingConfig.qrScanCloseTime || "19:00"}
@@ -3049,8 +3087,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-4 pt-2">
-                <label className="flex items-center gap-2 cursor-pointer bg-slate-900 px-4 py-2.5 rounded-xl border border-slate-700 text-xs text-white font-bold">
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <label className="flex items-center gap-2 cursor-pointer bg-slate-900 px-4 py-2.5 rounded-xl border border-slate-700 text-xs text-white font-bold min-h-[44px]">
                   <input
                     type="checkbox"
                     checked={!!meetingConfig.isQrScanManuallyLocked}
@@ -3060,7 +3098,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                   <span>إغلاق المسح يدوياً طوارئ (Lock QR)</span>
                 </label>
 
-                <label className="flex items-center gap-2 cursor-pointer bg-slate-900 px-4 py-2.5 rounded-xl border border-slate-700 text-xs text-white font-bold">
+                <label className="flex items-center gap-2 cursor-pointer bg-slate-900 px-4 py-2.5 rounded-xl border border-slate-700 text-xs text-white font-bold min-h-[44px]">
                   <input
                     type="checkbox"
                     checked={!!meetingConfig.isQrScanManuallyOpened}
@@ -3071,17 +3109,39 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
                 </label>
               </div>
 
-              <button
-                type="button"
-                onClick={async () => {
-                  await meetingStore.updateConfig(meetingConfig);
-                  sounds.playVictory();
-                  showFeedback("تم حفظ إعدادات مواعيد مسح الـ QR بنجاح! ⚡");
-                }}
-                className="px-6 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-sm transition-all cursor-pointer shadow-md"
-              >
-                حفظ إعدادات مواعيد الـ QR 💾
-              </button>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await meetingStore.updateConfig(meetingConfig);
+                    sounds.playVictory();
+                    showFeedback("تم حفظ إعدادات مواعيد مسح الـ QR بنجاح! ⚡");
+                  }}
+                  className="min-h-[44px] px-6 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-sm transition-all cursor-pointer shadow-md"
+                >
+                  حفظ إعدادات مواعيد الـ QR 💾
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const strictConfig = {
+                      ...meetingConfig,
+                      qrScanOpenTime: "17:00",
+                      qrScanCloseTime: "19:00",
+                      isQrScanManuallyLocked: false,
+                      isQrScanManuallyOpened: false,
+                    };
+                    setMeetingConfig(strictConfig);
+                    await meetingStore.updateConfig(strictConfig);
+                    sounds.playVictory();
+                    showFeedback("تم ضبط مسح الـ QR تلقائياً: كل جمعة من 5:00 م إلى 7:00 م (ومغلق غير ذلك)! 🔒");
+                  }}
+                  className="min-h-[44px] px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 font-bold text-xs transition-all cursor-pointer"
+                >
+                  ضبط تلقائي (الجمعة 5 – 7 م فقط) 🔄
+                </button>
+              </div>
             </div>
 
             {/* Backup & Tools */}
@@ -3489,6 +3549,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToScoreboard, init
             }));
             setPhotoTargetMember(null);
           }}
+        />
+      )}
+
+      {/* Member Itemized Transactions Statement Modal */}
+      {statementTargetMember && (
+        <MemberTransactionsModal
+          member={statementTargetMember}
+          team={data.teams.find((t) => t.id === statementTargetMember.teamId)}
+          onClose={() => setStatementTargetMember(null)}
         />
       )}
 
