@@ -2393,7 +2393,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    sounds.playTap();
+                    const res = await meetingStore.deduplicateSameDayAttendance(currentUser);
+                    if (res.success) {
+                      sounds.playVictory();
+                      if (res.removedAttendanceCount === 0 && res.removedTransactionsCount === 0) {
+                        showFeedback("سجل المعاملات والحضور نظيف تماماً ولا يوجد أي حضور مكرر في نفس اليوم ✅", "success");
+                      } else {
+                        showFeedback(
+                          `تم حذف ${res.removedAttendanceCount} سجل حضور مكرر و ${res.removedTransactionsCount} معاملة مكررة وتصحيح أرصدة ${res.adjustedMembersCount} عضو (-${res.totalPointsRemoved} XP) بنجاح! 🧹`,
+                          "success"
+                        );
+                      }
+                    } else {
+                      sounds.playClose();
+                      showFeedback(res.error || "فشل تنظيف الحضور المكرر", "error");
+                    }
+                  }}
+                  className="px-3.5 py-2 min-h-[40px] rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs shadow-md shadow-rose-600/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 border border-rose-500/40"
+                  title="حذف أي حضور تم احتسابه مرتين لنفس الشخص في نفس اليوم وتصحيح النقاط فوراً"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  <span>تنظيف الحضور المكرر 🧹</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -2401,7 +2428,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                     exportTransactionsToExcel({ transactions: data.transactions });
                     showFeedback("تم تصدير سجل المعاملات والتاريخ بنجاح إلى ملف Excel! 📊", "success");
                   }}
-                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md shadow-emerald-600/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 border border-emerald-500/40"
+                  className="px-3.5 py-2 min-h-[40px] rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md shadow-emerald-600/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 border border-emerald-500/40"
                   title="تصدير سجل المعاملات والتاريخ إلى Excel"
                 >
                   <Download className="h-4 w-4" />
@@ -2421,14 +2448,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToScoreboa
                       showFeedback(res.error || "فشل استيراد السجلات", "error");
                     }
                   }}
-                  className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs shadow-md shadow-blue-600/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 border border-blue-500/40"
+                  className="px-3.5 py-2 min-h-[40px] rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs shadow-md shadow-blue-600/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 border border-blue-500/40"
                   title="استيراد سجل الجمعة من الصورة وتحديث اللوحة"
                 >
                   <Upload className="h-4 w-4" />
                   <span>استيراد سجل الجمعة 📥</span>
                 </button>
 
-                <span className="px-3 py-1 rounded-full bg-slate-900 border border-slate-700 text-emerald-300 font-mono text-xs font-bold">
+                <span className="px-3 py-1.5 rounded-full bg-slate-900 border border-slate-700 text-emerald-300 font-mono text-xs font-bold">
                   {data.transactions.length} معاملة مسجلة
                 </span>
               </div>

@@ -111,6 +111,8 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
   const fileInputCameraRef = useRef<HTMLInputElement | null>(null);
   const fileInputGalleryRef = useRef<HTMLInputElement | null>(null);
+  const isProcessingScanRef = useRef<boolean>(false);
+  const lastScannedRef = useRef<{ code: string; at: number } | null>(null);
 
   useEffect(() => {
     const unsub = authStore.subscribe(() => {
@@ -177,15 +179,12 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     return data.members.find((m) => m.id === selectedMemberId);
   }, [data.members, selectedMemberId]);
 
-  // Attendance map for the currently selected event
+  // Same-day attendance map (strictly 1 scan per person per calendar day across all events)
   const attendedMemberIdsSet = React.useMemo(() => {
-    if (!currentEvent || !data.attendance) return new Set<string>();
-    return new Set(
-      data.attendance
-        .filter((a) => a.eventId === currentEvent.id)
-        .map((a) => a.memberId)
-    );
-  }, [data.attendance, currentEvent]);
+    if (!currentEvent) return new Set<string>();
+    const dayKey = meetingStore.getEventDayKey(currentEvent);
+    return meetingStore.getAttendedMemberIdsForDay(dayKey);
+  }, [data.attendance, data.transactions, currentEvent]);
 
   // Filtered members list for quick check-in checklist
   const filteredChecklistMembers = React.useMemo(() => {
@@ -256,7 +255,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
             qrbox: { width: 240, height: 240 },
           },
           (decodedText) => {
-            handleProcessQRCode(decodedText);
+            handleProcessQRCode(decodedText, true);
           },
           () => {}
         );
@@ -274,7 +273,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
               qrbox: { width: 240, height: 240 },
             },
             (decodedText) => {
-              handleProcessQRCode(decodedText);
+              handleProcessQRCode(decodedText, true);
             },
             () => {}
           );
@@ -330,9 +329,10 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     }
   };
 
-  // Core Attendance Recording Processor
-  const handleProcessQRCode = async (codeOrId: string) => {
+  // Core Attendance Recording Processor (Protected by in-flight mutex + 4s same-code cooldown)
+  const handleProcessQRCode = async (codeOrId: string, fromCameraStream = false) => {
     let processedCode = (codeOrId || "").trim();
+    if (!processedCode) return;
 
     // If scanned code is a full URL, extract ?code= or &code=
     if (processedCode.includes("?code=") || processedCode.includes("&code=")) {
@@ -342,6 +342,20 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
           processedCode = decodeURIComponent(match[1]).trim();
         }
       } catch {}
+    }
+
+    const normalizedKey = processedCode.toLowerCase();
+    const nowMs = Date.now();
+
+    // Prevent Html5Qrcode (10 FPS) or rapid taps from firing concurrent duplicate calls
+    if (isProcessingScanRef.current) return;
+    if (
+      fromCameraStream &&
+      lastScannedRef.current &&
+      lastScannedRef.current.code === normalizedKey &&
+      nowMs - lastScannedRef.current.at < 4000
+    ) {
+      return;
     }
 
     const targetEventId = selectedEventId || (currentEvent ? currentEvent.id : "");
@@ -355,42 +369,60 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       return;
     }
 
-    // Call meetingStore with optional manual bonus
-    const parsedBonus = Number(manualBonusPoints) || 0;
-    const res = await meetingStore.recordQRAttendance({
-      eventIdOrCode: targetEventId,
-      memberId: processedCode,
-      isPunctual,
-      executor: currentUser,
-      manualBonusPoints: parsedBonus > 0 ? parsedBonus : undefined,
-      manualBonusReason: parsedBonus > 0 ? (manualBonusReason.trim() || undefined) : undefined,
-    });
+    isProcessingScanRef.current = true;
+    lastScannedRef.current = { code: normalizedKey, at: nowMs };
 
-    if (res.success) {
-      sounds.playVictory();
-      setScanResult({
-        type: "success",
-        title: "تم تسجيل الحضور بنجاح! 🎉",
-        message: `العضو: ${res.member?.name} | الفعالية: ${res.event?.title}. تم إضافة +${res.pointsAwarded} XP لرصيده وللفريق.`,
-        points: res.pointsAwarded,
+    try {
+      // Call meetingStore with optional manual bonus
+      const parsedBonus = Number(manualBonusPoints) || 0;
+      const res = await meetingStore.recordQRAttendance({
+        eventIdOrCode: targetEventId,
+        memberId: processedCode,
+        isPunctual,
+        executor: currentUser,
+        manualBonusPoints: parsedBonus > 0 ? parsedBonus : undefined,
+        manualBonusReason: parsedBonus > 0 ? (manualBonusReason.trim() || undefined) : undefined,
       });
 
-      // Clear input
-      setManualCode("");
-    } else {
-      sounds.playClose();
-      setScanResult({
-        type: "error",
-        title: "تعذر تسجيل الحضور",
-        message: res.error || "تأكد من صحة كود العضو أو عدم تكرار تسجيله مسبقاً.",
-      });
+      if (res.success) {
+        sounds.playVictory();
+        setScanResult({
+          type: "success",
+          title: "تم تسجيل الحضور بنجاح! 🎉",
+          message: `العضو: ${res.member?.name} | الفعالية: ${res.event?.title}. تم إضافة +${res.pointsAwarded} XP لرصيده وللفريق.`,
+          points: res.pointsAwarded,
+        });
+
+        // Clear input
+        setManualCode("");
+      } else {
+        sounds.playClose();
+        setScanResult({
+          type: "error",
+          title: "تعذر تسجيل الحضور",
+          message: res.error || "تأكد من صحة كود العضو أو عدم تكرار تسجيله مسبقاً.",
+        });
+      }
+    } finally {
+      isProcessingScanRef.current = false;
     }
   };
 
   // Direct 1-tap Attendance for a specific member
   const handleDirectRegisterMember = async (member: CustomMember) => {
+    if (isProcessingScanRef.current) return;
     sounds.playTap();
     setScanResult(null);
+
+    if (attendedMemberIdsSet.has(member.id)) {
+      sounds.playClose();
+      setScanResult({
+        type: "error",
+        title: "تم تسجيل الحضور اليوم مسبقاً",
+        message: `تم تسجيل حضور (${member.name}) اليوم بالفعل! مسح الـ QR متاح مرة واحدة فقط لكل فرد في اليوم.`,
+      });
+      return;
+    }
 
     const targetEventId = selectedEventId || (currentEvent ? currentEvent.id : "");
     if (!targetEventId) {
@@ -402,31 +434,36 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       return;
     }
 
-    const parsedBonus = Number(manualBonusPoints) || 0;
-    const res = await meetingStore.recordQRAttendance({
-      eventIdOrCode: targetEventId,
-      memberId: member.id,
-      isPunctual,
-      executor: currentUser,
-      manualBonusPoints: parsedBonus > 0 ? parsedBonus : undefined,
-      manualBonusReason: parsedBonus > 0 ? (manualBonusReason.trim() || undefined) : undefined,
-    });
+    isProcessingScanRef.current = true;
+    try {
+      const parsedBonus = Number(manualBonusPoints) || 0;
+      const res = await meetingStore.recordQRAttendance({
+        eventIdOrCode: targetEventId,
+        memberId: member.id,
+        isPunctual,
+        executor: currentUser,
+        manualBonusPoints: parsedBonus > 0 ? parsedBonus : undefined,
+        manualBonusReason: parsedBonus > 0 ? (manualBonusReason.trim() || undefined) : undefined,
+      });
 
-    if (res.success) {
-      sounds.playVictory();
-      setScanResult({
-        type: "success",
-        title: "تم تسجيل الحضور بنجاح! 🎉",
-        message: `العضو: ${res.member?.name} | الفعالية: ${res.event?.title}. تم رصد +${res.pointsAwarded} XP فوراً!`,
-        points: res.pointsAwarded,
-      });
-    } else {
-      sounds.playClose();
-      setScanResult({
-        type: "error",
-        title: "فشل في التسجيل",
-        message: res.error || "حدث خطأ أثناء رصد النقاط.",
-      });
+      if (res.success) {
+        sounds.playVictory();
+        setScanResult({
+          type: "success",
+          title: "تم تسجيل الحضور بنجاح! 🎉",
+          message: `العضو: ${res.member?.name} | الفعالية: ${res.event?.title}. تم رصد +${res.pointsAwarded} XP فوراً!`,
+          points: res.pointsAwarded,
+        });
+      } else {
+        sounds.playClose();
+        setScanResult({
+          type: "error",
+          title: "فشل في التسجيل",
+          message: res.error || "حدث خطأ أثناء رصد النقاط.",
+        });
+      }
+    } finally {
+      isProcessingScanRef.current = false;
     }
   };
 

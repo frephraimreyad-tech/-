@@ -146,6 +146,12 @@ class MeetingStore {
   private listeners: Set<() => void> = new Set();
   private initialized: boolean = false;
   private isLoading: boolean = true;
+  private pendingScanKeys: Set<string> = new Set();
+  private hasLoadedTeams: boolean = false;
+  private hasLoadedMembers: boolean = false;
+  private hasLoadedAttendance: boolean = false;
+  private hasLoadedTransactions: boolean = false;
+  private hasRunAutoDedupe: boolean = false;
 
   constructor() {
     this.data = this.getFallbackData();
@@ -296,9 +302,11 @@ class MeetingStore {
         });
         this.data.teams = teams;
         this.saveTeamsToStorage(teams);
+        this.hasLoadedTeams = true;
         this.isLoading = false;
         this.initialized = true;
         this.notify();
+        this.maybeAutoDeduplicateAttendance();
       },
       (error) => {
         handleFirestoreError(error, OperationType.LIST, "teams", { silent: true });
@@ -325,7 +333,9 @@ class MeetingStore {
         });
         this.data.members = members;
         this.saveMembersToStorage(members);
+        this.hasLoadedMembers = true;
         this.notify();
+        this.maybeAutoDeduplicateAttendance();
       },
       (error) => {
         handleFirestoreError(error, OperationType.LIST, "members", { silent: true });
@@ -348,7 +358,9 @@ class MeetingStore {
         });
         this.data.transactions = txs;
         this.saveTransactionsToStorage(txs);
+        this.hasLoadedTransactions = true;
         this.notify();
+        this.maybeAutoDeduplicateAttendance();
       },
       (error) => {
         handleFirestoreError(error, OperationType.LIST, "transactions", { silent: true });
@@ -386,7 +398,9 @@ class MeetingStore {
         );
         this.data.attendance = atts;
         this.saveAttendanceToStorage(atts);
+        this.hasLoadedAttendance = true;
         this.notify();
+        this.maybeAutoDeduplicateAttendance();
       },
       (error) => {
         handleFirestoreError(error, OperationType.LIST, "attendance", { silent: true });
@@ -531,10 +545,395 @@ class MeetingStore {
 
   private isAttendanceTransaction(tx: ScoreTransaction): boolean {
     const reason = tx.reason || "";
+    const id = tx.id || "";
     return (
+      id.startsWith("tx-qr-") ||
+      id.startsWith("tx-att-") ||
+      id.startsWith("tx-import-att-") ||
       reason.includes("تسجيل حضور") ||
       (tx.category === "حضور والتزام" && tx.targetType === "member" && reason.includes("حضور"))
     );
+  }
+
+  /**
+   * Canonical local calendar day key (YYYY-MM-DD) for an event.
+   */
+  public getEventDayKey(event?: EventSession): string {
+    if (event?.date && /^\d{4}-\d{2}-\d{2}$/.test(event.date.trim())) {
+      return event.date.trim();
+    }
+    if (event?.id) {
+      const m = event.id.match(/(\d{4}-\d{2}-\d{2})/);
+      if (m && m[1]) return m[1];
+    }
+    return formatLocalDate(new Date());
+  }
+
+  /**
+   * Canonical local calendar day key (YYYY-MM-DD) for an AttendanceRecord.
+   */
+  public getAttendanceDayKey(record: AttendanceRecord): string {
+    const evt = (this.data.events || []).find((e) => e.id === record.eventId);
+    if (evt?.date && /^\d{4}-\d{2}-\d{2}$/.test(evt.date.trim())) {
+      return evt.date.trim();
+    }
+    if (record.id) {
+      const idMatch = record.id.match(/^att-(\d{4}-\d{2}-\d{2})-/);
+      if (idMatch && idMatch[1]) return idMatch[1];
+    }
+    if (record.eventId) {
+      const evtIdMatch = record.eventId.match(/(\d{4}-\d{2}-\d{2})/);
+      if (evtIdMatch && evtIdMatch[1]) return evtIdMatch[1];
+    }
+    if (record.scannedAt) {
+      const d = new Date(record.scannedAt);
+      if (!isNaN(d.getTime())) return formatLocalDate(d);
+      if (/^\d{4}-\d{2}-\d{2}/.test(record.scannedAt)) return record.scannedAt.slice(0, 10);
+    }
+    return formatLocalDate(new Date());
+  }
+
+  /**
+   * Canonical local calendar day key (YYYY-MM-DD) for an attendance ScoreTransaction.
+   */
+  private getTransactionDayKey(tx: ScoreTransaction): string {
+    if (tx.id) {
+      const idMatch = tx.id.match(/^tx-(?:qr|att|qrbonus)-(\d{4}-\d{2}-\d{2})-/);
+      if (idMatch && idMatch[1]) return idMatch[1];
+    }
+    const reason = tx.reason || "";
+    const reasonDateMatch = reason.match(/(\d{4}-\d{2}-\d{2})/);
+    if (reasonDateMatch && reasonDateMatch[1]) return reasonDateMatch[1];
+
+    // Match against known event titles so UTC/local edge cases align with event.date
+    const matchedEvent = (this.data.events || []).find(
+      (e) => e.title && reason.includes(e.title) && e.date && /^\d{4}-\d{2}-\d{2}$/.test(e.date.trim())
+    );
+    if (matchedEvent?.date) return matchedEvent.date.trim();
+
+    if (tx.timestamp) {
+      const d = new Date(tx.timestamp);
+      if (!isNaN(d.getTime())) return formatLocalDate(d);
+      if (/^\d{4}-\d{2}-\d{2}/.test(tx.timestamp)) return tx.timestamp.slice(0, 10);
+    }
+    return formatLocalDate(new Date());
+  }
+
+  /**
+   * Checks whether a member already has ANY attendance record OR attendance score transaction on the given calendar day.
+   */
+  public hasMemberAttendedOnDay(memberId: string, dayKey: string): boolean {
+    const hasAtt = (this.data.attendance || []).some(
+      (a) => a.memberId === memberId && this.getAttendanceDayKey(a) === dayKey
+    );
+    if (hasAtt) return true;
+
+    const hasTx = (this.data.transactions || []).some(
+      (tx) =>
+        tx.targetType === "member" &&
+        tx.targetId === memberId &&
+        this.isAttendanceTransaction(tx) &&
+        this.getTransactionDayKey(tx) === dayKey
+    );
+    return hasTx;
+  }
+
+  /**
+   * Returns Set of member IDs who already attended on a given day (YYYY-MM-DD) across all events.
+   */
+  public getAttendedMemberIdsForDay(dayKey: string): Set<string> {
+    const ids = new Set<string>();
+    (this.data.attendance || []).forEach((a) => {
+      if (this.getAttendanceDayKey(a) === dayKey) {
+        ids.add(a.memberId);
+      }
+    });
+    (this.data.transactions || []).forEach((tx) => {
+      if (
+        tx.targetType === "member" &&
+        tx.targetId &&
+        this.isAttendanceTransaction(tx) &&
+        this.getTransactionDayKey(tx) === dayKey
+      ) {
+        ids.add(tx.targetId);
+      }
+    });
+    return ids;
+  }
+
+  /**
+   * Automatically scans once on app load (after snapshots settle) and cleans up
+   * any existing same-day duplicate attendance records/transactions in Firestore.
+   */
+  private maybeAutoDeduplicateAttendance(): void {
+    if (
+      this.hasRunAutoDedupe ||
+      !this.hasLoadedTeams ||
+      !this.hasLoadedMembers ||
+      !this.hasLoadedAttendance ||
+      !this.hasLoadedTransactions
+    ) {
+      return;
+    }
+
+    // Fast in-memory check before touching Firestore
+    const seenAtt = new Set<string>();
+    let hasDuplicate = false;
+    for (const a of this.data.attendance || []) {
+      const key = `${a.memberId}__${this.getAttendanceDayKey(a)}`;
+      if (seenAtt.has(key)) {
+        hasDuplicate = true;
+        break;
+      }
+      seenAtt.add(key);
+    }
+
+    if (!hasDuplicate) {
+      const seenTx = new Set<string>();
+      for (const tx of this.data.transactions || []) {
+        if (tx.targetType === "member" && tx.targetId && this.isAttendanceTransaction(tx)) {
+          const key = `${tx.targetId}__${this.getTransactionDayKey(tx)}`;
+          if (seenTx.has(key)) {
+            hasDuplicate = true;
+            break;
+          }
+          seenTx.add(key);
+        }
+      }
+    }
+
+    this.hasRunAutoDedupe = true;
+    if (hasDuplicate) {
+      this.deduplicateSameDayAttendance().catch((err) => {
+        console.warn("Auto deduplicate same-day attendance warning:", err);
+      });
+    }
+  }
+
+  /**
+   * Permanently removes all duplicate same-day attendance records and duplicate
+   * attendance transactions from Firestore (keeping only the earliest 1 per member per day),
+   * deducts duplicate points from affected members, and recalculates every team's total.
+   */
+  async deduplicateSameDayAttendance(executor?: SystemUser): Promise<{
+    success: boolean;
+    removedAttendanceCount: number;
+    removedTransactionsCount: number;
+    adjustedMembersCount: number;
+    totalPointsRemoved: number;
+    error?: string;
+  }> {
+    try {
+      // Load authoritative collections directly from Firestore so nothing is missed
+      let allAttendance: AttendanceRecord[] = [...(this.data.attendance || [])];
+      let allTransactions: ScoreTransaction[] = [...(this.data.transactions || [])];
+
+      try {
+        const [attSnap, txSnap] = await Promise.all([
+          getDocs(collection(db, "attendance")),
+          getDocs(collection(db, "transactions")),
+        ]);
+        const remoteAtt: AttendanceRecord[] = [];
+        attSnap.forEach((d) => remoteAtt.push({ ...d.data(), id: d.id } as AttendanceRecord));
+        const remoteTx: ScoreTransaction[] = [];
+        txSnap.forEach((d) => {
+          const raw = d.data() as any;
+          remoteTx.push({ ...raw, id: d.id, points: Number(raw.points) || 0 } as ScoreTransaction);
+        });
+        if (remoteAtt.length > 0 || allAttendance.length === 0) allAttendance = remoteAtt;
+        if (remoteTx.length > 0 || allTransactions.length === 0) allTransactions = remoteTx;
+      } catch {
+        // Fallback cleanly to live cached snapshots if offline
+      }
+
+      // 1. Group attendance records by (memberId + calendar day) and keep earliest scan only
+      const attGroups = new Map<string, AttendanceRecord[]>();
+      allAttendance.forEach((a) => {
+        if (!a.memberId) return;
+        const key = `${a.memberId}__${this.getAttendanceDayKey(a)}`;
+        const list = attGroups.get(key) || [];
+        list.push(a);
+        attGroups.set(key, list);
+      });
+
+      const duplicateAttIds = new Set<string>();
+      const duplicateAttList: AttendanceRecord[] = [];
+      attGroups.forEach((group) => {
+        if (group.length <= 1) return;
+        group.sort(
+          (a, b) => new Date(a.scannedAt || 0).getTime() - new Date(b.scannedAt || 0).getTime()
+        );
+        // Keep index 0 (earliest), mark the rest for permanent deletion
+        for (let i = 1; i < group.length; i++) {
+          duplicateAttIds.add(group[i].id);
+          duplicateAttList.push(group[i]);
+        }
+      });
+
+      // 2. Group attendance transactions by (targetId + calendar day) and keep earliest only
+      const txGroups = new Map<string, ScoreTransaction[]>();
+      allTransactions.forEach((tx) => {
+        if (tx.targetType !== "member" || !tx.targetId || !this.isAttendanceTransaction(tx)) return;
+        const key = `${tx.targetId}__${this.getTransactionDayKey(tx)}`;
+        const list = txGroups.get(key) || [];
+        list.push(tx);
+        txGroups.set(key, list);
+      });
+
+      const duplicateTxIds = new Set<string>();
+      const pointsToSubtractByMember = new Map<string, number>();
+      const txDedupedKeys = new Set<string>();
+
+      txGroups.forEach((group, key) => {
+        if (group.length <= 1) return;
+        group.sort(
+          (a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()
+        );
+        txDedupedKeys.add(key);
+        for (let i = 1; i < group.length; i++) {
+          const dupTx = group[i];
+          duplicateTxIds.add(dupTx.id);
+          const pts = Math.max(0, Number(dupTx.points) || 0);
+          if (pts > 0) {
+            pointsToSubtractByMember.set(
+              dupTx.targetId,
+              (pointsToSubtractByMember.get(dupTx.targetId) || 0) + pts
+            );
+          }
+        }
+      });
+
+      // Handle rare legacy case where duplicate attendance doc exists with no duplicate transaction
+      duplicateAttList.forEach((dupAtt) => {
+        const key = `${dupAtt.memberId}__${this.getAttendanceDayKey(dupAtt)}`;
+        if (!txDedupedKeys.has(key)) {
+          const hasAnyTxForKey = txGroups.has(key);
+          if (!hasAnyTxForKey && dupAtt.pointsAwarded > 0) {
+            pointsToSubtractByMember.set(
+              dupAtt.memberId,
+              (pointsToSubtractByMember.get(dupAtt.memberId) || 0) + dupAtt.pointsAwarded
+            );
+          }
+        }
+      });
+
+      if (duplicateAttIds.size === 0 && duplicateTxIds.size === 0) {
+        return {
+          success: true,
+          removedAttendanceCount: 0,
+          removedTransactionsCount: 0,
+          adjustedMembersCount: 0,
+          totalPointsRemoved: 0,
+        };
+      }
+
+      // 3. Apply updates to local memory immediately
+      this.data.attendance = allAttendance
+        .filter((a) => !duplicateAttIds.has(a.id))
+        .sort((a, b) => new Date(b.scannedAt || 0).getTime() - new Date(a.scannedAt || 0).getTime());
+      this.data.transactions = allTransactions
+        .filter((tx) => !duplicateTxIds.has(tx.id))
+        .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+
+      const writeOps: Array<
+        | { type: "delete"; ref: ReturnType<typeof doc> }
+        | { type: "set"; ref: ReturnType<typeof doc>; payload: Record<string, unknown> }
+      > = [];
+
+      duplicateAttIds.forEach((id) => {
+        writeOps.push({ type: "delete", ref: doc(db, "attendance", id) });
+      });
+      duplicateTxIds.forEach((id) => {
+        writeOps.push({ type: "delete", ref: doc(db, "transactions", id) });
+      });
+
+      let adjustedMembersCount = 0;
+      let totalPointsRemoved = 0;
+
+      pointsToSubtractByMember.forEach((ptsToSub, memberId) => {
+        const member = this.data.members.find((m) => m.id === memberId);
+        if (!member || ptsToSub <= 0) return;
+        const prevPts = Number(member.points) || 0;
+        const nextPts = Math.max(0, prevPts - ptsToSub);
+        member.points = nextPts;
+        adjustedMembersCount++;
+        totalPointsRemoved += Math.max(0, prevPts - nextPts);
+        writeOps.push({
+          type: "set",
+          ref: doc(db, "members", member.id),
+          payload: { points: nextPts },
+        });
+      });
+
+      // Recompute canonical scores for all teams
+      this.data.teams.forEach((team) => {
+        const canonical = this.computeTeamCanonicalPoints(team.id).totalPoints;
+        if (team.points !== canonical) {
+          team.points = canonical;
+          writeOps.push({
+            type: "set",
+            ref: doc(db, "teams", team.id),
+            payload: { points: canonical },
+          });
+        }
+      });
+
+      // Save caches & notify UI
+      this.saveAttendanceToStorage(this.data.attendance);
+      this.saveTransactionsToStorage(this.data.transactions);
+      this.saveMembersToStorage(this.data.members);
+      this.saveTeamsToStorage(this.data.teams);
+      this.notify();
+
+      // 4. Commit all Firestore deletes & updates in safe chunks of 400
+      const CHUNK_SIZE = 400;
+      for (let i = 0; i < writeOps.length; i += CHUNK_SIZE) {
+        const chunk = writeOps.slice(i, i + CHUNK_SIZE);
+        const batch = writeBatch(db);
+        chunk.forEach((op) => {
+          if (op.type === "delete") {
+            batch.delete(op.ref);
+          } else {
+            batch.set(op.ref, stripUndefined(op.payload), { merge: true });
+          }
+        });
+        await batch.commit();
+      }
+
+      if (executor) {
+        this.logAudit({
+          userId: executor.id,
+          userName: executor.name,
+          userRole: executor.role,
+          action: "attendance_scan",
+          targetType: "system",
+          targetId: "attendance_dedupe",
+          targetName: "تنظيف الحضور المكرر",
+          details: `حذف ${duplicateAttIds.size} سجل حضور مكرر و ${duplicateTxIds.size} معاملة حضور مكررة وتصحيح أرصدة ${adjustedMembersCount} عضو (-${totalPointsRemoved} XP)`,
+          status: "success",
+        }).catch(() => {});
+      }
+
+      this.triggerAutoSync();
+
+      return {
+        success: true,
+        removedAttendanceCount: duplicateAttIds.size,
+        removedTransactionsCount: duplicateTxIds.size,
+        adjustedMembersCount,
+        totalPointsRemoved,
+      };
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, "attendance/deduplicate", { silent: true });
+      return {
+        success: false,
+        removedAttendanceCount: 0,
+        removedTransactionsCount: 0,
+        adjustedMembersCount: 0,
+        totalPointsRemoved: 0,
+        error: "تعذر تنظيف سجلات الحضور المكررة في قاعدة البيانات، يرجى المحاولة مرة أخرى.",
+      };
+    }
   }
 
   /**
@@ -1864,159 +2263,196 @@ class MeetingStore {
     const team = this.data.teams.find((t) => t.id === member.teamId);
     const teamName = team ? team.name : "الفريق";
 
-    // 4. DUPLICATE CHECK: Prevent duplicate attendance or awarding points twice
+    // 4. STRICT ONCE-PER-DAY DUPLICATE CHECK + CONCURRENT SCAN MUTEX
     if (!this.data.attendance) this.data.attendance = [];
-    const alreadyAttended = this.data.attendance.find(
-      (a) => a.eventId === event.id && a.memberId === member.id
-    );
+    const dayKey = this.getEventDayKey(event);
+    const scanLockKey = `${member.id}__${dayKey}`;
 
-    if (alreadyAttended) {
+    if (this.pendingScanKeys.has(scanLockKey)) {
       return {
         success: false,
-        error: `تم تسجيل حضور (${member.name}) في هذا اللقاء مسبقاً! يمنع النظام تكرار احتساب النقاط مرتين في نفس اليوم.`,
+        error: `جاري معالجة مسح الـ QR للعضو (${member.name}) بالفعل... مسح الكود متاح مرة واحدة فقط في اليوم.`,
       };
     }
 
-    // 5. Individual Attendance Registration (Points awarded per scan for member & cumulative Friday XP for team)
-    let baseAttendancePoints = event.attendancePoints || 30;
-    let punctualityStatus = " (تسجيل حضور منتظم)";
-    const effectivePunctual = !!isPunctual;
+    this.pendingScanKeys.add(scanLockKey);
 
-    if (effectivePunctual && event.punctualityBonusPoints) {
-      baseAttendancePoints += event.punctualityBonusPoints;
-      punctualityStatus = " (تسجيل حضور مبكر + بونص الالتزام بالموعد ⏰)";
-    }
+    try {
+      // Check BOTH local attendance records AND attendance transactions for the SAME calendar day (across ALL events)
+      if (this.hasMemberAttendedOnDay(member.id, dayKey)) {
+        return {
+          success: false,
+          error: `تم تسجيل حضور (${member.name}) اليوم مسبقاً! مسح الـ QR متاح مرة واحدة فقط لكل فرد في اليوم.`,
+        };
+      }
 
-    // Optional Extra Manual Bonus from Servant / Admin
-    const extraBonus = Number(manualBonusPoints) || 0;
-    const pointsAwarded = baseAttendancePoints + (extraBonus > 0 ? extraBonus : 0);
+      // Deterministic Firestore document IDs make duplicate same-day records physically impossible
+      const deterministicAttId = `att-${dayKey}-${member.id}`;
+      const deterministicTxId = `tx-qr-${dayKey}-${member.id}`;
+      const deterministicBonusTxId = `tx-qrbonus-${dayKey}-${member.id}`;
 
-    // Update member points
-    member.points = (member.points || 0) + pointsAwarded;
+      // Verify against Firestore directly to prevent simultaneous multi-device double scans
+      try {
+        const remoteAttSnap = await getDoc(doc(db, "attendance", deterministicAttId));
+        if (remoteAttSnap.exists()) {
+          return {
+            success: false,
+            error: `تم تسجيل حضور (${member.name}) اليوم مسبقاً! مسح الـ QR متاح مرة واحدة فقط لكل فرد في اليوم.`,
+          };
+        }
+      } catch {
+        // Offline or transient read error: local same-day check + deterministic IDs still protect
+      }
 
-    // 6. Record Attendance Score Transaction (for member statement)
-    const nowIso = new Date().toISOString();
-    const reasonText = `تسجيل حضور تلقائي بالـ QR في [${event.title}]${punctualityStatus}`;
+      // 5. Individual Attendance Registration (Points awarded ONCE per day for member & cumulative Friday XP for team)
+      let baseAttendancePoints = event.attendancePoints || 30;
+      let punctualityStatus = " (تسجيل حضور منتظم)";
+      const effectivePunctual = !!isPunctual;
 
-    const tx: ScoreTransaction = {
-      id: "tx-qr-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      timestamp: nowIso,
-      targetType: "member",
-      targetId: member.id,
-      targetName: member.name,
-      teamId: member.teamId,
-      teamName: teamName,
-      points: baseAttendancePoints,
-      reason: reasonText,
-      category: "حضور والتزام",
-      notes: "",
-      executorId: executor.id,
-      executorName: executor.name,
-      executorRole: executor.role,
-    };
+      if (effectivePunctual && event.punctualityBonusPoints) {
+        baseAttendancePoints += event.punctualityBonusPoints;
+        punctualityStatus = " (تسجيل حضور مبكر + بونص الالتزام بالموعد ⏰)";
+      }
 
-    // If servant/admin entered an extra manual bonus during QR scan, save it as a separate
-    // bonus transaction so it ALSO adds immediately to the team's scoreboard total!
-    let extraBonusTx: ScoreTransaction | null = null;
-    if (extraBonus > 0) {
-      extraBonusTx = {
-        id: "tx-qrbonus-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      // Optional Extra Manual Bonus from Servant / Admin
+      const extraBonus = Number(manualBonusPoints) || 0;
+      const pointsAwarded = baseAttendancePoints + (extraBonus > 0 ? extraBonus : 0);
+
+      // Update member points
+      member.points = (member.points || 0) + pointsAwarded;
+
+      // 6. Record Attendance Score Transaction (deterministic ID per member per day)
+      const nowIso = new Date().toISOString();
+      const reasonText = `تسجيل حضور تلقائي بالـ QR في [${event.title}]${punctualityStatus}`;
+
+      const tx: ScoreTransaction = {
+        id: deterministicTxId,
         timestamp: nowIso,
         targetType: "member",
         targetId: member.id,
         targetName: member.name,
         teamId: member.teamId,
         teamName: teamName,
-        points: extraBonus,
-        reason: manualBonusReason?.trim() || `بونص تشجيعي مع حضور QR (${member.name})`,
-        category: "بونص حضور",
-        notes: `رُصد مع مسح QR في ${event.title}`,
+        points: baseAttendancePoints,
+        reason: reasonText,
+        category: "حضور والتزام",
+        notes: "",
         executorId: executor.id,
         executorName: executor.name,
         executorRole: executor.role,
       };
-    }
 
-    // 7. Record Attendance (Preserved permanently for EVERY QR scan!)
-    const attendanceRecord: AttendanceRecord = {
-      id: "att-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      eventId: event.id,
-      eventTitle: event.title,
-      memberId: member.id,
-      memberName: member.name,
-      teamId: member.teamId,
-      teamName: teamName,
-      scannedAt: nowIso,
-      scannedByUserId: executor.id,
-      scannedByUserName: executor.name,
-      pointsAwarded,
-      isPunctual: effectivePunctual,
-    };
-
-    this.data.attendance = [attendanceRecord, ...(this.data.attendance || [])];
-    this.data.transactions = extraBonusTx
-      ? [extraBonusTx, tx, ...this.data.transactions]
-      : [tx, ...this.data.transactions];
-
-    // Recalculate cumulative team score (all Fridays + all manual/member bonuses)
-    const syncedTeamPoints = team
-      ? this.computeTeamCanonicalPoints(team.id).totalPoints
-      : 0;
-    if (team) {
-      team.points = syncedTeamPoints;
-      this.saveTeamsToStorage(this.data.teams);
-    }
-
-    // Persist local backups immediately & notify UI before awaiting network commit
-    this.saveAttendanceToStorage(this.data.attendance);
-    this.saveTransactionsToStorage(this.data.transactions);
-    this.saveMembersToStorage(this.data.members);
-    this.notify();
-
-    // 8. Atomic Firestore Write Batch (Event + Attendance + Transactions + Member + Team)
-    try {
-      const batch = writeBatch(db);
-      batch.set(doc(db, "events", event.id), stripUndefined(event), { merge: true });
-      batch.set(doc(db, "attendance", attendanceRecord.id), stripUndefined(attendanceRecord));
-      batch.set(doc(db, "transactions", tx.id), stripUndefined(tx));
-      if (extraBonusTx) {
-        batch.set(doc(db, "transactions", extraBonusTx.id), stripUndefined(extraBonusTx));
+      // If servant/admin entered an extra manual bonus during QR scan, save it as a separate
+      // bonus transaction so it ALSO adds immediately to the team's scoreboard total!
+      let extraBonusTx: ScoreTransaction | null = null;
+      if (extraBonus > 0) {
+        extraBonusTx = {
+          id: deterministicBonusTxId,
+          timestamp: nowIso,
+          targetType: "member",
+          targetId: member.id,
+          targetName: member.name,
+          teamId: member.teamId,
+          teamName: teamName,
+          points: extraBonus,
+          reason: manualBonusReason?.trim() || `بونص تشجيعي مع حضور QR (${member.name})`,
+          category: "بونص حضور",
+          notes: `رُصد مع مسح QR في ${event.title}`,
+          executorId: executor.id,
+          executorName: executor.name,
+          executorRole: executor.role,
+        };
       }
-      batch.set(doc(db, "members", member.id), { points: member.points }, { merge: true });
-      if (team) {
-        batch.set(doc(db, "teams", team.id), { points: syncedTeamPoints }, { merge: true });
-      }
-      await batch.commit();
-    } catch (e) {
-      handleFirestoreError(e, OperationType.WRITE, `attendance/${attendanceRecord.id}`, { silent: true });
-      return {
-        success: false,
-        error: "حدث خطأ أثناء حفظ مسح الـ QR في قاعدة البيانات، يرجى المحاولة مرة أخرى.",
+
+      // 7. Record Attendance (Deterministic ID — strictly ONE scan per person per day!)
+      const attendanceRecord: AttendanceRecord = {
+        id: deterministicAttId,
+        eventId: event.id,
+        eventTitle: event.title,
+        memberId: member.id,
+        memberName: member.name,
+        teamId: member.teamId,
+        teamName: teamName,
+        scannedAt: nowIso,
+        scannedByUserId: executor.id,
+        scannedByUserName: executor.name,
+        pointsAwarded,
+        isPunctual: effectivePunctual,
       };
+
+      this.data.attendance = [
+        attendanceRecord,
+        ...(this.data.attendance || []).filter((a) => a.id !== deterministicAttId),
+      ];
+      const filteredTxs = this.data.transactions.filter(
+        (t) => t.id !== deterministicTxId && (!extraBonusTx || t.id !== deterministicBonusTxId)
+      );
+      this.data.transactions = extraBonusTx
+        ? [extraBonusTx, tx, ...filteredTxs]
+        : [tx, ...filteredTxs];
+
+      // Recalculate cumulative team score (all Fridays + all manual/member bonuses)
+      const syncedTeamPoints = team
+        ? this.computeTeamCanonicalPoints(team.id).totalPoints
+        : 0;
+      if (team) {
+        team.points = syncedTeamPoints;
+        this.saveTeamsToStorage(this.data.teams);
+      }
+
+      // Persist local backups immediately & notify UI before awaiting network commit
+      this.saveAttendanceToStorage(this.data.attendance);
+      this.saveTransactionsToStorage(this.data.transactions);
+      this.saveMembersToStorage(this.data.members);
+      this.notify();
+
+      // 8. Atomic Firestore Write Batch (Event + Attendance + Transactions + Member + Team)
+      try {
+        const batch = writeBatch(db);
+        batch.set(doc(db, "events", event.id), stripUndefined(event), { merge: true });
+        batch.set(doc(db, "attendance", attendanceRecord.id), stripUndefined(attendanceRecord));
+        batch.set(doc(db, "transactions", tx.id), stripUndefined(tx));
+        if (extraBonusTx) {
+          batch.set(doc(db, "transactions", extraBonusTx.id), stripUndefined(extraBonusTx));
+        }
+        batch.set(doc(db, "members", member.id), { points: member.points }, { merge: true });
+        if (team) {
+          batch.set(doc(db, "teams", team.id), { points: syncedTeamPoints }, { merge: true });
+        }
+        await batch.commit();
+      } catch (e) {
+        handleFirestoreError(e, OperationType.WRITE, `attendance/${attendanceRecord.id}`, { silent: true });
+        return {
+          success: false,
+          error: "حدث خطأ أثناء حفظ مسح الـ QR في قاعدة البيانات، يرجى المحاولة مرة أخرى.",
+        };
+      }
+
+      // 9. Log Audit under Servant / Admin name
+      this.logAudit({
+        userId: executor.id,
+        userName: executor.name,
+        userRole: executor.role,
+        action: "attendance_scan",
+        targetType: "member",
+        targetId: member.id,
+        targetName: member.name,
+        details: `تسجيل حضور عبر QR للعضو [${member.name}] في [${event.title}] بواسطة الخادم [${executor.name}]. +${pointsAwarded} XP`,
+        status: "success",
+      }).catch(() => {});
+
+      this.triggerAutoSync();
+
+      return {
+        success: true,
+        record: attendanceRecord,
+        pointsAwarded,
+        member,
+        event,
+      };
+    } finally {
+      this.pendingScanKeys.delete(scanLockKey);
     }
-
-    // 9. Log Audit under Servant / Admin name
-    this.logAudit({
-      userId: executor.id,
-      userName: executor.name,
-      userRole: executor.role,
-      action: "attendance_scan",
-      targetType: "member",
-      targetId: member.id,
-      targetName: member.name,
-      details: `تسجيل حضور عبر QR للعضو [${member.name}] في [${event.title}] بواسطة الخادم [${executor.name}]. +${pointsAwarded} XP`,
-      status: "success",
-    }).catch(() => {});
-
-    this.triggerAutoSync();
-
-    return {
-      success: true,
-      record: attendanceRecord,
-      pointsAwarded,
-      member,
-      event,
-    };
   }
 
   getAttendanceRecords(eventId?: string): AttendanceRecord[] {
@@ -2088,148 +2524,119 @@ class MeetingStore {
     const teamName = team ? team.name : "الفريق";
 
     if (!this.data.attendance) this.data.attendance = [];
-    const existingIndex = this.data.attendance.findIndex(
-      (a) => a.eventId === event.id && a.memberId === member.id
-    );
+    const dayKey = this.getEventDayKey(event);
+    const scanLockKey = `${member.id}__${dayKey}`;
+    const deterministicAttId = `att-${dayKey}-${member.id}`;
+    const deterministicTxId = `tx-qr-${dayKey}-${member.id}`;
 
-    const batch = writeBatch(db);
+    if (this.pendingScanKeys.has(scanLockKey)) {
+      return { success: false, error: `جاري تحديث حضور (${member.name}) بالفعل...` };
+    }
+    this.pendingScanKeys.add(scanLockKey);
 
-    if (isPresent) {
-      if (existingIndex !== -1) {
-        const existing = this.data.attendance[existingIndex];
-        if (existing.isPunctual !== isPunctual) {
-          const delta = isPunctual
-            ? (event.punctualityBonusPoints || 15)
-            : -(event.punctualityBonusPoints || 15);
-          existing.isPunctual = isPunctual;
-          existing.pointsAwarded = Math.max(0, existing.pointsAwarded + delta);
-          member.points = Math.max(0, (member.points || 0) + delta);
-          const syncedTeamPoints = team
-            ? this.computeTeamCanonicalPoints(team.id).totalPoints
-            : 0;
-          if (team) {
-            team.points = syncedTeamPoints;
-            batch.set(doc(db, "teams", team.id), { points: syncedTeamPoints }, { merge: true });
+    try {
+      const existingIndex = this.data.attendance.findIndex(
+        (a) =>
+          (a.eventId === event.id && a.memberId === member.id) ||
+          (a.memberId === member.id && this.getAttendanceDayKey(a) === dayKey)
+      );
+
+      const batch = writeBatch(db);
+
+      if (isPresent) {
+        if (existingIndex !== -1) {
+          const existing = this.data.attendance[existingIndex];
+          if (existing.eventId !== event.id) {
+            return {
+              success: false,
+              error: `تم تسجيل حضور (${member.name}) اليوم مسبقاً! لا يمكن احتساب الحضور مرتين في نفس اليوم.`,
+            };
           }
-          batch.set(doc(db, "attendance", existing.id), stripUndefined(existing), { merge: true });
-          batch.set(doc(db, "members", member.id), { points: member.points }, { merge: true });
-          this.saveAttendanceToStorage(this.data.attendance);
-          this.saveMembersToStorage(this.data.members);
-          this.notify();
-          try {
-            await batch.commit();
-          } catch (e) {
-            handleFirestoreError(e, OperationType.WRITE, `attendance/${existing.id}`, { silent: true });
+          if (existing.isPunctual !== isPunctual) {
+            const delta = isPunctual
+              ? (event.punctualityBonusPoints || 15)
+              : -(event.punctualityBonusPoints || 15);
+            existing.isPunctual = isPunctual;
+            existing.pointsAwarded = Math.max(0, existing.pointsAwarded + delta);
+            member.points = Math.max(0, (member.points || 0) + delta);
+            const syncedTeamPoints = team
+              ? this.computeTeamCanonicalPoints(team.id).totalPoints
+              : 0;
+            if (team) {
+              team.points = syncedTeamPoints;
+              batch.set(doc(db, "teams", team.id), { points: syncedTeamPoints }, { merge: true });
+            }
+            batch.set(doc(db, "attendance", existing.id), stripUndefined(existing), { merge: true });
+            batch.set(doc(db, "members", member.id), { points: member.points }, { merge: true });
+            this.saveAttendanceToStorage(this.data.attendance);
+            this.saveMembersToStorage(this.data.members);
+            this.notify();
+            try {
+              await batch.commit();
+            } catch (e) {
+              handleFirestoreError(e, OperationType.WRITE, `attendance/${existing.id}`, { silent: true });
+            }
+            this.triggerAutoSync();
           }
-          this.triggerAutoSync();
+          return { success: true, record: existing };
         }
-        return { success: true, record: existing };
-      }
 
-      let pointsAwarded = event.attendancePoints || 30;
-      if (isPunctual && event.punctualityBonusPoints) {
-        pointsAwarded += event.punctualityBonusPoints;
-      }
-
-      member.points = (member.points || 0) + pointsAwarded;
-
-      const nowIso = new Date().toISOString();
-      const tx: ScoreTransaction = {
-        id: "tx-att-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-        timestamp: nowIso,
-        targetType: "member",
-        targetId: member.id,
-        targetName: member.name,
-        teamId: member.teamId,
-        teamName: teamName,
-        points: pointsAwarded,
-        reason: `تسجيل حضور: ${event.title}${isPunctual ? " (في الموعد)" : ""}`,
-        category: "حضور والتزام",
-        notes: "",
-        executorId: executor.id,
-        executorName: executor.name,
-        executorRole: executor.role,
-      };
-
-      const record: AttendanceRecord = {
-        id: "att-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-        eventId: event.id,
-        eventTitle: event.title,
-        memberId: member.id,
-        memberName: member.name,
-        teamId: member.teamId,
-        teamName: teamName,
-        scannedAt: nowIso,
-        scannedByUserId: executor.id,
-        scannedByUserName: executor.name,
-        pointsAwarded,
-        isPunctual,
-      };
-
-      this.data.attendance = [record, ...this.data.attendance];
-      this.data.transactions = [tx, ...this.data.transactions];
-
-      const syncedTeamPoints = team
-        ? this.computeTeamCanonicalPoints(team.id).totalPoints
-        : 0;
-      if (team) {
-        team.points = syncedTeamPoints;
-        this.saveTeamsToStorage(this.data.teams);
-        batch.set(doc(db, "teams", team.id), { points: syncedTeamPoints }, { merge: true });
-      }
-
-      this.saveAttendanceToStorage(this.data.attendance);
-      this.saveTransactionsToStorage(this.data.transactions);
-      this.saveMembersToStorage(this.data.members);
-      this.notify();
-
-      batch.set(doc(db, "events", event.id), stripUndefined(event), { merge: true });
-      batch.set(doc(db, "attendance", record.id), stripUndefined(record));
-      batch.set(doc(db, "transactions", tx.id), stripUndefined(tx));
-      batch.set(doc(db, "members", member.id), { points: member.points }, { merge: true });
-
-      try {
-        await batch.commit();
-      } catch (e) {
-        handleFirestoreError(e, OperationType.WRITE, `attendance/${record.id}`, { silent: true });
-        return { success: false, error: "تعذر حفظ الحضور في قاعدة البيانات" };
-      }
-
-      this.logAudit({
-        userId: executor.id,
-        userName: executor.name,
-        userRole: executor.role,
-        action: "attendance_scan",
-        targetType: "member",
-        targetId: member.id,
-        targetName: member.name,
-        details: `تسجيل حضور يدوي للعضو [${member.name}] في [${event.title}]. +${pointsAwarded} XP`,
-        status: "success",
-      }).catch(() => {});
-
-      this.triggerAutoSync();
-      return { success: true, record };
-    } else {
-      if (existingIndex !== -1) {
-        const existing = this.data.attendance[existingIndex];
-        const pts = existing.pointsAwarded || 0;
-        member.points = Math.max(0, (member.points || 0) - pts);
-
-        this.data.attendance.splice(existingIndex, 1);
-
-        // Also remove the matching attendance transaction for this event+member if present
-        const matchingAttTx = this.data.transactions.find(
-          (t) =>
-            t.targetType === "member" &&
-            t.targetId === member.id &&
-            this.isAttendanceTransaction(t) &&
-            (t.reason.includes(event.title) ||
-              Math.abs(new Date(t.timestamp).getTime() - new Date(existing.scannedAt).getTime()) < 60000)
-        );
-        if (matchingAttTx) {
-          this.data.transactions = this.data.transactions.filter((t) => t.id !== matchingAttTx.id);
-          batch.delete(doc(db, "transactions", matchingAttTx.id));
+        // Strict same-day guard across attendance + transactions
+        if (this.hasMemberAttendedOnDay(member.id, dayKey)) {
+          return {
+            success: false,
+            error: `تم تسجيل حضور (${member.name}) اليوم مسبقاً! لا يمكن احتساب الحضور مرتين في نفس اليوم.`,
+          };
         }
+
+        let pointsAwarded = event.attendancePoints || 30;
+        if (isPunctual && event.punctualityBonusPoints) {
+          pointsAwarded += event.punctualityBonusPoints;
+        }
+
+        member.points = (member.points || 0) + pointsAwarded;
+
+        const nowIso = new Date().toISOString();
+        const tx: ScoreTransaction = {
+          id: deterministicTxId,
+          timestamp: nowIso,
+          targetType: "member",
+          targetId: member.id,
+          targetName: member.name,
+          teamId: member.teamId,
+          teamName: teamName,
+          points: pointsAwarded,
+          reason: `تسجيل حضور: ${event.title}${isPunctual ? " (في الموعد)" : ""}`,
+          category: "حضور والتزام",
+          notes: "",
+          executorId: executor.id,
+          executorName: executor.name,
+          executorRole: executor.role,
+        };
+
+        const record: AttendanceRecord = {
+          id: deterministicAttId,
+          eventId: event.id,
+          eventTitle: event.title,
+          memberId: member.id,
+          memberName: member.name,
+          teamId: member.teamId,
+          teamName: teamName,
+          scannedAt: nowIso,
+          scannedByUserId: executor.id,
+          scannedByUserName: executor.name,
+          pointsAwarded,
+          isPunctual,
+        };
+
+        this.data.attendance = [
+          record,
+          ...this.data.attendance.filter((a) => a.id !== deterministicAttId),
+        ];
+        this.data.transactions = [
+          tx,
+          ...this.data.transactions.filter((t) => t.id !== deterministicTxId),
+        ];
 
         const syncedTeamPoints = team
           ? this.computeTeamCanonicalPoints(team.id).totalPoints
@@ -2240,18 +2647,21 @@ class MeetingStore {
           batch.set(doc(db, "teams", team.id), { points: syncedTeamPoints }, { merge: true });
         }
 
-        batch.delete(doc(db, "attendance", existing.id));
-        batch.set(doc(db, "members", member.id), { points: member.points }, { merge: true });
-
         this.saveAttendanceToStorage(this.data.attendance);
         this.saveTransactionsToStorage(this.data.transactions);
         this.saveMembersToStorage(this.data.members);
         this.notify();
 
+        batch.set(doc(db, "events", event.id), stripUndefined(event), { merge: true });
+        batch.set(doc(db, "attendance", record.id), stripUndefined(record));
+        batch.set(doc(db, "transactions", tx.id), stripUndefined(tx));
+        batch.set(doc(db, "members", member.id), { points: member.points }, { merge: true });
+
         try {
           await batch.commit();
         } catch (e) {
-          handleFirestoreError(e, OperationType.DELETE, `attendance/${existing.id}`, { silent: true });
+          handleFirestoreError(e, OperationType.WRITE, `attendance/${record.id}`, { silent: true });
+          return { success: false, error: "تعذر حفظ الحضور في قاعدة البيانات" };
         }
 
         this.logAudit({
@@ -2262,13 +2672,78 @@ class MeetingStore {
           targetType: "member",
           targetId: member.id,
           targetName: member.name,
-          details: `إلغاء تسجيل حضور العضو [${member.name}] واسترجاع ${pts} XP`,
+          details: `تسجيل حضور يدوي للعضو [${member.name}] في [${event.title}]. +${pointsAwarded} XP`,
           status: "success",
         }).catch(() => {});
 
         this.triggerAutoSync();
+        return { success: true, record };
+      } else {
+        if (existingIndex !== -1) {
+          const existing = this.data.attendance[existingIndex];
+          const pts = existing.pointsAwarded || 0;
+          member.points = Math.max(0, (member.points || 0) - pts);
+
+          this.data.attendance.splice(existingIndex, 1);
+
+          // Also remove matching attendance transaction(s) for this member on the same day
+          const matchingAttTxs = this.data.transactions.filter(
+            (t) =>
+              t.id === deterministicTxId ||
+              (t.targetType === "member" &&
+                t.targetId === member.id &&
+                this.isAttendanceTransaction(t) &&
+                (this.getTransactionDayKey(t) === dayKey ||
+                  t.reason.includes(event.title) ||
+                  Math.abs(new Date(t.timestamp).getTime() - new Date(existing.scannedAt).getTime()) < 60000))
+          );
+          if (matchingAttTxs.length > 0) {
+            const removeTxIds = new Set(matchingAttTxs.map((t) => t.id));
+            this.data.transactions = this.data.transactions.filter((t) => !removeTxIds.has(t.id));
+            matchingAttTxs.forEach((t) => batch.delete(doc(db, "transactions", t.id)));
+          }
+
+          const syncedTeamPoints = team
+            ? this.computeTeamCanonicalPoints(team.id).totalPoints
+            : 0;
+          if (team) {
+            team.points = syncedTeamPoints;
+            this.saveTeamsToStorage(this.data.teams);
+            batch.set(doc(db, "teams", team.id), { points: syncedTeamPoints }, { merge: true });
+          }
+
+          batch.delete(doc(db, "attendance", existing.id));
+          batch.set(doc(db, "members", member.id), { points: member.points }, { merge: true });
+
+          this.saveAttendanceToStorage(this.data.attendance);
+          this.saveTransactionsToStorage(this.data.transactions);
+          this.saveMembersToStorage(this.data.members);
+          this.notify();
+
+          try {
+            await batch.commit();
+          } catch (e) {
+            handleFirestoreError(e, OperationType.DELETE, `attendance/${existing.id}`, { silent: true });
+          }
+
+          this.logAudit({
+            userId: executor.id,
+            userName: executor.name,
+            userRole: executor.role,
+            action: "attendance_scan",
+            targetType: "member",
+            targetId: member.id,
+            targetName: member.name,
+            details: `إلغاء تسجيل حضور العضو [${member.name}] واسترجاع ${pts} XP`,
+            status: "success",
+          }).catch(() => {});
+
+          this.triggerAutoSync();
+        }
+        return { success: true };
       }
-      return { success: true };
+    } finally {
+      this.pendingScanKeys.delete(scanLockKey);
     }
   }
 
@@ -2862,7 +3337,6 @@ class MeetingStore {
       { name: "مارفي راي", team: "الكتاب المقدس", time: "2026-11-06T18:27:00Z", scannedBy: "ايناس صابر باشا" },
       { name: "لوجي عصام", team: "الكتاب المقدس", time: "2026-11-06T18:28:00Z", scannedBy: "ايناس صابر باشا" },
       { name: "مايفيل ماجد", team: "الكتاب المقدس", time: "2026-11-06T18:29:00Z", scannedBy: "ايناس صابر باشا" },
-      { name: "جوليانا هاني ثابت", team: "الكتاب المقدس", time: "2026-11-06T18:30:00Z", scannedBy: "ايناس صابر باشا" },
       { name: "مايفيل ماجد منير", team: "الكتاب المقدس", time: "2026-11-06T18:31:00Z", scannedBy: "ايناس صابر باشا" },
       { name: "انطون زاخر نعيم", team: "الكتاب المقدس", time: "2026-11-06T18:32:00Z", scannedBy: "ايناس صابر باشا" },
       { name: "ماريان روماني", team: "الكتاب المقدس", time: "2026-11-06T18:33:00Z", scannedBy: "ايناس صابر باشا" },
@@ -2879,14 +3353,14 @@ class MeetingStore {
       { name: "كيرلس اسكندر ظريف", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:44:00Z", scannedBy: "مريم اشرف حلمى" },
       { name: "امجد مجدى فكره", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:45:00Z", scannedBy: "مريم اشرف حلمى" },
       { name: "مينا تواضروس", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:46:00Z", scannedBy: "مريم اشرف حلمى" },
-      { name: "مايكل عماد", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:47:00Z", scannedBy: "مريم اشرف حلمى" },
       { name: "كيرلس عيسى", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:48:00Z", scannedBy: "مريم اشرف حلمى" },
       { name: "فيلوباتير سامح", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:49:00Z", scannedBy: "مريم اشرف حلمى" },
       { name: "مارتينا اشرف حلمى", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:50:00Z", scannedBy: "مريم اشرف حلمى" },
       { name: "مريم اشرف حلمى", team: "تاريخ الكنيسة والأبائيات", time: "2026-11-06T18:51:00Z", scannedBy: "مريم اشرف حلمى" },
     ];
 
-    const event = this.ensureFridayMeetingEvent("2026-11-06");
+    const importDayKey = "2026-11-06";
+    const event = this.ensureFridayMeetingEvent(importDayKey);
     batch.set(doc(db, "events", event.id), stripUndefined(event), { merge: true });
 
     attendeesList.forEach((att) => {
@@ -2910,18 +3384,18 @@ class MeetingStore {
         batch.set(doc(db, "members", member.id), stripUndefined(member), { merge: true });
       }
 
-      // Skip if attendance already exists for this Friday + member
-      const alreadyExists = (this.data.attendance || []).some(
-        (a) => a.eventId === event.id && a.memberId === member!.id
-      );
-      if (alreadyExists) return;
+      // Skip if attendance already exists on the same calendar day for this member
+      if (this.hasMemberAttendedOnDay(member.id, importDayKey)) return;
 
       const pointsAwarded = 37;
       member.points = (member.points || 0) + pointsAwarded;
       batch.set(doc(db, "members", member.id), { points: member.points }, { merge: true });
 
+      const deterministicAttId = `att-${importDayKey}-${member.id}`;
+      const deterministicTxId = `tx-qr-${importDayKey}-${member.id}`;
+
       const tx: ScoreTransaction = {
-        id: "tx-import-att-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        id: deterministicTxId,
         timestamp: att.time,
         targetType: "member",
         targetId: member.id,
@@ -2939,7 +3413,7 @@ class MeetingStore {
       batch.set(doc(db, "transactions", tx.id), stripUndefined(tx));
 
       const attRecord: AttendanceRecord = {
-        id: "att-import-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        id: deterministicAttId,
         eventId: event.id,
         eventTitle: event.title,
         memberId: member.id,

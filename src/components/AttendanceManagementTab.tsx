@@ -459,6 +459,32 @@ export const AttendanceManagementTab: React.FC<AttendanceManagementTabProps> = (
               type="button"
               onClick={async () => {
                 sounds.playTap();
+                const res = await meetingStore.deduplicateSameDayAttendance(currentUser);
+                if (res.success) {
+                  sounds.playVictory();
+                  if (res.removedAttendanceCount === 0 && res.removedTransactionsCount === 0) {
+                    showToast("سجلات الحضور والمعاملات نظيفة تماماً ولا يوجد أي حضور مكرر في نفس اليوم ✅");
+                  } else {
+                    showToast(
+                      `تم حذف ${res.removedAttendanceCount} سجل حضور مكرر و ${res.removedTransactionsCount} معاملة مكررة وتصحيح أرصدة ${res.adjustedMembersCount} عضو (-${res.totalPointsRemoved} XP) بنجاح! 🧹`
+                    );
+                  }
+                } else {
+                  sounds.playClose();
+                  showToast(res.error || "فشل في تنظيف الحضور المكرر", "error");
+                }
+              }}
+              className="px-3.5 py-2.5 rounded-2xl bg-rose-600/90 hover:bg-rose-500 text-white font-black text-xs sm:text-sm shadow-md active:scale-95 transition-all cursor-pointer flex items-center gap-2 border border-rose-400/40"
+              title="حذف أي تسجيل حضور مكرر لنفس الشخص في نفس اليوم وتصحيح النقاط تلقائياً"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>تنظيف الحضور المكرر 🧹</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={async () => {
+                sounds.playTap();
                 const res = await meetingStore.recalculateTeamsByAttendanceOnly(currentUser);
                 if (res.success) {
                   sounds.playVictory();
